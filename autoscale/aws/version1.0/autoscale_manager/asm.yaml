@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >-
+  Cisco NGFWv AWS autoscale template deploys:
+    [Lambda Role & Policy, Dynamo DB table, SNS Topic, Serverless Lambda function, Lambda function log group]
+Parameters:
+  ASMname:
+    Description: AutoScale Manager(ASM) Name Prefix
+    Type: String
+    MaxLength: 18
+    ConstraintDescription: must be a string with Maximum length 18
+  ActionEmail:
+    Description: >-
+      Email address to which Autoscale Events Email needs to be sent to.
+    Type: String
+    Default: admin@mynetwork.com
+    AllowedPattern: '^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+  ASMpodNo:
+    Description: >-
+      AutoScale Manager Pod Number, It should be at least 1 numerical digit but not more than 5.
+        Example - 'NGFW-AS-Manager-1'
+    Type: String
+    AllowedPattern: '^\d{1,5}$'
+    ConstraintDescription: must be a numerical string matching '^\d{1,5}$'
+  FTDvGroupName:
+    Description: Cisco NGFWv Autoscale Group Name (To be deployed),
+    Type: String
+    MaxLength: 24
+    ConstraintDescription: must be a string with Maximum length 24
+  LayerArn:
+    Description: Lambda layer for lambda functions
+    Type: String
+    AllowedPattern: '^arn:aws:lambda:.*:.*:layer:.*:\d*$'
+    ConstraintDescription: must be a ARN string matching '^arn:aws:lambda:.*:.*:layer:.*:\d*$'
+  S3BktName:
+    Description: You should be the owner of the bucket
+    Type: String
+    AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: must be a valid S3 bucket name
+  ConfigJSONname:
+    Description: User defined rules in JSON, must be available in the above mentioned s3 bucket
+    Type: String
+    AllowedPattern: '.*\.json'
+    ConstraintDescription: must be a <filename>.json
+  DisableDebug:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable/Disable debug logs, default is debug enabled.
+  KmsArn:
+    Description: >-
+      [Conditional] ARN of an existing KMS (AWS KMS key to encrypt at rest), If specified, FMC & FTD Passwords below should be encrypted
+      Password. The Password encryption should be done only using the specified ARN.
+      Generating Encrypted Password Ex: " aws kms encrypt --key-id <KMS ARN> --plaintext <password> ", Please used such generated password in below fields.
+    Type: String
+  fmcServer:
+    Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
+    Type: String
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
+  fmcUsername:
+    Description: >-
+      Unique Internal user for AutoScale Manager automation tasks on FMC,
+        User should have roles system provided 'Network Admin' and 'Maintenance User' or more.
+        Refer 'Firepower Management Center Configuration Guide'
+    Type: String
+  fmcPassword:
+    Description: >-
+      Please make sure you type correct password (Wrong password will result in failure in automation).
+      If KMS ARN is specified above, please provide encrypted password.
+    NoEcho: true
+    Type: String
+  ngfwPassword:
+    Description: >-
+      All NGFW instances come up with default password, which is in Userdata field of Launch Template(Autoscale Group).
+      The same default password should also be available in Configuration.json file. If this parameter field is different
+      from default password, this will be applied upon first boot.
+      Any changes to this field post deployment will not propagate to existing VMs.
+    NoEcho: true
+    Type: String
+  TgHealthPort:
+    Description: >-
+      This port is used by Target group for health probes, Health probes arriving at this port on NGFWv will be routed to AWS Metadata server.
+        Autoscale Manager will create a NAT rule, from this port to HTTP port with dest IP as AWS Metadata server
+    Type: String
+    AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
+    ConstraintDescription: must be a valid TCP port
+Conditions:
+  ShouldEncrypt: !Not
+    - !Equals
+      - ''
+      - !Ref KmsArn
+  EventEmail: !Not
+    - !Equals
+      - ''
+      - !Ref ActionEmail
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Autoscale Manager Configuration
+        Parameters:
+          - ASMname
+          - ASMpodNo
+          - ActionEmail
+          - FTDvGroupName
+          - LayerArn
+          - S3BktName
+          - ConfigJSONname
+          - DisableDebug
+      -
+        Label:
+          default: FMCv automation Configuration
+        Parameters:
+          - KmsArn
+          - fmcServer
+          - fmcUsername
+          - fmcPassword
+          - ngfwPassword
+          - TgHealthPort
+    ParameterLabels:
+      ASMname:
+        default: Autoscale Manager Name
+      ASMpodNo:
+        default: AutoScale Manager Pod Number
+      ActionEmail:
+        default: Autoscale Email Notification
+      FTDvGroupName:
+        default: Autoscale Group Name
+      LayerArn:
+        default: Autoscale Manager Lambda layer ARN
+      S3BktName:
+        default: S3 bucket name
+      ConfigJSONname:
+        default: Configuration JSON File
+      DisableDebug:
+        default: Disable debug logs
+      KmsArn:
+        default: KMS Master Key ARN
+      fmcServer:
+        default: FMC host IP address
+      fmcUsername:
+        default: FMC Username
+      fmcPassword:
+        default: FMC Password
+      ngfwPassword:
+        default: NGFWv Password
+      TgHealthPort:
+        default: Target Group Health Port
+Resources:
+  ASGLambdaRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Delete
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Path: '/'
+      RoleName: !Join ['-', [ !Ref 'AWS::Region', !Ref ASMname, !Ref ASMpodNo, 'execution-role']]
+  ASGLambdaPolicy:
+    DependsOn: ASGLambdaRole
+    Type: AWS::IAM::Policy
+    DeletionPolicy: Delete
+    Properties:
+      PolicyName: !Join ['-', [ !Ref 'AWS::Region', !Ref ASMname, !Ref ASMpodNo, 'execution-policy']]
+      Roles: [!Ref ASGLambdaRole]
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Resource: '*'
+            Action:
+              - logs:*
+              - ec2:*
+              - elasticloadbalancing:*
+              - autoscaling:*
+              - events:*
+              - s3:*
+              - cloudwatch:*
+              - sns:*
+              - ssm:*
+              - lambda:*
+              - kms:Decrypt
+  AutoscaleManager:
+    Type: AWS::Serverless::Function
+    DependsOn: ASmanagerTopic
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: !Join ['-', [!Ref ASMname, !Ref ASMpodNo, 'manager-lambda'] ]
+      Handler: manager.lambda_handler
+      Runtime: python3.6
+      ReservedConcurrentExecutions: 1
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: autoscale_manager.zip
+      Description: ''
+      MemorySize: 128
+      Timeout: 900
+      KmsKeyArn: !Ref KmsArn
+      Environment:
+        Variables:
+          DEBUG_DISABLED: !Ref DisableDebug
+          KMS_ENC: !If
+            - ShouldEncrypt
+            - !Ref KmsArn
+            - !Ref 'AWS::NoValue'
+          ASG_NAME: !Ref FTDvGroupName
+          CONFIG_JSON_FILE_NAME: !Ref ConfigJSONname
+          FMC_SERVER: !Ref fmcServer
+          FMC_USERNAME: !Ref fmcUsername
+          FMC_PASSWORD: !Ref fmcPassword
+          FTD_PASSWORD: !Ref ngfwPassword
+          TG_HEALTH_PORT: !Ref TgHealthPort
+          AS_MANAGER_TOPIC: !Ref ASmanagerTopic
+      Role: !GetAtt ASGLambdaRole.Arn
+      Events:
+        SNS1:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: ASmanagerTopic
+      Layers:
+        - !Ref LayerArn
+  ASmanagerTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Join ['-', [!Ref ASMname, !Ref ASMpodNo, 'autoscale-manager-topic'] ]
+  ASmanagerTopicSubscription:
+    Condition: EventEmail
+    DependsOn: ASmanagerTopic
+    DeletionPolicy: Delete
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref ActionEmail
+      Protocol: email
+      TopicArn: !Ref ASmanagerTopic
+  CloudWatchEvent1:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref ASMname, !Ref ASMpodNo, 'notify-instance-launch'] ]
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance Launch Successful
+        detail:
+          AutoScalingGroupName:
+            - !Ref FTDvGroupName
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt AutoscaleManager.Arn
+      State: ENABLED
+  CloudWatchEvent1InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: CloudWatchEvent1
+    Properties:
+      FunctionName: !Ref AutoscaleManager
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchEvent1.Arn
+  CloudWatchEvent2:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref ASMname, !Ref ASMpodNo, 'notify-instance-termination'] ]
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance Terminate Successful
+        detail:
+          AutoScalingGroupName:
+            - !Ref FTDvGroupName
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt AutoscaleManager.Arn
+      State: ENABLED
+  CloudWatchEvent2InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: CloudWatchEvent2
+    Properties:
+      FunctionName: !Ref AutoscaleManager
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchEvent2.Arn
+  AutoscaleManagerLogGrp:
+    DependsOn: AutoscaleManager
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref AutoscaleManager]]
+Outputs:
+  ASGLambdaRole:
+    Description: Lambda function Execution Role
+    Value: !Ref ASGLambdaRole
+  ASGLambdaPolicy:
+    Description: Lambda function Execution Policy
+    Value: !Ref ASGLambdaPolicy
+  AutoscaleManager:
+    Description: Autoscale Lambda function
+    Value: !Ref AutoscaleManager

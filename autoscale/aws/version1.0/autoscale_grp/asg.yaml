@@ -1,0 +1,1168 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: 'AWS::Serverless-2016-10-31'
+Description: NGFWv Auto Scaling Group attached to internet-facing NLB/ALB
+Parameters:
+  AutoscaleGrpNameSuffix:
+    Description: >-
+      This will be Autoscale Group Name prefix with suffix as Pod Number
+    Type: String
+    MaxLength: 18
+  PodNumber:
+    Description: >-
+      This will be suffixed to Autoscale Group, like:
+      NGFW-AS-Group-1, It should be at least 1 numerical digit but not more than 5.
+    Type: String
+    AllowedPattern: '^\d{1,5}$'
+    ConstraintDescription: must be a numerical string matching '^\d{1,5}$'
+  VpcId:
+    Description: Select vpc
+    Type: 'AWS::EC2::VPC::Id'
+  NoOfAZs:
+    Description: >-
+      Total Number of Availability Zones into which NGFWv will be deployed (Min 1 and Max 2 depends on Region).
+      If Application Load Balancer is to be deployed, minimum 2 Availability Zones required.
+    Type: Number
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+    Default: 2
+  ListOfAzs:
+    Type: CommaDelimitedList
+    Description: >-
+      Enter the list of Availability Zones (Based on Number of Availability Zones above). Please note down the order of AZs.
+  S3BktName:
+    Description: The S3 Bucket name for lambda function
+    Type: String
+    AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: must be a valid S3 bucket name
+  FTDvMgmtSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvInsideSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvOutsideSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvInstanceType:
+    Description: Cisco NGFWv EC2 instance type
+    Type: String
+    AllowedValues:
+      - c4.xlarge
+      - c4.2xlarge
+  NGFWvAmiID:
+    Description: >-
+      Please choose correct AMI ID as per the region and desired version of the image. Autoscale Feature supports
+      NGFWv 6.4 onwards releases, this can be BYOL/PAYG images, either of the case user should have accepted License in market place.
+      In case of BYOL, please update 'licenseCaps' key in Configuration JSON with features such as 'BASE', 'MALWARE', 'THREAT', 'URLFilter' etc.
+      Please refer link to get correct AMI IDs.
+      https://aws.amazon.com/marketplace/server/configuration?productId=ad0af76e-c569-4a81-84d0-cff2308179ef&ref_=psb_cfg_continue
+      https://aws.amazon.com/marketplace/server/configuration?productId=b28c8fc5-cc45-4a81-998e-6896ff098646&ref_=psb_cfg_continue
+    Type: AWS::EC2::Image::Id
+    Default: ami-0de5d3956a718f517
+  LoadBalancerType:
+    Type: String
+    AllowedValues:
+      - application
+      - network
+    Default: application
+    Description: >-
+      Choose the type of External load balancer
+  NoOfUnSecPorts:
+    Description: >-
+      Total Number of Unsecured ports to be opened
+    Type: Number
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+    Default: 0
+  UnSecuredPorts:
+    Description: >-
+      [Optional] These ports will be opened on LB with either HTTP or TCP as protocol, based on chosen LB type.  (Min: 0 and Max: 2)
+      Make sure ports are valid TCP ports.
+    Type: CommaDelimitedList
+    Default: 80, 8000
+  SSLcertificate:
+    Description: >-
+      [Conditional] ARN of an existing TLS/SSL Certificate in AWS ACM, If specified, TLS with port 443 gets opened on Load Balancer.
+      If Any Secured port has to be opened then, Certificate ARN has to be entered, otherwise optional.
+    Type: String
+  NoOfSecPorts:
+    Description: >-
+      Total Number of Unsecured ports to be opened
+    Type: Number
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+    Default: 0
+  SecuredPorts:
+    Description: >-
+      [Optional] These ports will be opened on LB with either HTTPS or TLS as protocol, based on chosen LB type.  (Min: 0 and Max: 2)
+      Make sure ports are valid TCP ports.
+    Type: CommaDelimitedList
+    Default: 443, 8443
+  LBDeRegDelay:
+    Description: >-
+      Seconds of time the connection drain happens for Graceful termination
+    Type: Number
+    Default: 180
+    MinValue: 0
+    MaxValue: 999
+    ConstraintDescription: must be in digits (Minumum 0, Maximum 999 seconds)
+  TgHealthPort:
+    Description: >-
+      This port is used by Target group for health probes, Health probes arriving at this port on NGFWv will be routed to AWS Metadata server
+    Type: String
+    AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
+    ConstraintDescription: must be a valid TCP port
+  DisableDebug:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+    Description: Enable/Disable debug logs, default is debug enabled.
+  ScalingAction:
+    Type: String
+    AllowedValues:
+      - Custom Scaling via Lambda Functions
+      - AWS provided Dynamic Scaling
+    Description: Choose Scaling Action type (AWS Dynamic policy or Custom Lambda Function)
+    Default: AWS provided Dynamic Scaling
+  CPUScaleOutThreshold:
+    Description: >-
+      Enter details Scale-Out percentage threshold. (Group Average)
+      Please make sure ScaleOut threshold is greater than ScaleIn threshold.
+    Type: Number
+    Default: 70
+    MinValue: 10
+    MaxValue: 99
+    ConstraintDescription: must be in digits (Minimum 10, Maximum 99)
+  CPUScaleOutDatapointsToAlarm:
+    Description: >-
+      Scale-Out Cloudwatch alarm, Data points.
+      If '3' is value then 3 times threshold breach should happen in 3x60 seconds.
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 180
+    ConstraintDescription: must be in digits (Minumum 1, Maximum 180)
+  CPUScaleInThreshold:
+    Description: >-
+      Enter details Scale-In percentage threshold. (Group Average)
+      Please make sure ScaleIn threshold is lower than ScaleOut threshold.
+    Type: Number
+    Default: 15
+    MinValue: 0
+    MaxValue: 99
+    ConstraintDescription: must be in digits (Minimum 0, Maximum 99)
+  CPUScaleInDatapointsToAlarm:
+    Description: >-
+      Scale-In Cloudwatch alarm, Data points.
+      If '8' is value then 8 times threshold breach should happen in 8x60 seconds.
+    Type: Number
+    Default: 10
+    MinValue: 1
+    MaxValue: 180
+    ConstraintDescription: must be in digits (Minumum 1, Maximum 180)
+  ActionEmail:
+    Description: >-
+      Email address to which Autoscale Events Email needs to be sent to.
+    Type: String
+    Default: admin@mynetwork.com
+    AllowedPattern: '^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+  CoolDownPeriod:
+    Description: Time in seconds, time taken for a Scale out action to bring up new NGFWv & configure it to take traffic
+    Type: Number
+    Default: 1320
+    MinValue: 1320
+  MinInstanceCapacity:
+    Type: Number
+    MinValue: 0
+    MaxValue: 5
+    Default: 1
+    Description: >-
+      Minimum number of instances that needs to be launched immediately after Autoscale Group Creation.
+      This should be less or equal to Maximum number of instances.
+  MaxInstanceCapacity:
+    Type: Number
+    MaxValue: 25
+    MinValue: 1
+    Default: 2
+    Description: >-
+      Maximum number of instances that can spin up over the time as demanded.
+      This should be equal or greater than minimum number of instances.
+Conditions:
+  CreateScalingPolicy: !Equals
+    - !Ref ScalingAction
+    - AWS provided Dynamic Scaling
+  CreateScalingLambda: !Equals
+    - !Ref ScalingAction
+    - Custom Scaling via Lambda Functions
+  support1zone: !Equals
+    - !Ref NoOfAZs
+    - 1
+  support2zone: !Equals
+    - !Ref NoOfAZs
+    - 2
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
+  CreateHealthAlarm: !Or
+    - !Condition SecPort1
+    - !Condition UnSecPort1
+  HealthEmail: !Not
+    - !Equals
+      - ''
+      - !Ref ActionEmail
+  UnSecPort2: !Equals
+    - '2'
+    - !Ref NoOfUnSecPorts
+  UnSecPort1: !Or
+    - !Condition UnSecPort2
+    - !Equals
+      - '1'
+      - !Ref NoOfUnSecPorts
+  ScaleEmail: !Not
+    - !Equals
+      - ''
+      - !Ref ActionEmail
+  SSLcert: !Not
+    - !Equals
+      - ''
+      - !Ref SSLcertificate
+  SecPort2: !And
+    - !Equals
+      - '2'
+      - !Ref NoOfSecPorts
+    - !Condition SSLcert
+  SecPort1: !And
+    - !Or
+      - !Condition SecPort2
+      - !Equals
+        - '1'
+        - !Ref NoOfSecPorts
+    - !Condition SSLcert
+  CreateELBTypeApp: !Equals
+    - !Ref LoadBalancerType
+    - application
+  CreateELBTypeNet: !Equals
+    - !Ref LoadBalancerType
+    - network
+  CreateScaleSNStopic: !Or
+    - !Condition CreateScalingLambda
+    - !Condition ScaleEmail
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: VPC Configuration
+        Parameters:
+          - VpcId
+          - NoOfAZs
+          - ListOfAzs
+          - S3BktName
+      - Label:
+          default: Autoscale Group Settings
+        Parameters:
+          - AutoscaleGrpNameSuffix
+          - PodNumber
+          - MinInstanceCapacity
+          - MaxInstanceCapacity
+          - ScalingAction
+          - CPUScaleOutThreshold
+          - CPUScaleOutDatapointsToAlarm
+          - CPUScaleInThreshold
+          - CPUScaleInDatapointsToAlarm
+          - ActionEmail
+          - CoolDownPeriod
+          - DisableDebug
+      - Label:
+          default: Load Balancer Settings
+        Parameters:
+          - LoadBalancerType
+          - NoOfUnSecPorts
+          - UnSecuredPorts
+          - SSLcertificate
+          - NoOfSecPorts
+          - SecuredPorts
+          - TgHealthPort
+          - LBDeRegDelay
+      - Label:
+          default: Cisco NGFWv Settings
+        Parameters:
+          - FTDvInstanceType
+          - NGFWvAmiID
+          - FTDvMgmtSubnetId
+          - FTDvInsideSubnetId
+          - FTDvOutsideSubnetId
+    ParameterLabels:
+      AutoscaleGrpNameSuffix:
+        default: Autoscale Group Name Prefix
+      ScalingAction:
+        default: Scaling Action
+      MinInstanceCapacity:
+        default: Minimum number of instances in Autoscale Group
+      MaxInstanceCapacity:
+        default: Maximum number of instances in Autoscale Group
+      CPUScaleOutThreshold:
+        default: Scale Out CPU Upper Threshold
+      CPUScaleOutDatapointsToAlarm:
+        default: Scale Out Data points
+      CPUScaleInThreshold:
+        default: Scale In CPU Lower Threshold
+      CPUScaleInDatapointsToAlarm:
+        default: Scale In Data points
+      ActionEmail:
+        default: Autoscale Email Notification
+      CoolDownPeriod:
+        default: Cool Down period
+      DisableDebug:
+        default: Disable debug logs
+      PodNumber:
+        default: Pod Number
+      VpcId:
+        default: VPC ID
+      NoOfAZs:
+        default: Number of Availibility Zones
+      ListOfAzs:
+        default: Availability Zones
+      S3BktName:
+        default: S3 Bucket Name
+      FTDvInstanceType:
+        default: NGFWv Instance type
+      NGFWvAmiID:
+        default: NGFWv AMI-ID
+      FTDvMgmtSubnetId:
+        default: Subnets List for NGFWv Management Interface
+      FTDvInsideSubnetId:
+        default: Subnets List for NGFWv Inside Interface
+      FTDvOutsideSubnetId:
+        default: Subnets List for NGFWv Outside Interface
+      LoadBalancerType:
+        default: Load Balancer type
+      NoOfUnSecPorts:
+        default: Number of Unsecured ports
+      UnSecuredPorts:
+        default: Unsecured Ports List
+      NoOfSecPorts:
+        default: Number of Secured ports
+      SecuredPorts:
+        default: Secured Ports List
+      SSLcertificate:
+        default: ARN of existing SSL Certificate ACM/IAM
+      LBDeRegDelay:
+        default: Enter draining time in seconds
+      TgHealthPort:
+        default: Enter a port for NGFWv instance health check
+Resources:
+# ------------------------------------------------------------------------
+# Load Balancer & Target groups
+# ------------------------------------------------------------------------
+  lbOutside:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name: !If
+        - CreateELBTypeApp
+        - !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ALB' ] ]
+        - !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'NLB' ] ]
+      Type: !Ref LoadBalancerType
+      Scheme: internet-facing
+      Subnets: !If
+        - support1zone
+        - !Split
+          - ':'
+          - !Select ['0', !Ref FTDvOutsideSubnetId ]
+        - !If
+          - support2zone
+          - !Split
+            - ':'
+            - !Join [':', [ !Select ['0', !Ref FTDvOutsideSubnetId ], !Select ['1', !Ref FTDvOutsideSubnetId ] ] ]
+          - !Split
+            - ':'
+            - !Join [':',[ !Select ['0', !Ref FTDvOutsideSubnetId ], !Select ['1', !Ref FTDvOutsideSubnetId ], !Select ['2', !Ref FTDvOutsideSubnetId ] ] ]
+  UnSectg0:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Condition: UnSecPort1
+    DependsOn:
+      - lbOutside
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'lb-UnSec-tg0' ] ]
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      HealthCheckPort: !Ref TgHealthPort
+      Port: !If
+        - UnSecPort1
+        - !Select ['0', !Ref UnSecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      TargetType: ip
+      VpcId: !Ref VpcId
+  UnSeclistener0:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Condition: UnSecPort1
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref UnSectg0
+      LoadBalancerArn: !Ref lbOutside
+      Port: !If
+        - UnSecPort1
+        - !Select ['0', !Ref UnSecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+  UnSectg1:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Condition: UnSecPort2
+    DependsOn:
+      - lbOutside
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'lb-UnSec-tg1' ] ]
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      HealthCheckPort: !Ref TgHealthPort
+      Port: !If
+        - UnSecPort2
+        - !Select ['1', !Ref UnSecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      TargetType: ip
+      VpcId: !Ref VpcId
+  UnSeclistener1:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Condition: UnSecPort2
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref UnSectg1
+      LoadBalancerArn: !Ref lbOutside
+      Port: !If
+        - UnSecPort2
+        - !Select ['1', !Ref UnSecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+  Sectg0:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Condition: SecPort1
+    DependsOn:
+      - lbOutside
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'lb-Sec-tg0' ] ]
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      HealthCheckPort: !Ref TgHealthPort
+      Port: !If
+        - SecPort1
+        - !Select ['0', !Ref SecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTPS
+        - TLS
+      TargetType: ip
+      VpcId: !Ref VpcId
+  Seclistener0:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Condition: SecPort1
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref Sectg0
+      LoadBalancerArn: !Ref lbOutside
+      Port: !If
+        - SecPort1
+        - !Select ['0', !Ref SecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTPS
+        - TLS
+      Certificates:
+        - CertificateArn: !Ref SSLcertificate
+  Sectg1:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Condition: SecPort2
+    DependsOn:
+      - lbOutside
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'lb-Sec-tg1' ] ]
+      HealthCheckIntervalSeconds: 10
+      HealthCheckProtocol: !If
+        - CreateELBTypeApp
+        - HTTP
+        - TCP
+      HealthCheckPort: !Ref TgHealthPort
+      Port: !If
+        - SecPort1
+        - !Select ['1', !Ref SecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTPS
+        - TLS
+      TargetType: ip
+      VpcId: !Ref VpcId
+  Seclistener1:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Condition: SecPort2
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref Sectg1
+      LoadBalancerArn: !Ref lbOutside
+      Port: !If
+        - SecPort1
+        - !Select ['1', !Ref SecuredPorts ]
+        - !Ref AWS::NoValue
+      Protocol: !If
+        - CreateELBTypeApp
+        - HTTPS
+        - TLS
+      Certificates:
+        - CertificateArn: !Ref SSLcertificate
+  UnhealthyAlarm:
+    Condition: CreateHealthAlarm
+    DependsOn:
+      - lbOutside
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join ['', [!Ref AutoscaleGrpNameSuffix, '-',!Ref PodNumber, ' Unhealthy-VMs' ] ]
+      ActionsEnabled: true
+      Namespace: !If
+        - CreateELBTypeApp
+        - AWS/ApplicationELB
+        - AWS/NetworkELB
+      AlarmActions:
+        - !Ref ASgroupTopic
+      AlarmDescription: Alarm when Unhealthy host count hits threshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: !If
+            - SecPort1
+            - !GetAtt Sectg0.TargetGroupFullName
+            - !GetAtt UnSectg0.TargetGroupFullName
+        - Name: LoadBalancer
+          Value: !GetAtt lbOutside.LoadBalancerFullName
+      EvaluationPeriods: 60
+      MetricName: UnHealthyHostCount
+      DatapointsToAlarm: 60
+      Threshold: 1
+      Period: 60
+      Statistic: Maximum
+      Unit: Count
+# ------------------------------------------------------------------------
+# AutoScale Group & Launch Template
+# ------------------------------------------------------------------------
+  FTDvInstance:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      LaunchConfigurationName: !Join ['-', [ !Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'launch-config' ] ]
+      EbsOptimized: 'false'
+      AssociatePublicIpAddress: 'true'
+      SecurityGroups:
+        - !Ref sgAllowAll
+      ImageId: !Ref NGFWvAmiID
+      InstanceType: !Ref FTDvInstanceType
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+      UserData: !Base64 >-
+        { "AdminPassword": "Admin123"}
+  FTDvGroup:
+    DependsOn:
+      - CloudWatchEvent1
+      - CloudWatchEvent2
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      AutoScalingGroupName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber ] ]
+      VPCZoneIdentifier: !If
+        - support1zone
+        - !Split
+          - ':'
+          - !Select ['0', !Ref FTDvMgmtSubnetId ]
+        - !If
+          - support2zone
+          - !Split
+            - ':'
+            - !Join [':', [ !Select ['0', !Ref FTDvMgmtSubnetId ], !Select ['1', !Ref FTDvMgmtSubnetId ] ] ]
+          - !Split
+            - ':'
+            - !Join [':', [ !Select ['0', !Ref FTDvMgmtSubnetId ], !Select ['1', !Ref FTDvMgmtSubnetId ], !Select ['2', !Ref FTDvMgmtSubnetId ] ] ]
+      LaunchConfigurationName: !Ref FTDvInstance
+      MinSize: !Ref MinInstanceCapacity
+      DesiredCapacity: !Ref MinInstanceCapacity
+      MaxSize: !Ref MaxInstanceCapacity
+      MetricsCollection:
+        - Granularity: 1Minute
+          Metrics:
+            - GroupDesiredCapacity
+            - GroupInServiceInstances
+            - GroupPendingInstances
+            - GroupTerminatingInstances
+            - GroupTotalInstances
+            - GroupStandbyInstances
+      HealthCheckGracePeriod: !Ref CoolDownPeriod
+      Cooldown: !Ref CoolDownPeriod
+      TerminationPolicies:
+        - NewestInstance
+      LifecycleHookSpecificationList:
+        - DefaultResult: ABANDON
+          HeartbeatTimeout: 60
+          LifecycleHookName: Launch_LifecycleHook
+          LifecycleTransition: 'autoscaling:EC2_INSTANCE_LAUNCHING'
+        - DefaultResult: CONTINUE
+          HeartbeatTimeout: !Ref LBDeRegDelay
+          LifecycleHookName: Terminate_LifecycleHook
+          LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
+# ------------------------------------------------------------------------
+# Security Groups & Policies
+# ------------------------------------------------------------------------
+  sgAllowAll:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Join
+        - '-'
+        - - !Ref AutoscaleGrpNameSuffix
+          - !Ref PodNumber
+          - SecurityGroup
+      GroupDescription: Allow all traffic
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref AutoscaleGrpNameSuffix
+              - !Ref PodNumber
+              - '-security-grp'
+  ingressAll:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !Ref sgAllowAll
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+  egressAll:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !Ref sgAllowAll
+      IpProtocol: '-1'
+      CidrIp: 0.0.0.0/0
+# ------------------------------------------------------------------------
+# Lifecycle Action Lambda
+# ------------------------------------------------------------------------
+  AttachLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'Role' ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+  AttachLambdaPolicy:
+    DependsOn:
+      - AttachLambdaRole
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'Policy' ] ]
+      Roles:
+        - !Ref AttachLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - logs:*
+              - cloudwatch:SetAlarmState
+              - ec2:*
+              - elasticloadbalancing:*
+              - autoscaling:*
+              - events:*
+              - s3:*
+            Effect: Allow
+            Resource: '*'
+  AutoscaleGrpLambda:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - AttachLambdaRole
+      - AttachLambdaPolicy
+      - lbOutside
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'lifecycle-lambda'] ]
+      Handler: autoscale_grp.lambda_handler
+      Runtime: python3.6
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: autoscale_grp.zip
+      Description: ''
+      MemorySize: 128
+      Timeout: 300
+      Role: !GetAtt AttachLambdaRole.Arn
+      Events:
+        SNS1:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: ASgroupTopic
+      Environment:
+        Variables:
+          DEBUG_DISABLED: !Ref DisableDebug
+          ASG_NAME: !Join [ '-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber]]
+          NO_OF_AZs: !Ref NoOfAZs
+          INSIDE_SUBNET0: !Select ['0', !Ref FTDvInsideSubnetId ]
+          OUTSIDE_SUBNET0: !Select ['0', !Ref FTDvOutsideSubnetId ]
+          INSIDE_SUBNET1: !If
+            - support2zone
+            - !Select ['1', !Ref FTDvInsideSubnetId ]
+            - !If
+              - support3zone
+              - !Select ['1', !Ref FTDvInsideSubnetId ]
+              - !Ref 'AWS::NoValue'
+          OUTSIDE_SUBNET1: !If
+            - support2zone
+            - !Select ['1', !Ref FTDvOutsideSubnetId ]
+            - !If
+              - support3zone
+              - !Select ['1', !Ref FTDvOutsideSubnetId ]
+              - !Ref 'AWS::NoValue'
+          INSIDE_SUBNET2: !If
+            - support3zone
+            - !Select ['2', !Ref FTDvInsideSubnetId ]
+            - !Ref 'AWS::NoValue'
+          OUTSIDE_SUBNET2: !If
+            - support3zone
+            - !Select ['2', !Ref FTDvOutsideSubnetId ]
+            - !Ref 'AWS::NoValue'
+          LB_ARN_OUTSIDE: !Ref lbOutside
+          LB_DEREGISTRATION_DELAY: !Ref LBDeRegDelay
+  AutoscaleGrpLambdaLogGrp:
+    Type: 'AWS::Logs::LogGroup'
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref AutoscaleGrpLambda]]
+  CloudWatchEvent1:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'register-target' ] ]
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-launch Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber ] ]
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt AutoscaleGrpLambda.Arn
+      State: ENABLED
+  CloudWatchEvent1InvokeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    DependsOn: CloudWatchEvent1
+    Properties:
+      FunctionName: !Ref AutoscaleGrpLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchEvent1.Arn
+  CloudWatchEvent2:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'deregister-target' ] ]
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber ] ]
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt AutoscaleGrpLambda.Arn
+      State: ENABLED
+  CloudWatchEvent2InvokeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    DependsOn: CloudWatchEvent2
+    Properties:
+      FunctionName: !Ref AutoscaleGrpLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchEvent2.Arn
+  ASgroupTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ASgroupTopic']]
+  ASgroupTopicSubscription:
+    Condition: HealthEmail
+    DependsOn: ASgroupTopic
+    DeletionPolicy: Delete
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref ActionEmail
+      Protocol: email
+      TopicArn: !Ref ASgroupTopic
+# ------------------------------------------------------------------------
+# Scaling Alarm & Notification
+# ------------------------------------------------------------------------
+  CPUUpperboundAlarm1:
+    DependsOn:
+      - FTDvGroup
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: !Join ['', [!Ref AutoscaleGrpNameSuffix, '-',!Ref PodNumber, ' CPU-Upper-Threshold-Breach' ] ]
+      ActionsEnabled: true
+      Namespace: AWS/EC2
+      AlarmActions: !If
+        - CreateScalingLambda
+        - !Split [',', !Ref ScaleOutTopic ]
+        - !Split [',', !Join [',',[!Ref ScaleOutTopic, !Ref ASGscaleOutCPUpolicy]]]
+      AlarmDescription: Alarm when CPU usage hits upper threshold
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: !Ref CPUScaleOutDatapointsToAlarm
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup
+      EvaluationPeriods: !Ref CPUScaleOutDatapointsToAlarm
+      MetricName: CPUUtilization
+      Threshold: !Ref CPUScaleOutThreshold
+      Period: 60
+      Statistic: Average
+      Unit: Percent
+  CPULowerboundAlarm1:
+    DependsOn:
+      - FTDvGroup
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: !Join ['', [!Ref AutoscaleGrpNameSuffix, '-',!Ref PodNumber, ' CPU-Lower-Threshold-Breach' ] ]
+      ActionsEnabled: true
+      Namespace: AWS/EC2
+      AlarmActions: !If
+        - CreateScalingLambda
+        - !Split [',', !Ref ScaleInTopic ]
+        - !Split [',', !Join [',',[!Ref ScaleInTopic, !Ref ASGscaleInCPUpolicy]]]
+      AlarmDescription: Alarm when CPU usage hits lower threshold
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: !Ref CPUScaleInDatapointsToAlarm
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup
+      EvaluationPeriods: !Ref CPUScaleInDatapointsToAlarm
+      MetricName: CPUUtilization
+      Threshold: !Ref CPUScaleInThreshold
+      Period: 60
+      Statistic: Maximum
+      Unit: Percent
+  ScaleInTopic:
+    Condition: CreateScaleSNStopic
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleInTopic']]
+  ScaleInTopicSubscription:
+    Condition: ScaleEmail
+    DependsOn: ScaleInTopic
+    DeletionPolicy: Delete
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref ActionEmail
+      Protocol: email
+      TopicArn: !Ref ScaleInTopic
+  ScaleOutTopic:
+    Condition: CreateScaleSNStopic
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleOutTopic']]
+  ScaleOutTopicSubscription:
+    Condition: ScaleEmail
+    DependsOn: ScaleOutTopic
+    DeletionPolicy: Delete
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref ActionEmail
+      Protocol: email
+      TopicArn: !Ref ScaleOutTopic
+# ------------------------------------------------------------------------
+# AWS provided Dynamic Scaling
+# ------------------------------------------------------------------------
+  ASGscaleOutCPUpolicy:
+    Condition: CreateScalingPolicy
+    DependsOn:
+      - FTDvGroup
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+  ASGscaleInCPUpolicy:
+    Condition: CreateScalingPolicy
+    DependsOn:
+      - FTDvGroup
+    Type: 'AWS::AutoScaling::ScalingPolicy'
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
+# ------------------------------------------------------------------------
+# Custom Scaling via Lambda Functions
+# ------------------------------------------------------------------------
+  ScaleLambdaRole:
+    Condition: CreateScalingLambda
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleLambdaRole']]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+  ScaleLambdaPolicy:
+    Condition: CreateScalingLambda
+    DependsOn:
+      - ScaleLambdaRole
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleLambdaPolicy']]
+      Roles:
+        - !Ref ScaleLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'logs:*'
+              - 'cloudwatch:*'
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - 'ec2:*'
+              - 'elasticloadbalancing:*'
+              - 'autoscaling:*'
+              - 'events:*'
+              - 'sns:*'
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - 's3:*'
+            Effect: Allow
+            Resource: '*'
+  ScaleInLambda:
+    Condition: CreateScalingLambda
+    DependsOn:
+      - ScaleLambdaRole
+      - ScaleLambdaPolicy
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleIn']]
+      Handler: scalein.lambda_handler
+      Runtime: python3.6
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: 'scale_functions.zip'
+      Description: ''
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          DO_ACTION: 'true'
+          DEBUG_DISABLED: !Ref DisableDebug
+          ASG_NAME: !Ref FTDvGroup
+          FUNC_NAME: ScaleIn
+          si_ma_event: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleIn' ] ]
+      Role: !GetAtt ScaleLambdaRole.Arn
+      Events:
+        SNS1:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: ScaleInTopic
+  ScaleInLambdaLogGrp:
+    Condition: CreateScalingLambda
+    DependsOn: ScaleInLambda
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref ScaleInLambda]]
+  ScaleOutLambda:
+    Condition: CreateScalingLambda
+    DependsOn:
+      - ScaleLambdaRole
+      - ScaleLambdaPolicy
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'ScaleOut']]
+      Handler: scaleout.lambda_handler
+      Runtime: python3.6
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: 'scale_functions.zip'
+      Description: ''
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          DO_ACTION: 'true'
+          DEBUG_DISABLED: !Ref DisableDebug
+          ASG_NAME: !Ref FTDvGroup
+          FUNC_NAME: ScaleOut
+          so_ma_event: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleOut' ] ]
+      Role: !GetAtt ScaleLambdaRole.Arn
+      Events:
+        SNS1:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: ScaleOutTopic
+  ScaleOutLambdaLogGrp:
+    Condition: CreateScalingLambda
+    DependsOn: ScaleOutLambda
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref ScaleOutLambda]]
+  ScaleOutCronLambda:
+    Condition: CreateScalingLambda
+    DependsOn:
+      - ScaleLambdaRole
+      - ScaleLambdaPolicy
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleOut']]
+      Handler: scaleout_cron.lambda_handler
+      Runtime: python3.6
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: 'scale_functions.zip'
+      Description: ''
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          so_ma_event: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleOut' ] ]
+          CPU_UPPER_ALARM_ARN: !GetAtt CPUUpperboundAlarm1.Arn
+          CPU_LOWER_ALARM_ARN: !GetAtt CPULowerboundAlarm1.Arn
+      Role: !GetAtt ScaleLambdaRole.Arn
+  ScaleOutCronLambdaLogGrp:
+    Condition: CreateScalingLambda
+    DependsOn: ScaleOutLambda
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref ScaleOutCronLambda]]
+  CloudWatchCron1:
+    Condition: CreateScalingLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleOut' ] ]
+      ScheduleExpression: rate(23 minutes)
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt ScaleOutCronLambda.Arn
+      State: DISABLED
+  CloudWatchCron1InvokeLambdaPermission:
+    Condition: CreateScalingLambda
+    Type: AWS::Lambda::Permission
+    DependsOn: CloudWatchCron1
+    Properties:
+      FunctionName: !Ref ScaleOutCronLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchCron1.Arn
+  ScaleInCronLambda:
+    Condition: CreateScalingLambda
+    DependsOn:
+      - ScaleLambdaRole
+      - ScaleLambdaPolicy
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      FunctionName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleIn']]
+      Handler: scalein_cron.lambda_handler
+      Runtime: python3.6
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: 'scale_functions.zip'
+      Description: ''
+      MemorySize: 128
+      Timeout: 60
+      Environment:
+        Variables:
+          si_ma_event: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleIn' ] ]
+          CPU_UPPER_ALARM_ARN: !GetAtt CPUUpperboundAlarm1.Arn
+          CPU_LOWER_ALARM_ARN: !GetAtt CPULowerboundAlarm1.Arn
+      Role: !GetAtt ScaleLambdaRole.Arn
+  ScaleInCronLambdaLogGrp:
+    Condition: CreateScalingLambda
+    DependsOn: ScaleOutLambda
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref ScaleInCronLambda]]
+  CloudWatchCron2:
+    Condition: CreateScalingLambda
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber, 'cron-ScaleIn' ] ]
+      ScheduleExpression: cron(23/23 * * * ? *)
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt ScaleInCronLambda.Arn
+      State: DISABLED
+  CloudWatchCron2InvokeLambdaPermission:
+    Condition: CreateScalingLambda
+    Type: AWS::Lambda::Permission
+    DependsOn: CloudWatchCron2
+    Properties:
+      FunctionName: !Ref ScaleInCronLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchCron2.Arn
+Outputs:
+  ASGName:
+    Description: Auto Scale Group Name
+    Value: !Ref FTDvGroup
+  LoadBalancer:
+    Description: Load Balancer Name
+    Value: !Ref lbOutside
+  LoadBalancerUrl:
+    Description: Load Balancer URL
+    Value: !Join ['', ['https://', !GetAtt lbOutside.DNSName, ':<port>']]
