@@ -101,7 +101,7 @@
         "allowedValues": [
 		    "66090.0.0",
             "650115.0.0",
-            "640102.0.0"
+            "640110.0.0"
         ],
         "metadata": {
             "description": "FTD Software version to use."
@@ -156,7 +156,7 @@
         "type": "string",
         "defaultValue": "1.2.3.4",
         "metadata": {
-            "description": "FMC IP Address"
+            "description": "FMC Public IP Address"
         }
       },
       "fmcUserName": {
@@ -941,12 +941,6 @@
                           "subnet": {
                             "id": "[variables('outsideSubnetId')]"
                           },
-                          "publicipaddressconfiguration": {
-                            "name": "outsidePublicIP",
-                            "properties": {
-                              "idleTimeoutInMinutes": "[variables('idleTimeoutInMinutes')]"
-                            }
-                          },                    
                           "loadBalancerBackendAddressPools": [
                             {
                               "id": "[concat( variables('elbId'), '/backendAddressPools/backendPool')]"
