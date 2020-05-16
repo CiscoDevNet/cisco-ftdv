@@ -140,14 +140,14 @@
       },
       "ftdVmManagementUserPassword": {
         "type": "securestring",
-        "defaultValue" : "Cisco@12345678#",
+        "defaultValue" : "",
         "metadata": {
             "description": "Password for the FTD VM management user (Passwords must be 12 to 72 characters long, must have : lowercase, uppercase, numbers & special characters and must have no more than 2 repeating characters)"
         }
       },
       "ftdAdminUserPassword": {
         "type": "securestring",
-        "defaultValue": "Cisco@12345678#",
+        "defaultValue": "",
         "metadata": {
             "description": "Password for FTD 'admin' user (Passwords must be 12 to 72 characters long, must have : lowercase, uppercase, numbers & special characters and must have no more than 2 repeating characters)"
         }
@@ -168,7 +168,7 @@
       },	  
       "fmcPassword": {
         "type": "securestring",
-        "defaultValue": "fmcpass",
+        "defaultValue": "",
         "metadata": {
             "description": "FMC Password"
         }
@@ -624,6 +624,10 @@
                 "name": "RESOURCE_GROUP_NAME",
                 "value": "[resourceGroup().name]"
               },
+			  {
+                "name": "SUBSCRIPTION_ID",
+                "value": "[subscription().subscriptionId]"
+              },			  
               {
                 "name": "SAMPLING_TIME_MIN",
                 "value": "[parameters('metricsAverageDuration')]"

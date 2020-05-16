@@ -1,3 +1,19 @@
+//  Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+//
+//  All Rights Reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//  http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -29,6 +45,7 @@ namespace FTDAutoScaleManager
             int operationDelay = 60000; //1min
             var resoureGroupName = System.Environment.GetEnvironmentVariable("RESOURCE_GROUP_NAME", EnvironmentVariableTarget.Process);
             var vmScalesetName = System.Environment.GetEnvironmentVariable("VMSS_NAME", EnvironmentVariableTarget.Process);
+            var subscriptionId = System.Environment.GetEnvironmentVariable("SUBSCRIPTION_ID", EnvironmentVariableTarget.Process);
 
             string COUNT = req.Query["COUNT"];
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
@@ -41,7 +58,7 @@ namespace FTDAutoScaleManager
 
             var factory = new AzureCredentialsFactory();
             var msiCred = factory.FromMSI(new MSILoginInformation(MSIResourceType.AppService), AzureEnvironment.AzureGlobalCloud);
-            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithDefaultSubscription();
+            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithSubscription(subscriptionId);
             var vMachineScaleSet = azure.VirtualMachineScaleSets.GetByResourceGroup(resoureGroupName, vmScalesetName);
 
             log.LogWarning("FtdScaleOut:::: Current VMSS Capacity : {0}", vMachineScaleSet.Capacity.ToString());
@@ -85,6 +102,7 @@ namespace FTDAutoScaleManager
             int operationDelay = 90000; //1.5min
             var resoureGroupName = System.Environment.GetEnvironmentVariable("RESOURCE_GROUP_NAME", EnvironmentVariableTarget.Process);
             var vmScalesetName = System.Environment.GetEnvironmentVariable("VMSS_NAME", EnvironmentVariableTarget.Process);
+            var subscriptionId = System.Environment.GetEnvironmentVariable("SUBSCRIPTION_ID", EnvironmentVariableTarget.Process);
             string instanceid = req.Query["instanceid"];
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic data = JsonConvert.DeserializeObject(requestBody);
@@ -101,7 +119,8 @@ namespace FTDAutoScaleManager
 
             var factory = new AzureCredentialsFactory();
             var msiCred = factory.FromMSI(new MSILoginInformation(MSIResourceType.AppService), AzureEnvironment.AzureGlobalCloud);
-            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithDefaultSubscription();
+            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithSubscription(subscriptionId);
+
             var vMachineScaleSet = azure.VirtualMachineScaleSets.GetByResourceGroup(resoureGroupName, vmScalesetName);
 
             vmssCapacity = vMachineScaleSet.Capacity;
@@ -133,6 +152,8 @@ namespace FTDAutoScaleManager
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
+            var subscriptionId = System.Environment.GetEnvironmentVariable("SUBSCRIPTION_ID", EnvironmentVariableTarget.Process);
+
             string COUNT = req.Query["COUNT"];
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic data = JsonConvert.DeserializeObject(requestBody);
@@ -169,14 +190,18 @@ namespace FTDAutoScaleManager
 
             var factory = new AzureCredentialsFactory();
             var msiCred = factory.FromMSI(new MSILoginInformation(MSIResourceType.AppService), AzureEnvironment.AzureGlobalCloud);
-            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithDefaultSubscription();
+            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithSubscription(subscriptionId);
 
             var NmClient = new NetworkManagementClient(msiCred) { SubscriptionId = azure.SubscriptionId };
             var interfaceList = NmClient.NetworkInterfaces.ListVirtualMachineScaleSetNetworkInterfaces(resoureGroupName, vmScalesetName);
             string vmindex = "";
             string tmpVmindex = "";
             int intVmindex = 0;
-            
+            var vmlist = azure.VirtualMachineScaleSets.GetByResourceGroup(resoureGroupName, vmScalesetName);
+            var vmStatus = "";
+            var tmpVmName = "ERROR";
+
+            //ToDo: This logic should be simplified with just one loop of vmlist, no need of interfaceList
             foreach (var netInterface in interfaceList)
             {
                 if (netInterface.IpConfigurations[0].PublicIPAddress != null)
@@ -188,6 +213,34 @@ namespace FTDAutoScaleManager
                     if ((tmpIntfName.ToString() == networkInterfaceName) && (tmpConfigName.ToString() == ipConfigurationName) && (tmpPubIpName.ToString() == publicIpAddressName))
                     {
                         vmindex = netInterface.IpConfigurations[0].PublicIPAddress.Id.Split('/').GetValue(10).ToString();
+                        vmStatus = "ON";
+                        foreach (var vm in vmlist.VirtualMachines.List())
+                        {
+                            if (vm.InstanceId == vmindex)
+                            {
+                                if (null == vm.PowerState)
+                                {
+                                    vmStatus = "OFF";
+                                }
+                                if (null != vm.Name)
+                                {
+                                    tmpVmName = vm.Name;
+                                }
+                                break;
+                            }
+                        }
+                        //Azure bug, VM will be present in Azure DB for long time even after deletion
+                        if ("OFF" == vmStatus)
+                        {
+                            log.LogError("GetFtdPublicIp:::: VM index :{0} is in unknown state..skip", vmindex);
+                            continue;
+                        }
+                        //Azure bug, some times even deleted VMs are still attahed to network interfaces
+                        if ("ERROR" == tmpVmName)
+                        {
+                            log.LogError("GetFtdPublicIp:::: VM index :{0} VM name not found...skip", vmindex);
+                            continue;
+                        }
                         if ("INIT" == TYPE)
                         {
                             if (index == ftdCountInt)

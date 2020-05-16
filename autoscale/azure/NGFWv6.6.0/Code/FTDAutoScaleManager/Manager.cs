@@ -1,3 +1,19 @@
+//  Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+//
+//  All Rights Reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//  http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +58,7 @@ namespace FTDAutoScaleManager
             var scaleInThresholdStr = System.Environment.GetEnvironmentVariable("SCALE_IN_THRESHLD", EnvironmentVariableTarget.Process);
             var initialDeployMethod = System.Environment.GetEnvironmentVariable("INITIAL_DEPLOYMENT_MODE", EnvironmentVariableTarget.Process); //supported STEP / BULK
             var scalingPolicy = System.Environment.GetEnvironmentVariable("SCALING_POLICY", EnvironmentVariableTarget.Process); // POLICY-1 / POLICY-2
+            var subscriptionId = System.Environment.GetEnvironmentVariable("SUBSCRIPTION_ID", EnvironmentVariableTarget.Process);
 
             int minFTDCount = Convert.ToInt32(minFTDCountStr);
             int maxFTDCount = Convert.ToInt32(maxFTDCountStr);
@@ -72,7 +89,7 @@ namespace FTDAutoScaleManager
 
             var factory = new AzureCredentialsFactory();
             var msiCred = factory.FromMSI(new MSILoginInformation(MSIResourceType.AppService), AzureEnvironment.AzureGlobalCloud);
-            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithDefaultSubscription();
+            var azure = Azure.Configure().WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic).Authenticate(msiCred).WithSubscription(subscriptionId);
 
             string resourceUri = null;
             var vmss = azure.VirtualMachineScaleSets.GetByResourceGroup(resoureGroupName, vmScalesetName);
