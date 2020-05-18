@@ -24,7 +24,7 @@ The NGFWv Auto Scale solution is a CloudFormation template-based deployment that
 In this use-case, NGFWv three network interfaces are in use: management, inside and outside.
 Inside(Gig0/0) is to be placed in trusted zone same as applications or different. This interface
 doesn't require default route to internet. User can change Security Group for these interfaces & ACLs for subnet.
-Outside(Gig0/0) is to be placed in un-trusted zone, where default route is set to
+Outside(Gig0/1) is to be placed in un-trusted zone, where default route is set to
 internet. Also ports that needs to be opened on External Load Balancer, has to be opened on
 security group & ACLs. Management interface needs to be placed in a subnet where FMC connection is possible.
 This is like a application front-end, where traffic from un-trusted zone is passed to applications through NGFWv firewall.
@@ -69,7 +69,7 @@ Scaling Policies can be created based on CPU either using AWS Dynamic Scaling or
     * Port objects for LB health-probe & application ports
     * Access Policy allowing health-probe port connections to Metadata server & other configurations
     * NAT Policy, doing manual NAT for LB health probes to AWS Metadata service
-1. Update Configuration.json file in Autoscale_manager directory
+1. Update Configuration.json file in autoscale_manager directory
     * Update FMC registration requirements (FMC IP, Reg ID, NAT Id)
     * Access Policy & NAT policy names (Note: These are already existing, won't be created new )
     * Update interface configuration with security-zone, interface-name & mtu etc
