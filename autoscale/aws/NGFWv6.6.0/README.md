@@ -157,4 +157,4 @@ Scaling Policies can be created based on CPU either using AWS Dynamic Scaling or
 
 ## Licensing Info
 
-This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](../../../LICENSE) file for details.
