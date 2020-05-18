@@ -14,17 +14,19 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       aws.py
+Purpose:    This is contains aws resources related methods
 """
+
 import boto3
 import botocore
 import json
 from botocore.exceptions import ClientError
 import constant as const
 import utility as utl
-"""
-Name:       aws.py
-Purpose:    This is contains aws resources related methods
-"""
+
 # Setup Logging
 logger = utl.setup_logging(utl.e_var['DebugDisable'])
 
@@ -261,7 +263,7 @@ class Ec2Instance:
         except Exception as e:
             logger.error("Unable to split CIDR block to get subnet mask")
             return None
-            
+
 
 class SimpleNotificationService:
     def __init__(self):

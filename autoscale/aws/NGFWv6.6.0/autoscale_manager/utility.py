@@ -14,6 +14,11 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       utility.py
+Purpose:    This is contains utility functions
+            All non-class methods are available here
 """
 
 import os
@@ -25,13 +30,6 @@ import constant as const
 import boto3
 import ipaddress
 from base64 import b64decode
-
-"""
-Name:       utility.py
-Purpose:    This is contains utility functions
-            All non-class methods are available here
-            This gets called in all project files except constant.py
-"""
 
 
 def get_variables():

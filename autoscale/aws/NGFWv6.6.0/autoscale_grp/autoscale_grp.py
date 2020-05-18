@@ -14,16 +14,18 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-"""
-import time
-from aws_methods import *
-from datetime import datetime, timezone
-import constant as const
-"""
+--------------------------------------------------------------------------------
+
 Name:       autoscale_grp.py
 Purpose:    This is the main Lambda handler file( autoscale group).
             Takes AWS Lambda triggers & routes the request to appropriate function module.
 """
+
+import time
+from aws_methods import *
+from datetime import datetime, timezone
+import constant as const
+
 # Initialize ASG group class
 asg = ASG()
 # Initialize EC2 class

@@ -14,17 +14,19 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-"""
-import os
-import sys
-import logging
-import json
-"""
+--------------------------------------------------------------------------------
+
 Name:       utility.py
 Purpose:    This is contains utility functions
             All non-class methods are available here
             This gets called in all project files except constant.py
 """
+
+import os
+import sys
+import logging
+import json
+
 
 def setup_logging(debug_disabled):
     """
@@ -49,9 +51,9 @@ def setup_logging(debug_disabled):
 
 def get_common_member_in_list(list1, list2):
     """
-    Purpose:
-    Parameters:
-    Returns:
+    Purpose:        To get common member in two list
+    Parameters:     Two lists
+    Returns:        If only common item, retuns the item otherwise returns empty list
     Raises:
     """
     list1_set = set(list1)

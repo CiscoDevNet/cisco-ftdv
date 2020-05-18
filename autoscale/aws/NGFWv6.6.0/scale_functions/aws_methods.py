@@ -14,7 +14,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       aws_methods.py
+Purpose:    This file has AWS resources methods
 """
+
 import boto3
 import botocore
 import re
@@ -32,8 +37,6 @@ class ASG:
             response = self.asg_client.terminate_instance_in_auto_scaling_group(
                 InstanceId=instance_id,
                 ShouldDecrementDesiredCapacity=decrement_cap
-                # fixme if Scale-In/Out lambda is created this should be made
-                #   'False'
             )
         except botocore.exceptions.ClientError as e:
             logger.error("Botocore Error removing the instance: {}".format(e.response['Error']))
@@ -288,27 +291,6 @@ class EC2:
         else:
             return subnet_list
 
-
-# def get_inside_subnet_id(subnets_list_in_az):
-#     try:
-#         vpc_subnet_id = get_common_member_in_list(subnets_list_in_az, INSIDE_SUBNET_ID_LIST)
-#         logger.debug("Inside Subnet id: {}".format(vpc_subnet_id))
-#     except botocore.exceptions.ClientError as e:
-#         logger.debug("Error describing the subnet: {}".format(e.response['Error']))
-#         vpc_subnet_id = None
-#     return vpc_subnet_id
-#
-#
-# def get_outside_subnet_id(subnets_list_in_az):
-#     try:
-#         vpc_subnet_id = get_common_member_in_list(subnets_list_in_az, OUTSIDE_SUBNET_ID_LIST)
-#         logger.debug("Outside Subnet id: {}".format(vpc_subnet_id))
-#     except botocore.exceptions.ClientError as e:
-#         logger.debug("Error describing the subnet: {}".format(e.response['Error']))
-#         vpc_subnet_id = None
-#     return vpc_subnet_id
-
-
 def get_common_member_in_list(list1, list2):
     list1_set = set(list1)
     list2_set = set(list2)
@@ -323,4 +305,3 @@ def get_common_member_in_list(list1, list2):
     else:
         logger.error("No subnets from given Availability Zones")
         return []
-

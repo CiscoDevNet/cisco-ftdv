@@ -14,7 +14,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       scalein.py
+Purpose:    This file has Lambda Handler for scalein lambda
 """
+
 import json
 import boto3
 import datetime
@@ -24,6 +29,12 @@ import os
 import constant as const
 
 def lambda_handler(event, context):
+    """
+    Purpose:    Scale-In Lambda Handler
+    Parameters: events, context
+    Returns:
+    Raises:
+    """
     try:
         print("Info:Received the event: " + json.dumps(event, indent=2))
         message = json.loads(event['Records'][0]['Sns']['Message'])
@@ -36,9 +47,15 @@ def lambda_handler(event, context):
 
 
 def scalein_handler(asgname):
+    """
+    Purpose:    To decrement desired count by one
+    Parameters: AutoScale group name
+    Returns:
+    Raises:
+    """
     asg_client = boto3.client('autoscaling')
     asg_response = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asgname])
-    print("Info : ASG Response",asg_response) 
+    print("Info : ASG Response",asg_response)
     region = asg_client.meta.region_name
     print("Info: ASG Region",region)
     asg_minsize = asg_response['AutoScalingGroups'][0]['MinSize']
@@ -52,12 +69,12 @@ def scalein_handler(asgname):
             instanceids_unprotected.append(i["InstanceId"])
     print("Info : Printing scale-in unprotected Instance Ids",instanceids_unprotected)
     print("Info : Printing Instance Ids",instanceids)
-    
+
     current_vms = len(instanceids)
     if current_vms == asg_minsize:
         print("Warning: Can not Scale-in, Reached the ASG Minimum Size")
         return None
-    
+
     if len(instanceids_unprotected) == 0:
         print("Warning: Can not Scale-In, there are no scale-in unprotected VMs in ASG")
         return None
@@ -82,25 +99,24 @@ def scalein_handler(asgname):
         for eachpoint in datapoints:
             sumofmetric+=eachpoint['Average']
             k+=1
-            
+
         avgofmetrics = sumofmetric/k
-        print("Info: Printing Average of Metrics Corresponding to Instance ID:",iid,avgofmetrics) 
+        print("Info: Printing Average of Metrics Corresponding to Instance ID:",iid,avgofmetrics)
         instance_to_load[iid]=avgofmetrics
- 
-    #loop ends    
-    #comparing 2nd element of each tuple    
+
+    #loop ends
+    #comparing 2nd element of each tuple
     print("Info: Listing Instance to Load Map/n",instance_to_load)
     instid = min(instance_to_load, key=instance_to_load.get)
     print("Info: Instance to Kill",instid)
-    
+
     response = asg_client.terminate_instance_in_auto_scaling_group(
     InstanceId=instid,
     ShouldDecrementDesiredCapacity=True)
-    
+
     #enabling the event
     client = boto3.client('events')
     si_ma_event = os.environ['si_ma_event']
     response = client.enable_rule(Name=si_ma_event)
     print(response)
     return None
-    

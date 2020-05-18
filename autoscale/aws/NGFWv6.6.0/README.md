@@ -22,12 +22,12 @@ The NGFWv Auto Scale solution is a CloudFormation template-based deployment that
 ## Use-case
 
 In this use-case, NGFWv three network interfaces are in use: management, inside and outside.
-Inside(Gig0/0) is to be placed in trusted-zone same as applications or different. This interface
+Inside(Gig0/0) is to be placed in trusted zone same as applications or different. This interface
 doesn't require default route to internet. User can change Security Group for these interfaces & ACLs for subnet.
-Outside(Gig0/0) is to be placed in un-trusted-zone, where default route is set to
+Outside(Gig0/0) is to be placed in un-trusted zone, where default route is set to
 internet. Also ports that needs to be opened on External Load Balancer, has to be opened on
 security group & ACLs. Management interface needs to be placed in a subnet where FMC connection is possible.
-This is like a application front-end, where traffic from un-trasted zone is passed to applications through NGFWv firewall.
+This is like a application front-end, where traffic from un-trusted zone is passed to applications through NGFWv firewall.
 These connections flow through NGFWv, however Ingress traffic (inbound connections initiated) to internet/un-trusted zone will not go through NGFWv.
 Please refer Configuration guide where use-case is briefly explained.
 
@@ -69,7 +69,7 @@ Scaling Policies can be created based on CPU either using AWS Dynamic Scaling or
     * Port objects for LB health-probe & application ports
     * Access Policy allowing health-probe port connections to Metadata server & other configurations
     * NAT Policy, doing manual NAT for LB health probes to AWS Metadata service
-1. Update Configuration.json file in lambda-python-files directory
+1. Update Configuration.json file in Autoscale_manager directory
     * Update FMC registration requirements (FMC IP, Reg ID, NAT Id)
     * Access Policy & NAT policy names (Note: These are already existing, won't be created new )
     * Update interface configuration with security-zone, interface-name & mtu etc
@@ -151,7 +151,7 @@ Scaling Policies can be created based on CPU either using AWS Dynamic Scaling or
 
     ```
 
-1. Collect AutoScale Stack parameters list (AWS, FMC & NGFW details)
+1. Collect AutoScale Stack parameters list (AWS, FMC & NGFWv details)
 1. Deploy deploy.yaml CloudFormation template
 1. Modify resources & configurations on AWS Dashboard & FMC GUI as needed
 

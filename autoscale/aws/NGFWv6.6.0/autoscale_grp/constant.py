@@ -14,16 +14,15 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-"""
-"""
+--------------------------------------------------------------------------------
+
 Name:       constant.py
 Purpose:    This is contains all system constants & descriptions
             This gets called in all project files if necessary
 """
 
-""" 
-Interface Tag Suffix, shouldn't be changed. 
-"""
+
+# Interface Tag Suffix, shouldn't be changed.
 DIAG_ENI_NAME = "-diag-eni"
 INSIDE_ENI_NAME = "-inside-eni"
 OUTSIDE_ENI_NAME = "-outside-eni"

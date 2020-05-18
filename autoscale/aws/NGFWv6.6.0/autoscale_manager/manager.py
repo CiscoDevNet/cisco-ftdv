@@ -14,18 +14,20 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-"""
-import json
-import time  
-import utility as utl
-from ngfw import NgfwInstance
-from fmc import FirepowerManagementCenter
-from aws import SimpleNotificationService
-"""
+--------------------------------------------------------------------------------
+
 Name:       manager.py
 Purpose:    This is the main Lambda handler file( autoscale_manager ).
             Takes AWS Lambda triggers & routes the request to appropriate function module.
 """
+
+import json
+import time
+import utility as utl
+from ngfw import NgfwInstance
+from fmc import FirepowerManagementCenter
+from aws import SimpleNotificationService
+
 # Setup Logging
 logger = utl.setup_logging(utl.e_var['DebugDisable'])
 
@@ -364,7 +366,7 @@ def execute_vm_configure_first(ftd, fmc):
         routes_status = ftd.check_and_configure_routes(fmc)
         if routes_status != 'SUCCESS':
             raise ValueError("Route configuration failed")
-            
+
         return 'SUCCESS'
     except ValueError as e:
         logger.info("Exception(known) occurred {}".format(repr(e)))

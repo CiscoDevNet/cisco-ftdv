@@ -14,12 +14,22 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       scaleout_cron.py
+Purpose:    To change CloudWatch Scheduled Event state for Scale-Out Lamda
 """
 import json
 import boto3
 import os
 
 def lambda_handler(event, context):
+    """
+    Purpose:    Lambda for changing Alarm state for Custom Scale-Out Lambda
+    Parameters: events, context
+    Returns:
+    Raises:
+    """
     try:
         print("Info:Received the event: " + json.dumps(event, indent=2))
         Eventclient = boto3.client('events')
@@ -42,8 +52,7 @@ def lambda_handler(event, context):
         print("Info:Scale Out MA event Name: "+so_ma_event)
         #response = Eventclient.disable_rule(Name=so_ma_event)
         #print("Info:Disabled the event")
-        
+
     except Exception as e:
         print("Error in event handler: %s", str(e))
         return None
-

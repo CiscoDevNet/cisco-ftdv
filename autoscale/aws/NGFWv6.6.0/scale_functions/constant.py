@@ -14,7 +14,13 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       constant.py
+Purpose:    This is contains all system constants & descriptions
+            This gets called in all project files if necessary
 """
+
 import os
 import logging
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ FTDv Auto Scale solution is a complete serverless implementation which makes use
 infrastructure provided by Azure (Logic App, Azure Functions, Load Balancers, Virtual Machine Scale Set.. etc.)
 
 Some of the key features of the FTDv Auto Scale for Azure implementation include:
-*	Completely automated FTDv instance registration and de-registered with FMC
+*	Completely automated FTDv instance registration and de-registration with FMC
 *	NAT policy, Access Policy, IP and Routes are automatically applied to scaled-out FTDv instance
 *	Support for Standard Load Balancers
 *	Supports FTDv deployment in Multi-availability zones

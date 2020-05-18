@@ -14,12 +14,23 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       scalein_cron.py
+Purpose:    To change CloudWatch Scheduled Event state for Scale-In Lamda
 """
+
 import json
 import boto3
 import os
 
 def lambda_handler(event, context):
+    """
+    Purpose:    Lambda for changing Alarm state for Custom Scale-In Lambda
+    Parameters: events, context
+    Returns:
+    Raises:
+    """
     try:
         print("Info:Received the event: " + json.dumps(event, indent=2))
         Eventclient = boto3.client('events')

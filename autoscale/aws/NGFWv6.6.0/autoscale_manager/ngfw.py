@@ -14,7 +14,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       ngfw.py
+Purpose:    This is contains ngfw class methods, SSH Paramiko class methods
 """
+
 import re
 import time
 import logging
@@ -25,10 +30,7 @@ import constant as const
 import utility as utl
 from aws import Ec2Instance
 from aws import ASG
-"""
-Name:       ngfw.py
-Purpose:    This is contains ngfw class methods, SSH Paramiko class methods
-"""
+
 # Setup Logging
 logger = utl.setup_logging(utl.e_var['DebugDisable'])
 
@@ -368,7 +370,7 @@ class NgfwInstance (Ec2Instance):
         ifname = []
         name = []
         nicId = []
-        
+
         if const.NIC_CONFIGURE == "STATIC":  # Related to CSCvs17405
             ip = []
             netmask = []
@@ -411,25 +413,25 @@ class NgfwInstance (Ec2Instance):
                 logger.error("In Configuration JSON file, interface name "
                              "(Ex: GigabitEthernet0/0 or 0/1) isn't available")
                 return 'FAIL'
-            
+
             if const.NIC_CONFIGURE == "STATIC":
                 if name[var_i] == "GigabitEthernet0/0":
                     nic_suffix = const.INSIDE_ENI_NAME
                 elif name[var_i] == "GigabitEthernet0/1":
                     nic_suffix = const.OUTSIDE_ENI_NAME
-                    
+
                 ip.append(self.get_private_ip_of_interface(nic_suffix))
                 subnet_id.append(self.get_subnet_id_of_interface(nic_suffix))
                 netmask.append(self.get_subnet_mask_from_subnet_id(subnet_id[var_i]))
-                
+
                 # Check if configured when Static
                 check_if_configured = fmc.get_nic_status(deviceId, name[var_i], nicId[var_i], ifname[var_i], zoneId[var_i], ip[var_i])
-                
+
             elif const.NIC_CONFIGURE == "DHCP":
                 # Check if configured when DHCP
                 check_if_configured = fmc.get_nic_status(deviceId, name[var_i], nicId[var_i], ifname[var_i], zoneId[var_i])
-            
-            
+
+
             # Configure Nic if not CONFIGURED
             if check_if_configured == 'UN-CONFIGURED':
                 try:
@@ -453,7 +455,7 @@ class NgfwInstance (Ec2Instance):
             elif const.NIC_CONFIGURE == "DHCP":
                 # Check if configured when DHCP
                 check_if_configured = fmc.get_nic_status(deviceId, name[var_i], nicId[var_i], ifname[var_i], zoneId[var_i])
-                
+
             if check_if_configured == 'UN-CONFIGURED':
                 return 'FAIL'
             else:

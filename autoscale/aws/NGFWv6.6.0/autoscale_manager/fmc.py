@@ -14,7 +14,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       fmc.py
+Purpose:    This is contains FMC class having REST methods
 """
+
 import time
 import requests
 import logging
@@ -22,10 +27,7 @@ import json
 import utility as utl
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-"""
-Name:       fmc
-Purpose:    This is contains fmc related REST methods
-"""
+
 # Setup Logging
 logger = utl.setup_logging(utl.e_var['DebugDisable'])
 

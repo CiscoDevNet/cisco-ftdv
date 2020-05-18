@@ -14,13 +14,24 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       scaleout.py
+Purpose:    This file has Lambda Handler for scaleout lambda
 """
+
 import json
 import os
 from aws_methods import *
 
 
 def lambda_handler(event, context):
+    """
+    Purpose:    Scale-Out Lambda Handler
+    Parameters: events, context
+    Returns:
+    Raises:
+    """
     try:
         logger.info("Info:Received the event: " + json.dumps(event, indent=2))
         message = json.loads(event['Records'][0]['Sns']['Message'])
@@ -35,6 +46,12 @@ def lambda_handler(event, context):
 
 
 def scaleout_handler(asgname):
+    """
+    Purpose:    To increment desired count by one
+    Parameters: AutoScale group name
+    Returns:
+    Raises:
+    """
     try:
         asg_client = boto3.client('autoscaling')
         asg_response = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asgname])

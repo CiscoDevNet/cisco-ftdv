@@ -14,17 +14,19 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+--------------------------------------------------------------------------------
+
+Name:       aws_methods.py
+Purpose:    This is contains aws resources related methods
 """
+
 import boto3
 import botocore
 import re
 from utility import *
 from botocore.exceptions import ClientError
 import constant as const
-"""
-Name:       aws_methods.py
-Purpose:    This is contains aws resources related methods
-"""
+
 
 class ASG:
     def __init__(self):
