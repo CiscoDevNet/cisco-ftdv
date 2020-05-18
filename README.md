@@ -1,2 +1,2 @@
-# ftd-azure-autoscaling
-FTDv auto scaling on Azure
+# ftd--autoscaling
+FTDv auto scaling on Azure, AWS, OCI, GCP
