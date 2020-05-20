@@ -17,7 +17,7 @@ The NGFWv Auto Scale solution is a CloudFormation template-based deployment that
 
 *Disclaimer: It is required to have prior understanding of AWS deployments & resources*
 
-**Note: Please refer Configuration Guide for detailed explanation**
+**Note: Please refer [Configuration Guide](./deploy-ftdv-auto-scale-for-aws.pdf) for detailed explanation**
 
 ## Use-case
 
