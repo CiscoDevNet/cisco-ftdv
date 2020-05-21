@@ -1,0 +1,56 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "vmNamePrefix": "Cisco-NGFW",
+  "DefaultPassword": {
+    "Description": "Default password of NGFW, Note: This should be same as AdminPassword in Day0 if specified in template",
+    "password": "Admin123"
+  },
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "aws-asg-policy",
+  "fmcDeviceGroupName": "AWS-Cisco-NGFW-VMs",
+  "fmcInsideNicName": "inside",
+  "fmcOutsideNicName": "outside",
+  "fmcInsideNic": "GigabitEthernet0/0",
+  "fmcOutsideNic": "GigabitEthernet0/1",
+  "fmcOutsideZone": "Outside-sz",
+  "fmcInsideZone": "Inside-sz",
+  "MetadataServerObjectName": "aws-metadata-server",
+  "interfaceConfig": [
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "Inside-sz"
+      },
+      "mode": "NONE",
+      "ifname": "inside",
+      "name": "GigabitEthernet0/0"
+    },
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "Outside-sz"
+      },
+      "mode": "NONE",
+      "ifname": "outside",
+      "name": "GigabitEthernet0/1"
+    }
+  ],
+  "trafficRoutes": [
+    {
+      "interface": "inside",
+      "network": "aws-metadata-server",
+      "gateway": "",
+      "metric": "1"
+    },
+    {
+      "interface": "inside",
+      "network": "Inside-subnet",
+      "gateway": "",
+      "metric": "1"
+    }
+  ]
+}
