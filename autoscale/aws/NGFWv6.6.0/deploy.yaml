@@ -1,0 +1,559 @@
+#  Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+#
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Deploys Autoscale solution for Cisco NGFWv instances
+Parameters:
+  AsmYamlFileName:
+    Description: Autoscale Manager Stack Template URL
+    Type: String
+  AsgYamlFileName:
+    Description: Autoscale Group Stack Template URL
+    Type: String
+  PodNumber:
+    Description: >-
+      This will be suffixed to Autoscale Group, like:
+      NGFW-AS-Group-1, It should be at least 1 numerical digit but not more than 5.
+    Type: String
+    Default: 1
+    AllowedPattern: '^\d{1,5}$'
+    ConstraintDescription: must be a numerical string matching '^\d{1,5}$'
+  S3BktName:
+    Description: The S3 Bucket name for lambda function
+    Type: String
+    AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: must be a valid S3 bucket name
+  DisableDebug:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable/Disable debug logs, default is debug enabled.
+  TgHealthPort:
+    Description: >-
+      This port is used by Target group for health probes, Health probes arriving at this port on NGFWv will be routed to AWS Metadata server
+    Type: String
+    AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
+    ConstraintDescription: must be a valid TCP port
+  ASMname:
+    Description: AutoScale Manager(ASM) Name Prefix
+    Type: String
+    Default: Cisco-NGFW
+    MaxLength: 18
+    ConstraintDescription: must be a string with Maximum length 18
+  LayerArn:
+    Description: Lambda layer for lambda functions
+    Type: String
+    AllowedPattern: '^arn:aws:lambda:.*:.*:layer:.*:\d*$'
+    ConstraintDescription: must be a ARN string matching '^arn:aws:lambda:.*:.*:layer:.*:\d*$'
+  ConfigJSONname:
+    Description: User defined rules in JSON, must be available in the above mentioned s3 bucket
+    Type: String
+    Default: Configuration.json
+    AllowedPattern: '.*\.json'
+    ConstraintDescription: must be a <filename>.json
+  KmsArn:
+    Description: >-
+      [Conditional] ARN of an existing KMS (AWS KMS key to encrypt at rest), If specified, FMC & FTD Passwords below should be encrypted
+      Password. The Password encryption should be done only using the specified ARN.
+      Generating Encrypted Password Ex: " aws kms encrypt --key-id <KMS ARN> --plaintext <password> ", Please used such generated password in below fields.
+    Type: String
+  fmcServer:
+    Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
+    Type: String
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
+  fmcUsername:
+    Description: >-
+      Unique Internal user for Autoscale Manager automation tasks on FMC,
+        User should have roles system provided 'Network Admin' and 'Maintenance User' or more.
+        Refer 'Firepower Management Center Configuration Guide'
+    Type: String
+  fmcPassword:
+    Description: >-
+      Please make sure you type correct password (Wrong password will result in failure in automation)
+      If KMS ARN is specified above, please provide encrypted password.
+    NoEcho: true
+    Type: String
+  ngfwPassword:
+    Description: >-
+      All NGFW instances come up with default password, which is in Userdata field of Launch Template(Autoscale Group).
+      The same default password should also be available in Configuration.json file. If this parameter field is different
+      from default password, this will be applied upon first boot.
+      Any changes to this field post deployment will not propagate to existing VMs.
+    NoEcho: true
+    Type: String
+  AutoscaleGrpNameSuffix:
+    Description: >-
+      This will be Autoscale Group Name prefix with suffix as Pod Number
+    Type: String
+    Default: Cisco-NGFW
+    MaxLength: 18
+  VpcId:
+    Description: Select vpc
+    Type: 'AWS::EC2::VPC::Id'
+  NoOfAZs:
+    Description: >-
+      Total Number of Availability Zones into which NGFWv will be deployed (Min 1 and Max 2 depends on Region).
+      If Application Load Balancer is to be deployed, minimum 2 Availability Zones required.
+    Type: Number
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+    Default: 2
+  ListOfAzs:
+    Type: CommaDelimitedList
+    Description: Enter the list of Availability Zones (Based on Number of Availability Zones above). Please note down the order of AZs.
+  FTDvMgmtSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvInsideSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvOutsideSubnetId:
+    Description: >-
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      The order in which subnet-ids are listed should be same of list of AZs mentioned above.
+    Type: CommaDelimitedList
+  FTDvInstanceType:
+    Description: Cisco NGFWv EC2 instance type
+    Type: String
+    AllowedValues:
+      - c4.xlarge
+      - c4.2xlarge
+    Default: c4.xlarge
+  NGFWvAmiID:
+    Description: >-
+      Please choose correct AMI ID as per the region and desired version of the image. Autoscale Feature supports
+      NGFWv 6.4 onwards releases, this can be BYOL/PAYG images, either of the case user should have accepted License in market place.
+      In case of BYOL, please update 'licenseCaps' key in Configuration JSON with features such as 'BASE', 'MALWARE', 'THREAT', 'URLFilter' etc.
+      Please refer link to get correct AMI IDs.
+      https://aws.amazon.com/marketplace/server/configuration?productId=ad0af76e-c569-4a81-84d0-cff2308179ef&ref_=psb_cfg_continue
+      https://aws.amazon.com/marketplace/server/configuration?productId=b28c8fc5-cc45-4a81-998e-6896ff098646&ref_=psb_cfg_continue
+    Type: AWS::EC2::Image::Id
+    Default: ami-003b7b3f67cab262d
+  LoadBalancerType:
+    Type: String
+    AllowedValues:
+      - application
+      - network
+    Description: >-
+      Choose the type of External load balancer
+    Default: network
+  NoOfUnSecPorts:
+    Description: >-
+      Total Number of Unsecured ports to be opened
+    Type: Number
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+    Default: 1
+  UnSecuredPorts:
+    Description: >-
+      [Optional] These ports will be opened on LB with either HTTP or TCP as protocol, based on chosen LB type.  (Min: 0 and Max: 2)
+    Type: CommaDelimitedList
+    Default: 80, 8000
+  SSLcertificate:
+    Description: >-
+      [Conditional] ARN of an existing TLS/SSL Certificate in AWS ACM, If specified, TLS with port 443 gets opened on Load Balancer.
+      If Any Secured port has to be opened then, Certificate ARN has to be entered, otherwise optional.
+    Type: String
+  NoOfSecPorts:
+    Description: >-
+      Total Number of Unsecured ports to be opened
+    Type: Number
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+    Default: 1
+  SecuredPorts:
+    Description: >-
+      [Optional] These ports will be opened on LB with either HTTPS or TLS as protocol, based on chosen LB type.  (Min: 0 and Max: 2)
+    Type: CommaDelimitedList
+    Default: 443, 444
+  LBDeRegDelay:
+    Description: >-
+      Seconds of time the connection drain happens for Graceful termination
+    Type: Number
+    Default: 180
+    MinValue: 0
+    MaxValue: 999
+    ConstraintDescription: must be in digits (Minumum 0, Maximum 999 seconds)
+  ScalingAction:
+    Type: String
+    AllowedValues:
+      - Custom Scaling via Lambda Functions
+      - AWS provided Dynamic Scaling
+    Description: Choose Scaling Action type (AWS Dynamic policy or Custom Lambda Function)
+    Default: AWS provided Dynamic Scaling
+  CPUScaleOutThreshold:
+    Description: >-
+      Enter details Scale-Out percentage threshold. (Group Average)
+      Please make sure ScaleOut threshold is greater than ScaleIn threshold.
+    Type: Number
+    Default: 70
+    MinValue: 10
+    MaxValue: 99
+    ConstraintDescription: must be in digits (Minimum 10, Maximum 99)
+  CPUScaleOutDatapointsToAlarm:
+    Description: >-
+      Scale-Out Cloudwatch alarm, Data points.
+      If '3' is value then 3 times threshold breach should happen in 3x60 seconds.
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 180
+    ConstraintDescription: must be in digits (Minumum 1, Maximum 180)
+  CPUScaleInThreshold:
+    Description: >-
+      Enter details Scale-In percentage threshold. (Group Average)
+      Please make sure ScaleIn threshold is lower than ScaleOut threshold.
+    Type: Number
+    Default: 15
+    MinValue: 0
+    MaxValue: 99
+    ConstraintDescription: must be in digits (Minimum 0, Maximum 99)
+  CPUScaleInDatapointsToAlarm:
+    Description: >-
+      Scale-In Cloudwatch alarm, Data points.
+      If '8' is value then 8 times threshold breach should happen in 8x60 seconds.
+    Type: Number
+    Default: 8
+    MinValue: 1
+    MaxValue: 180
+    ConstraintDescription: must be in digits (Minumum 1, Maximum 180)
+  ActionEmail:
+    Description: >-
+      Email address to which Scaling options email needs to be sent to.
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+  CoolDownPeriod:
+    Description: Time in seconds, time taken for a Scale out action to bring up new NGFWv & configure it to take traffic
+    Type: Number
+    Default: 1320
+    MinValue: 1320
+  MinInstanceCapacity:
+    Type: Number
+    MinValue: 0
+    MaxValue: 5
+    Default: 1
+    Description: >-
+      Minimum number of instances that needs to be launched immediately after Autoscale Group Creation.
+      This should be less or equal to Maximum number of instances.
+  MaxInstanceCapacity:
+    Type: Number
+    MaxValue: 25
+    MinValue: 1
+    Default: 2
+    Description: >-
+      Maximum number of instances that can spin up over the time as demanded.
+      This should be equal or greater than minimum number of instances.
+Conditions:
+  CreateScalingPolicy: !Equals
+    - !Ref ScalingAction
+    - AWS provided Dynamic Scaling
+  CreateScalingLambda: !Equals
+    - !Ref ScalingAction
+    - Custom Scaling via Lambda Functions
+  support1zone: !Equals
+    - !Ref NoOfAZs
+    - 1
+  support2zone: !Equals
+    - !Ref NoOfAZs
+    - 2
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
+  UnSecPort2: !Equals
+    - '2'
+    - !Ref NoOfUnSecPorts
+  UnSecPort1: !Or
+    - !Condition UnSecPort2
+    - !Equals
+      - '1'
+      - !Ref NoOfUnSecPorts
+  SSLcert: !Not
+    - !Equals
+      - ''
+      - !Ref SSLcertificate
+  SecPort2: !And
+    - !Equals
+      - '2'
+      - !Ref NoOfSecPorts
+    - !Condition SSLcert
+  SecPort1: !And
+    - !Or
+      - !Condition SecPort2
+      - !Equals
+        - '1'
+        - !Ref NoOfSecPorts
+    - !Condition SSLcert
+  CreateELBTypeApp: !Equals
+    - !Ref LoadBalancerType
+    - application
+  CreateELBTypeNet: !Equals
+    - !Ref LoadBalancerType
+    - network
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Stack Parameters
+        Parameters:
+          - PodNumber
+          - AsmYamlFileName
+          - AsgYamlFileName
+      - Label:
+          default: VPC Enviornment
+        Parameters:
+          - VpcId
+          - NoOfAZs
+          - S3BktName
+          - DisableDebug
+      - Label:
+          default: Autoscale Manager Setting
+        Parameters:
+          - ASMname
+          - LayerArn
+          - KmsArn
+          - ConfigJSONname
+      - Label:
+          default: Autoscale Group Settings
+        Parameters:
+          - AutoscaleGrpNameSuffix
+          - MinInstanceCapacity
+          - MaxInstanceCapacity
+          - ScalingAction
+          - CPUScaleOutThreshold
+          - CPUScaleOutDatapointsToAlarm
+          - CPUScaleInThreshold
+          - CPUScaleInDatapointsToAlarm
+          - ActionEmail
+          - CoolDownPeriod
+      - Label:
+          default: Load Balancer Settings
+        Parameters:
+          - LoadBalancerType
+          - NoOfUnSecPorts
+          - UnSecuredPorts
+          - SSLcertificate
+          - NoOfSecPorts
+          - SecuredPorts
+          - TgHealthPort
+          - LBDeRegDelay
+      - Label:
+          default: FMCv automation Configuration
+        Parameters:
+          - fmcServer
+          - fmcUsername
+          - fmcPassword
+      - Label:
+          default: Cisco NGFWv Settings
+        Parameters:
+          - FTDvInstanceType
+          - NGFWvAmiID
+          - ngfwPassword
+          - ListOfAzs
+          - FTDvMgmtSubnetId
+          - FTDvInsideSubnetId
+          - FTDvOutsideSubnetId
+    ParameterLabels:
+      AsmYamlFileName:
+        default: Autoscale Manager CloudFormation template name
+      AsgYamlFileName:
+        default: Autoscale Group CloudFormation template name
+      S3BktName:
+        default: S3 bucket name
+      PodNumber:
+        default: Pod Number
+      ASMname:
+        default: Autoscale Manager Name
+      LayerArn:
+        default: Autoscale Manager Lambda layer ARN
+      ConfigJSONname:
+        default: Configuration JSON File
+      DisableDebug:
+        default: Disable debug logs
+      KmsArn:
+        default: KMS Master Key ARN
+      fmcServer:
+        default: FMC host IP address
+      fmcUsername:
+        default: FMC Username
+      fmcPassword:
+        default: FMC Password
+      ngfwPassword:
+        default: NGFWv Password
+      AutoscaleGrpNameSuffix:
+        default: Autoscale Group Name Prefix
+      ScalingAction:
+        default: Scaling Action
+      MinInstanceCapacity:
+        default: Minimum number of instances in Autoscale Group
+      MaxInstanceCapacity:
+        default: Maximum number of instances in Autoscale Group
+      CPUScaleOutThreshold:
+        default: Scale Out CPU Upper Threshold
+      CPUScaleOutDatapointsToAlarm:
+        default: Scale Out Data points
+      CPUScaleInThreshold:
+        default: Scale In CPU Lower Threshold
+      CPUScaleInDatapointsToAlarm:
+        default: Scale In Data points
+      ActionEmail:
+        default: Autoscale Email Notification
+      CoolDownPeriod:
+        default: Cool Down period
+      VpcId:
+        default: VPC ID
+      NoOfAZs:
+        default: Number of Availibility Zones
+      ListOfAzs:
+        default: Availability Zones
+      FTDvInstanceType:
+        default: NGFWv Instance type
+      NGFWvAmiID:
+        default: NGFWv AMI-ID
+      FTDvMgmtSubnetId:
+        default: Subnets List for NGFWv Management Interface
+      FTDvInsideSubnetId:
+        default: Subnets List for NGFWv Inside Interface
+      FTDvOutsideSubnetId:
+        default: Subnets List for NGFWv Outside Interface
+      LoadBalancerType:
+        default: Load Balancer type
+      NoOfUnSecPorts:
+        default: Number of Unsecured ports
+      UnSecuredPorts:
+        default: Unsecured Ports List
+      NoOfSecPorts:
+        default: Number of Secured ports
+      SecuredPorts:
+        default: Secured Ports List
+      SSLcertificate:
+        default: ARN of existing SSL Certificate ACM/IAM
+      LBDeRegDelay:
+        default: Enter draining time in seconds
+      TgHealthPort:
+        default: Enter a port for NGFWv instance health check
+Resources:
+  ASMstack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref AsmYamlFileName
+      Parameters:
+        ASMname: !Ref ASMname
+        ASMpodNo: !Ref PodNumber
+        ActionEmail: !Ref ActionEmail
+        FTDvGroupName: !Join ['-', [!Ref AutoscaleGrpNameSuffix, !Ref PodNumber]]
+        LayerArn: !Ref LayerArn
+        S3BktName: !Ref S3BktName
+        ConfigJSONname: !Ref ConfigJSONname
+        DisableDebug: !Ref DisableDebug
+        KmsArn: !Ref KmsArn
+        fmcServer: !Ref fmcServer
+        fmcUsername: !Ref fmcUsername
+        fmcPassword: !Ref fmcPassword
+        ngfwPassword: !Ref ngfwPassword
+        TgHealthPort: !Ref TgHealthPort
+  ASGstack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: ASMstack
+    Properties:
+      TemplateURL: !Ref AsgYamlFileName
+      Parameters:
+        VpcId: !Ref VpcId
+        NoOfAZs: !Ref NoOfAZs
+        ListOfAzs: !If
+          - support1zone
+          - !Select ['0', !Ref ListOfAzs ]
+          - !If
+            - support2zone
+            - !Join [',', [ !Select ['0', !Ref ListOfAzs ], !Select ['1', !Ref ListOfAzs ] ] ]
+            - !Join [',', [ !Select ['0', !Ref ListOfAzs ], !Select ['1', !Ref ListOfAzs ], !Select ['2', !Ref ListOfAzs ] ] ]
+        S3BktName: !Ref S3BktName
+        AutoscaleGrpNameSuffix: !Ref AutoscaleGrpNameSuffix
+        PodNumber: !Ref PodNumber
+        MinInstanceCapacity: !Ref MinInstanceCapacity
+        MaxInstanceCapacity: !Ref MaxInstanceCapacity
+        ScalingAction: !Ref ScalingAction
+        CPUScaleOutThreshold: !Ref CPUScaleOutThreshold
+        CPUScaleOutDatapointsToAlarm: !Ref CPUScaleOutDatapointsToAlarm
+        CPUScaleInThreshold: !Ref CPUScaleInThreshold
+        CPUScaleInDatapointsToAlarm:  !Ref CPUScaleInDatapointsToAlarm
+        ActionEmail: !Ref ActionEmail
+        CoolDownPeriod: !Ref CoolDownPeriod
+        DisableDebug: !Ref DisableDebug
+        LoadBalancerType: !Ref LoadBalancerType
+        NoOfUnSecPorts: !Ref NoOfUnSecPorts
+        UnSecuredPorts: !If
+          - UnSecPort2
+          - !Join [',', [ !Select ['0', !Ref UnSecuredPorts ], !Select ['1', !Ref UnSecuredPorts ] ] ]
+          - !If
+            - UnSecPort1
+            - !Select ['0', !Ref UnSecuredPorts ]
+            - ''
+        SSLcertificate: !Ref SSLcertificate
+        NoOfSecPorts: !Ref NoOfSecPorts
+        SecuredPorts: !If
+          - SecPort2
+          - !Join [',', [ !Select ['0', !Ref SecuredPorts ], !Select ['1', !Ref SecuredPorts ] ] ]
+          - !If
+            - SecPort1
+            - !Select ['0', !Ref SecuredPorts ]
+            - ''
+        TgHealthPort: !Ref TgHealthPort
+        LBDeRegDelay: !Ref LBDeRegDelay
+        FTDvInstanceType: !Ref FTDvInstanceType
+        NGFWvAmiID: !Ref NGFWvAmiID
+        FTDvMgmtSubnetId: !If
+          - support1zone
+          - !Select ['0', !Ref FTDvMgmtSubnetId ]
+          - !If
+            - support2zone
+            - !Join [',', [ !Select ['0', !Ref FTDvMgmtSubnetId ], !Select ['1', !Ref FTDvMgmtSubnetId ] ] ]
+            - !Join [',', [ !Select ['0', !Ref FTDvMgmtSubnetId ], !Select ['1', !Ref FTDvMgmtSubnetId ], !Select ['2', !Ref FTDvMgmtSubnetId ] ] ]
+        FTDvInsideSubnetId: !If
+          - support1zone
+          - !Select ['0', !Ref FTDvInsideSubnetId ]
+          - !If
+            - support2zone
+            - !Join [',', [ !Select ['0', !Ref FTDvInsideSubnetId ], !Select ['1', !Ref FTDvInsideSubnetId ] ] ]
+            - !Join [',', [ !Select ['0', !Ref FTDvInsideSubnetId ], !Select ['1', !Ref FTDvInsideSubnetId ], !Select ['2', !Ref FTDvInsideSubnetId ] ] ]
+        FTDvOutsideSubnetId: !If
+          - support1zone
+          - !Select ['0', !Ref FTDvOutsideSubnetId ]
+          - !If
+            - support2zone
+            - !Join [',', [ !Select ['0', !Ref FTDvOutsideSubnetId ], !Select ['1', !Ref FTDvOutsideSubnetId ] ] ]
+            - !Join [',', [ !Select ['0', !Ref FTDvOutsideSubnetId ], !Select ['1', !Ref FTDvOutsideSubnetId ], !Select ['2', !Ref FTDvOutsideSubnetId ] ] ]
+Outputs:
+  ASMstack:
+    Description: Autoscale manager stack
+    Value: !Ref ASMstack
+  ASGstack:
+    Description: Autoscale group stack
+    Value: !Ref ASGstack
