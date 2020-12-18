@@ -28,7 +28,7 @@ You can customize this file for your Azure deployment environment.<br>
 ```
 
 ## References
-* [Software Downloads Home](https://software.cisco.com/download/home/286306503/type/286306337/release/6.6.0)
+* [Software Downloads Home](https://software.cisco.com/download/home/286306503/type/286306337/release/6.7.0)
 * [FTDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/azure/ftdv-azure-gsg/ftdv-azure-deploy.html#id_82702)
 * [FMCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 
