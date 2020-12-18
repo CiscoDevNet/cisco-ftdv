@@ -34,4 +34,5 @@ Azure Resource Manager templates are JSON files that contain resource descriptio
 * NGFWv6.7.0 : [Code](autoscale/aws/NGFWv6.7.0/)     |     [README](autoscale/aws/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.7.0/deploy-ftdv-auto-scale-for-aws.pdf)
 
 **Deployment Template**
-* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Azure NGFWv Deployment Template for NGFWv6.6.0: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Azure NGFWv Deployment Template for NGFWv6.7.0: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.7.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.7.0/fmcv/README.md)
