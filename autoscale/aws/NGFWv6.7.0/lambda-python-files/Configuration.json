@@ -1,0 +1,45 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "aws-asg-policy",
+  "fmcNatPolicyName": "AWS-Cisco-NGFW-VMs",
+  "fmcInsideNicName": "inside",
+  "fmcOutsideNicName": "outside",
+  "fmcInsideNic": "GigabitEthernet0/0",
+  "fmcOutsideNic": "GigabitEthernet0/1",
+  "fmcOutsideZone": "Outside-sz",
+  "fmcInsideZone": "Inside-sz",
+  "MetadataServerObjectName": "aws-metadata-server",
+  "interfaceConfig": [
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "Inside-sz"
+      },
+      "mode": "NONE",
+      "ifname": "inside",
+      "name": "GigabitEthernet0/0"
+    },
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "Outside-sz"
+      },
+      "mode": "NONE",
+      "ifname": "outside",
+      "name": "GigabitEthernet0/1"
+    }
+  ],
+  "trafficRoutes": [
+    {
+      "interface": "inside",
+      "network": "aws-metadata-server",
+      "gateway": "",
+      "metric": "1"
+    }
+  ]
+}
