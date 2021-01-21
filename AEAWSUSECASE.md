@@ -27,3 +27,7 @@ The Internet-facing load balancer can be a Network Load Balancer or an Applicati
 the AWS requirements and conditions hold true for either case. As indicated in the Use Case diagram, the right side of the dotted line is deployed via the FTDv templates. The left side is completely user-defined.
 
 *Note:* Application-initiated outbound traffic will not go through the FTDv.
+
+**FTDv Auto Scaling for AWS**
+* NGFWv6.6.0 : [Code](autoscale/aws/NGFWv6.6.0/)     |     [README](autoscale/aws/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.6.0/deploy-ftdv-auto-scale-for-aws.pdf)
+* NGFWv6.7.0 : [Code](autoscale/aws/NGFWv6.7.0/)     |     [README](autoscale/aws/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.7.0/deploy-ftdv-auto-scale-for-aws.pdf)
