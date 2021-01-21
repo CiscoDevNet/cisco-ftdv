@@ -27,3 +27,11 @@ traffic to application.
 firewall then forwards traffic to Internet.
 * A network packet will never pass through both (internal & external) load balancers in a single connection.
  * The number of FTDv instances in the scale set will be scaled and configured automatically based on load conditions.
+ 
+ ### FTDv Auto Scaling for Azure
+* NGFWv6.6.0 : [Code](autoscale/azure/NGFWv6.6.0/)     |     [README](autoscale/azure/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/deploy-ftdv-auto-scale-for-azure.pdf)
+* NGFWv6.7.0 : [Code](autoscale/azure/NGFWv6.7.0/)     |     [README](autoscale/azure/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/ftdv-azure-autoscale-v67.pdf)
+
+### Deployment Templates
+* Azure NGFWv Deployment Template for NGFWv6.6.0: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Azure NGFWv Deployment Template for NGFWv6.7.0: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.7.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.7.0/fmcv/README.md)
