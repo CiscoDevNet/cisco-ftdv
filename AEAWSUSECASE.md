@@ -8,8 +8,8 @@ automation of this feature) that adds horizontal auto scaling capability to FTDv
 environment.
 
 The FTDv Auto Scale solution is a CloudFormation template-based deployment that provides:<br>
-• Completely automated FTDv instance registration and de-registration with the FMC.
-• NAT policy, Access Policy, and Routes automatically applied to scaled-out FTDv instances.
+• Completely automated FTDv instance registration and de-registration with the FMC
+• NAT policy, Access Policy, and Routes automatically applied to scaled-out FTDv instances
 • Support for Load Balancers and multi-availability zones.
 
 ## Auto Scale Use Case
