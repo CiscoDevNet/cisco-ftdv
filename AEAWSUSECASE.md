@@ -17,7 +17,7 @@ The FTDv Auto Scale solution is a CloudFormation template-based deployment that 
 The Use Case for this FTDv AWS Auto Scale Solution is shown in Figure,  Because the AWS Load Balancer allows only Inbound-initiated connections, only
 externally generated traffic is allowed to pass inside via the Cisco FTDv firewall. 
 
-![Autoscale Use Case Diagram](dia.png)
+![Autoscale Use Case Diagram](dia.PNG)
 
 The Internet-facing Load Balancer will have a DNS name, and 0 to 4 ports can be kept open. Of those ports, 0 to 2 can be unsecured ports such as HTTP/80, and 0 to 2 can be secured ports such as HTTPS/443.
 
