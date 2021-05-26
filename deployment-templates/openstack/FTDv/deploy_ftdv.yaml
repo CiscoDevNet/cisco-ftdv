@@ -1,0 +1,136 @@
+heat_template_version: 2013-05-23
+description: FTDv template
+
+parameters:
+   ftdv_flavor_name:
+      type: string
+      default: ftdv_flavor
+
+   glance_ftdv_image_name:
+      type: string
+      default: ftdv_image
+
+   ftdv_secgroup_name:
+      type: string
+      default: ftdv_secgroup
+
+   mgmt_net_name:
+      type: string
+      default: mgmt_network
+
+   mgmt_subnet_name:
+      type: string
+      default: mgmt_subnet
+
+   diag_net_name:
+      type: string
+      default: diag_network
+
+   inside_net_name:
+      type: string
+      default: inside_network
+
+   outside_net_name:
+      type: string
+      default: outside_network
+
+   ext_net_name:
+      type: string
+      default: ext_network
+
+resources:
+   ftdv_flav_res:
+      type: OS::Nova::Flavor
+      properties:
+         name: { get_param: ftdv_flavor_name }
+         ram: 8192
+         vcpus: 4
+         disk: 50
+
+   ftdv_sec_grp:
+      type: OS::Neutron::SecurityGroup
+      properties:
+         name: { get_param: ftdv_secgroup_name}
+         rules:
+            - { direction: ingress, ethertype: IPv4 }
+            - { direction: egress, ethertype: IPv4 }
+            - { direction: ingress, ethertype: IPv6 }
+            - { direction: egress, ethertype: IPv6 }
+            - { direction: ingress, protocol: icmp, remote_ip_prefix: 0.0.0.0/0 }
+            - { direction: egress, protocol: icmp, remote_ip_prefix: 0.0.0.0/0 }
+            - { direction: ingress, protocol: tcp, port_range_min: 8305, port_range_max: 8305, remote_ip_prefix: 0.0.0.0/0}
+            - { direction: egress, protocol: tcp, port_range_min: 8305, port_range_max: 8305, remote_ip_prefix: 0.0.0.0/0}
+            - { direction: ingress, protocol: tcp, port_range_min: 80, port_range_max: 80, remote_ip_prefix: 0.0.0.0/0}
+            - { direction: ingress, protocol: tcp, port_range_min: 443, port_range_max: 443, remote_ip_prefix: 0.0.0.0/0}
+            - { direction: ingress, protocol: tcp, port_range_min: 22, port_range_max: 22, remote_ip_prefix: 0.0.0.0/0}
+
+   ftdv_float_ip:
+      type: OS::Neutron::FloatingIP
+      properties:
+         floating_network: { get_param: ext_net_name }
+         port_id: { get_resource: mgmt_port}
+
+   mgmt_port:
+      type: OS::Neutron::Port
+      properties:
+         name: mgmt_ftdv_port
+         network: { get_param: mgmt_net_name }
+         security_groups: [{ get_resource: ftdv_sec_grp}]
+         fixed_ips:
+            - subnet: { get_param: mgmt_subnet_name }
+
+   diag_port:
+      type: OS::Neutron::Port
+      properties:
+         name: diag_ftdv_port
+         network: { get_param: diag_net_name }
+
+   in_port:
+      type: OS::Neutron::Port
+      properties:
+         name: in_ftdv_port
+         network: { get_param: inside_net_name }
+         port_security_enabled: false
+
+   out_port:
+      type: OS::Neutron::Port
+      properties:
+         name: out_ftdv_port
+         network: { get_param: outside_net_name }
+         port_security_enabled: false
+
+   ftdv:
+      type: OS::Nova::Server
+      properties:
+         flavor: { get_resource: ftdv_flav_res} 
+         image: { get_param: glance_ftdv_image_name }
+         name: os-ftdv-vm
+         networks:
+            - port: { get_resource: mgmt_port }
+            - port: { get_resource: diag_port }
+            - port: { get_resource : in_port }
+            - port: { get_resource: out_port }
+         config_drive: true
+         user_data_format: RAW
+         user_data: |
+            {
+            "EULA": "accept",
+            "AdminPassword": "Admin123",
+            "FirewallMode": "routed",
+            "IPv4Mode": "dhcp",
+            "IPv6Mode": "Disabled",
+            "IPv6Addr": "",
+            "IPv6Mask": "",
+            "IPv6Gw": "", 
+            "ManageLocally":"No"
+            }
+
+outputs:
+   server_ip:
+      description: FTDv mgmt ip address
+      value: { get_attr: [ftdv, networks, { get_param: mgmt_net_name }, 0]}
+
+   floating_ip:
+      description: FTDV Floating IP addres
+      value: { get_attr: [ ftdv_float_ip, floating_ip_address ] }
+

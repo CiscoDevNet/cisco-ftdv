@@ -1229,4 +1229,4 @@ Resources:
           Enabled: true
         UserData:
           Fn::Base64: !Sub |
-            { "AdminPassword": "Admin123"}
+            { "AdminPassword": "FtDv_AuT0Scale"}
