@@ -1,4 +1,4 @@
-# Automated Horizontal Scaling of FTDv in Azure
+# Automated Horizontal Scaling of FTDv in Azure for Version 6.7.0 and Above
 
 ## Feature Overview
 

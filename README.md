@@ -30,13 +30,13 @@ This conatains heat template files to deploy the Firepower Threat Defense Virtua
 ## Resources
 
 **FTDv Auto Scaling for Azure**
-* For NGFWv6.6.0 : [Code](autoscale/azure/NGFWv6.6.0/)     |     [README](autoscale/azure/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/deploy-ftdv-auto-scale-for-azure.pdf)
 * For NGFWv6.7.0 & Above : [Code](autoscale/azure/NGFWv6.7.0/)     |     [README](autoscale/azure/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.7.0/ftdv-azure-autoscale-v67.pdf)
+* For NGFWv6.6.0 : [Code](autoscale/azure/NGFWv6.6.0/)     |     [README](autoscale/azure/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/deploy-ftdv-auto-scale-for-azure.pdf)
 
 **FTDv Auto Scaling for AWS**
-* For NGFWv6.6.0 : [Code](autoscale/aws/NGFWv6.6.0/)     |     [README](autoscale/aws/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.6.0/deploy-ftdv-auto-scale-for-aws.pdf)
 * For NGFWv6.7.0 & Above : [Code](autoscale/aws/NGFWv6.7.0/)     |     [README](autoscale/aws/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.7.0/deploy-ftdv-auto-scale-for-aws.pdf)
+* For NGFWv6.6.0 : [Code](autoscale/aws/NGFWv6.6.0/)     |     [README](autoscale/aws/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.6.0/deploy-ftdv-auto-scale-for-aws.pdf)
 
 **Deployment Template**
-* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv7.0.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv7.0.0/fmcv/README.md)
 * Openstack NGFWv Heat Deployment Template: [README](deployment-templates/openstack/README.md) | [NFWv/FTDv](deployment-templates/openstack/FTDv/README.md)  |   [FMCv](deployment-templates/openstack/FMCv/README.md)
