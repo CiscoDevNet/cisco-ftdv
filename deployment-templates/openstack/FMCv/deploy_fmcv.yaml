@@ -1,0 +1,95 @@
+heat_template_version: 2013-05-23
+description: FMCv template
+
+parameters:
+   fmcv_flavor_name:
+      type: string
+      default: fmcv_flavor
+
+   glance_fmcv_image_name:
+      type: string
+      default: fmcv_image
+
+   fmcv_secgroup_name:
+      type: string
+      default: fmcv_secgroup
+
+   mgmt_net_name:
+      type: string
+      default: mgmt_network
+
+   mgmt_subnet_name:
+      type: string
+      default: mgmt_subnet
+
+   ext_net_name:
+      type: string
+      default: ext_network 
+
+resources:
+   fmcv_flav_res:
+      type: OS::Nova::Flavor
+      properties:
+         name: { get_param: fmcv_flavor_name }
+         ram: 32768
+         vcpus: 16
+         disk: 250
+
+   fmcv_sec_grp:
+      type: OS::Neutron::SecurityGroup
+      properties:
+         name: { get_param: fmcv_secgroup_name}
+         rules:
+            - { direction: ingress, ethertype: IPv4, protocol: icmp, remote_ip_prefix: 0.0.0.0/0 }
+            - { direction: ingress, ethertype: IPv4, protocol: tcp, port_range_min: 1, port_range_max: 65535, remote_ip_prefix: 0.0.0.0/0}
+            - { direction: ingress, ethertype: IPv4, protocol: udp, port_range_min: 1, port_range_max: 65535, remote_ip_prefix: 0.0.0.0/0}
+
+   fmcv_float_ip:
+      type: OS::Neutron::FloatingIP
+      properties:
+         floating_network: { get_param: ext_net_name }
+         port_id: { get_resource: mgmt_port}
+
+   mgmt_port:
+      type: OS::Neutron::Port
+      properties:
+         name: mgmt_fmcv_port
+         network: { get_param: mgmt_net_name }
+         security_groups: [{ get_resource: fmcv_sec_grp}]
+         fixed_ips:
+            - subnet: { get_param: mgmt_subnet_name}
+
+   fmcv:
+      type: OS::Nova::Server
+      properties:
+         flavor: { get_resource: fmcv_flav_res} 
+         image: { get_param: glance_fmcv_image_name }
+         name: os-fmcv-vm
+         networks:
+            - port: { get_resource: mgmt_port }
+         config_drive: true
+         user_data_format: RAW
+         user_data: |
+            {
+            "EULA": "accept",
+            "AdminPassword": "Admin123",
+            "DNS1": "208.67.222.222",
+            "DNS2": "208.67.220.220",
+            "NTP1": "0.sourcefire.pool.ntp.org",
+            "NTP2": "1.sourcefire.pool.ntp.org",
+            "IPv4Mode": "dhcp",
+            "IPv6Mode": "Disabled",
+            "IPv6Addr": "",
+            "IPv6Mask": "",
+            "IPv6Gw": ""
+            }
+
+outputs:
+   server_ip:
+      description: FMCv mgmnt IP address
+      value: { get_attr: [fmcv, networks, { get_param: mgmt_net_name }, 0]}
+
+   floating_ip:
+      description: FMCv Floating IP address
+      value: { get_attr: [ fmcv_float_ip, floating_ip_address ] }
+

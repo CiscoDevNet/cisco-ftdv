@@ -1,0 +1,200 @@
+heat_template_version: 2013-05-23
+description: Infrastructure template for FTDv/FMCv and ASAv
+
+parameters:
+   mgmt_net_cidr:
+      type: string
+      default: 50.50.1.0/24
+
+   diag_net_cidr:
+      type: string
+      default: 50.50.2.0/24
+
+   inside_net_cidr:
+      type: string
+      default: 50.50.3.0/24
+
+   outside_net_cidr:
+      type: string
+      default: 50.50.4.0/24
+
+   provider_phys_net_name:
+      type: string
+      default: extnet
+ 
+   provider_net_type:
+      type: string
+      default: flat
+
+   ext_net_cidr:
+      type: string
+      default: 60.60.1.0/24
+
+   ext_net_gw_ip:
+      type: string
+      default: 60.60.1.1
+
+   ext_net_start_ip:
+      type: string
+      default: 60.60.1.10
+
+   ext_net_end_ip:
+      type: string
+      default: 60.60.1.25
+
+   mgmt_net_name:
+      type: string
+      default: mgmt_network 
+
+   mgmt_subnet_name:
+      type: string
+      default: mgmt_subnet
+
+   diag_net_name:
+      type: string
+      default: diag_network 
+
+   diag_subnet_name:
+      type: string
+      default: diag_subnet
+
+   inside_net_name:
+      type: string
+      default: inside_network 
+
+   inside_subnet_name:
+      type: string
+      default: inside_subnet
+
+   outside_net_name:
+      type: string
+      default: outside_network 
+
+   outside_subnet_name:
+      type: string
+      default: outside_subnet
+
+   ext_net_name:
+      type: string
+      default: ext_network 
+
+   ext_subnet_name:
+      type: string
+      default: ext_subnet
+
+resources:
+# Nova Quota setting for instances, ram and cores
+   default_quota:
+      type: OS::Nova::Quota
+      properties:
+         instances: 50
+         ram: 512000
+         cores: 1000
+         project: default
+
+# Neutron net creation for mgmt, diag, inside and outside networks
+   mgmt_net:
+      type: OS::Neutron::Net
+      properties:
+         name: { get_param: mgmt_net_name } 
+   mgmt_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+         name: { get_param: mgmt_subnet_name }
+         network: { get_resource: mgmt_net }
+         cidr: { get_param: mgmt_net_cidr }
+         enable_dhcp: true
+
+   diag_net:
+      type: OS::Neutron::Net
+      properties:
+         name: { get_param: diag_net_name } 
+   diag_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+         name: { get_param: diag_subnet_name }
+         network: { get_resource: diag_net }
+         cidr: { get_param: diag_net_cidr }
+         enable_dhcp: true
+
+   inside_net:
+      type: OS::Neutron::Net
+      properties:
+         name: { get_param: inside_net_name }
+   inside_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+         name: { get_param: inside_subnet_name }
+         network: { get_resource: inside_net }
+         cidr: { get_param: inside_net_cidr }
+         enable_dhcp: true
+
+   outside_net:
+      type: OS::Neutron::Net
+      properties:
+         name: { get_param: outside_net_name }
+   outside_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+         name: { get_param: outside_subnet_name }
+         network: { get_resource: outside_net }
+         cidr: { get_param: outside_net_cidr }
+         enable_dhcp: true
+
+   ext_net:
+      type: OS::Neutron::ProviderNet
+      properties:
+         name: { get_param: ext_net_name }
+         shared: true
+         router_external: true
+         physical_network: { get_param: provider_phys_net_name }
+         network_type: { get_param: provider_net_type }
+
+   ext_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+         name: { get_param: ext_subnet_name }
+         network: { get_resource: ext_net }
+         cidr: { get_param: ext_net_cidr }
+         gateway_ip: { get_param: ext_net_gw_ip }
+         allocation_pools: [{"start": {get_param: ext_net_start_ip}, "end": {get_param: ext_net_end_ip}}]
+
+   os_router:
+      type: OS::Neutron::Router
+      depends_on: [ mgmt_net, mgmt_subnet, diag_net, diag_subnet, inside_net, inside_subnet, outside_net, outside_subnet, ext_net, ext_subnet ]
+      properties:
+         name: os_rtr
+         external_gateway_info: 
+            network: { get_resource: ext_net }
+
+   mgmt_router_patch:
+      description: os_router patch into mgmt
+      type: OS::Neutron::RouterInterface
+      depends_on: os_router
+      properties:
+         router: { get_resource: os_router } 
+         subnet: { get_resource: mgmt_subnet }
+
+   diag_router_patch:
+      description: os_router patch into diag
+      type: OS::Neutron::RouterInterface
+      depends_on: os_router
+      properties:
+         router: { get_resource: os_router } 
+         subnet: { get_resource: diag_subnet }
+
+   inside_router_patch:
+      description: os_router patch into inside
+      type: OS::Neutron::RouterInterface
+      depends_on: os_router
+      properties:
+         router: { get_resource: os_router } 
+         subnet: { get_resource: inside_subnet }
+
+   outside_router_patch:
+      description: os_router patch into outside
+      type: OS::Neutron::RouterInterface
+      depends_on: os_router
+      properties:
+         router: { get_resource: os_router } 
+         subnet: { get_resource: outside_subnet }
