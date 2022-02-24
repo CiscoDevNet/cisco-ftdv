@@ -1,0 +1,456 @@
+{
+   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+   "contentVersion": "1.0.0.0",
+   "parameters": {
+      "vmName": {
+         "type": "string",
+         "defaultValue": "ngfw-vm",
+         "metadata": {
+            "description": "Name of the NGFW Virtual Machine."
+         }
+      },
+      "vmImageId": {
+         "type": "string",
+         "defaultValue": "/subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage",
+         "metadata": {
+            "description": "The ID of the image used for deployment. /subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage"
+         }
+      },
+      "adminUsername": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "Username for the Virtual Machine. admin, Administrator among other values are disallowed - see Azure docs"
+         }
+      },
+      "adminPassword": {
+         "type": "securestring",
+         "defaultValue": "",
+         "metadata": {
+            "description": "Password for the Virtual Machine. Passwords must be 12 to 72 chars and have at least 3 of the following: Lowercase, uppercase, numbers, special chars"
+         }
+      },
+      "vmStorageAccount": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "A storage account name (boot diags require a storage account). Between 3 and 24 characters. Lowercase letters and numbers only"
+         }
+      },
+      "availabilityZone": {
+          "type": "int",
+          "defaultValue": 0,
+          "minValue": 0,
+          "maxValue": 3,
+          "metadata": {
+              "description": "Specify the availability zone for deployment. Ensure that selected region supports availability zones and value provided is correct. Set to 0 if you do not want to use Availability Zones"
+          }
+      },
+      "customData": {
+         "type": "string",
+         "defaultValue": "{\"AdminPassword\": \"Cisco1234\",\"Hostname\": \"cisco-ftdv\", \"ManageLocally\":\"No\"}",
+         "metadata": {
+            "description": "Custom Data (Day 0 config) passed to the FTDv."
+         }
+      },
+      "virtualNetworkResourceGroup": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "Name of the virtual network's Resource Group"
+         }
+      },
+      "virtualNetworkName": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "Name of the virtual network"
+         }
+      },
+      "mgmtSubnetName": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The FTDv management interface will attach to this subnet"
+         }
+      },
+      "mgmtSubnetIP": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "NGFW IP on the mgmt interface (example: 192.168.0.10)"
+         }
+      },
+      "diagSubnetName": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The FTDv diagnostic0/0 interface will attach to this subnet"
+         }
+      },
+      "diagSubnetIP": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "NGFW IP on the diag interface (example: 192.168.1.10)"
+         }
+      },
+      "data1SubnetName": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The FTDv data1 interface will attach to this subnet"
+         }
+      },
+      "data1SubnetIP": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The IP on the data1 interface (example: 192.168.2.10)"
+         }
+      },
+      "data2SubnetName": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The FTDv data2 interface will attach to this subnet"
+         }
+      },
+      "data2SubnetIP": {
+         "type": "string",
+         "defaultValue": "",
+         "metadata": {
+            "description": "The IP on the data2 interface (example: 192.168.3.10)"
+         }
+      },
+      "vmSize": {
+         "type": "string",
+         "defaultValue": "Standard_D3_v2",
+         "allowedValues": [
+            "Standard_D3_v2",
+            "Standard_D3",
+            "Standard_D4_v2",
+            "Standard_D5_v2"
+         ],
+         "metadata": {
+            "description": "NGFW VM Size."
+         }
+      }
+   },
+   "variables": {
+      "subnet1Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('mgmtSubnetName'))]",
+      "subnet2Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('diagSubnetName'))]",
+      "subnet3Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('data1SubnetName'))]",
+      "subnet4Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('data2SubnetName'))]",
+      "vmNic0Name": "[concat(parameters('vmName'),'-nic0')]",
+      "vmNic1Name": "[concat(parameters('vmName'),'-nic1')]",
+      "vmNic2Name": "[concat(parameters('vmName'),'-nic2')]",
+      "vmNic3Name": "[concat(parameters('vmName'),'-nic3')]",
+      "mgtNsgName": "[concat(parameters('vmName'),'-SSH-SecurityGroup')]",
+      "dataNsgName": "[concat(parameters('vmName'),'-Data-Net-SecurityGroup')]",
+      "vmMgmtPublicIPAddressName": "[concat(parameters('vmName'),'nic0-ip')]",
+      "vmMgmtPublicIPAddressType": "Static",
+      "vmMgmtPublicIPAddressDnsName": "[variables('vmMgmtPublicIPAddressName')]",
+      "selectedAvailZone":"[if(equals(parameters('availabilityZone'), 0), json('null'), array(parameters('availabilityZone')))]",
+      "pipSku": "Standard"
+   },
+   "resources": [
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/publicIPAddresses",
+         "name": "[variables('vmMgmtPublicIPAddressName')]",
+         "location": "[resourceGroup().location]",
+         "sku": {
+             "name": "[variables('pipSku')]"
+         },
+         "properties": {
+            "publicIPAllocationMethod": "[variables('vmMgmtPublicIpAddressType')]",
+            "dnsSettings": {
+               "domainNameLabel": "[variables('vmMgmtPublicIPAddressDnsName')]"
+            }
+         },
+         "zones": "[variables('selectedAvailZone')]"
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkSecurityGroups",
+         "name": "[variables('mgtNsgName')]",
+         "location": "[resourceGroup().location]",
+         "properties": {
+            "securityRules": [
+               {
+                  "name": "SSH-Rule",
+                  "properties": {
+                     "description": "Allow SSH",
+                     "protocol": "Tcp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "22",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 100,
+                     "direction": "Inbound"
+                  }
+               },
+               {
+                  "name": "SFtunnel-Rule",
+                  "properties": {
+                     "description": "Allow tcp 8305",
+                     "protocol": "Tcp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "8305",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 101,
+                     "direction": "Inbound"
+                  }
+               },
+               {
+                  "name": "HTTPs-Rule",
+                  "properties": {
+                        "description": "Allow HTTPs (TCP 443) for FDM UI access",
+                        "protocol": "Tcp",
+                        "sourcePortRange": "*",
+                        "destinationPortRange": "443",
+                        "sourceAddressPrefix": "Internet",
+                        "destinationAddressPrefix": "*",
+                        "access": "Allow",
+                        "priority": 102,
+                        "direction": "Inbound"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkSecurityGroups",
+         "name": "[variables('dataNsgName')]",
+         "location": "[resourceGroup().location]",
+         "properties": {
+               "securityRules": [
+                  {
+                     "name": "UDP-Rule1",
+                     "properties": {
+                           "description": "Allow UDP",
+                           "protocol": "Udp",
+                           "sourcePortRange": "*",
+                           "destinationPortRange": "500",
+                           "sourceAddressPrefix": "Internet",
+                           "destinationAddressPrefix": "*",
+                           "access": "Allow",
+                           "priority": 120,
+                           "direction": "Inbound"
+                     }
+                  },
+                  {
+                     "name": "UDP-Rule2",
+                     "properties": {
+                           "description": "Allow UDP",
+                           "protocol": "Udp",
+                           "sourcePortRange": "*",
+                           "destinationPortRange": "4500",
+                           "sourceAddressPrefix": "Internet",
+                           "destinationAddressPrefix": "*",
+                           "access": "Allow",
+                           "priority": 130,
+                           "direction": "Inbound"
+                     }
+                  }
+               ]
+         }
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic0Name')]",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgtNsgName'))]",
+            "[concat('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('mgmtSubnetIP')]",
+                     "subnet": {
+                        "id": "[variables('subnet1Ref')]"
+                     },
+                     "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('mgtNsgName'))]"
+            },
+            "enableAcceleratedNetworking": false,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic1Name')]",
+         "location": "[resourceGroup().location]",
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('diagSubnetIP')]",
+                     "subnet": {
+                        "id": "[variables('subnet2Ref')]"
+                     }
+                  }
+               }
+            ],
+            "enableAcceleratedNetworking": false,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic2Name')]",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataNsgName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('data1SubnetIP')]",
+                     "subnet": {
+                        "id": "[variables('subnet3Ref')]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataNsgName'))]"
+            },
+            "enableAcceleratedNetworking": true,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2020-04-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic3Name')]",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataNsgName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('data2SubnetIP')]",
+                     "subnet": {
+                        "id": "[variables('subnet4Ref')]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataNsgName'))]"
+            },
+            "enableAcceleratedNetworking": true,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "type": "Microsoft.Storage/storageAccounts",
+         "name": "[concat(parameters('vmStorageAccount'))]",
+         "apiVersion": "2019-06-01",
+         "sku": {
+            "name": "Standard_LRS"
+         },
+         "location": "[resourceGroup().location]",
+         "kind": "Storage",
+         "properties": {}
+      },
+      {
+         "apiVersion": "2019-12-01",
+         "type": "Microsoft.Compute/virtualMachines",
+         "name": "[parameters('vmName')]",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+            "[concat('Microsoft.Storage/storageAccounts/', parameters('vmStorageAccount'))]",
+            "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic0Name'))]",
+            "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic1Name'))]",
+            "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic2Name'))]",
+            "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic3Name'))]"
+         ],
+         "properties": {
+            "hardwareProfile": {
+               "vmSize": "[parameters('vmSize')]"
+            },
+            "osProfile": {
+               "computername": "[parameters('vmName')]",
+               "adminUsername": "[parameters('AdminUsername')]",
+               "adminPassword": "[parameters('AdminPassword')]",
+               "customData": "[base64(parameters('customData'))]"
+            },
+            "storageProfile": {
+               "imageReference": {
+                  "id": "[parameters('vmImageId')]"
+               },
+               "osDisk": {
+                  "osType": "Linux",
+                  "caching": "ReadWrite",
+                  "createOption": "FromImage"
+               }
+            },
+            "networkProfile": {
+               "networkInterfaces": [
+                  {
+                     "properties": {
+                        "primary": true
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic0Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic1Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic2Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic3Name'))]"
+                  }
+               ]
+            },
+            "diagnosticsProfile": {
+               "bootDiagnostics": {
+                  "enabled": true,
+                  "storageUri": "[concat('http://',parameters('vmStorageAccount'),'.blob.core.windows.net')]"
+               }
+            }
+         },
+         "zones": "[variables('selectedAvailZone')]"
+      }
+   ],
+   "outputs": {}
+}

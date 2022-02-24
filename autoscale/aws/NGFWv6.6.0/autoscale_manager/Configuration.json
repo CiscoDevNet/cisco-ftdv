@@ -3,7 +3,7 @@
   "vmNamePrefix": "Cisco-NGFW",
   "DefaultPassword": {
     "Description": "Default password of NGFW, Note: This should be same as AdminPassword in Day0 if specified in template",
-    "password": "Admin123"
+    "password": "FtDv_AuT0Scale"
   },
   "fmcIpforDeviceReg": "DONTRESOLVE",
   "RegistrationId": "cisco",

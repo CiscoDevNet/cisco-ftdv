@@ -614,7 +614,7 @@ Resources:
           Ebs:
             DeleteOnTermination: true
       UserData: !Base64 >-
-        { "AdminPassword": "Admin123"}
+        { "AdminPassword": "FtDv_AuT0Scale"}
   FTDvGroup:
     DependsOn:
       - CloudWatchEvent1

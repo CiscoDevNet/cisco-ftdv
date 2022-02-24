@@ -144,10 +144,10 @@ class AutoScaleGroup:
                 ],
             )
         except botocore.exceptions.ClientError as e:
-            logger.error("Botocore Error removing the instance: {}".format(e.response['Error']))
+            logger.error("Botocore Error in describing instance tags: {}".format(e.response['Error']))
             return None
         except Exception as e:
-            logger.error("General Error removing the instance" + str(e))
+            logger.error("General Error in describing instance tags" + str(e))
             return None
         return response
 
@@ -192,7 +192,7 @@ class AutoScaleGroup:
             logger.error("Botocore Error: {}".format(e.response['Error']))
             return None
         except Exception as e:
-            logger.error("General Error removing the instance" + str(e))
+            logger.error("General Error in getting instance details" + str(e))
             return None
         return instance_list
 

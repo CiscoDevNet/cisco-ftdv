@@ -97,10 +97,9 @@
       },
       "softwareVersion": {
         "type": "string",
-        "defaultValue": "66090.0.0",
+        "defaultValue": "66459.0.0",
         "allowedValues": [
-		    "66090.0.0",
-            "650115.0.0",
+            "66459.0.0",
             "640110.0.0"
         ],
         "metadata": {
