@@ -1,0 +1,52 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "performanceTier": "FTDv30",
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "oci-autoscale-access-policy",
+  "fmcNatPolicyName": "oci-autoscale-nat-policy",
+  "fmcInsideNicName": "inside",
+  "fmcOutsideNicName": "outside",
+  "fmcInsideNic": "GigabitEthernet0/0",
+  "fmcOutsideNic": "GigabitEthernet0/1",
+  "fmcOutsideZone": "outside-zone",
+  "fmcInsideZone": "inside-zone",
+  "MetadataServerObjectName": "oci-metadata-server",
+  "interfaceConfig": [
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "inside-zone"
+      },
+      "mode": "NONE",
+      "ifname": "inside",
+      "name": "GigabitEthernet0/0"
+    },
+    {
+      "managementOnly": "false",
+      "MTU": "1500",
+      "securityZone": {
+        "name": "outside-zone"
+      },
+      "mode": "NONE",
+      "ifname": "outside",
+      "name": "GigabitEthernet0/1"
+    }
+  ],
+  "trafficRoutes": [
+    {
+      "interface": "outside",
+      "network": "any-ipv4",
+      "gateway": "",
+      "metric": "2"
+    },
+    {
+      "interface": "inside",
+      "network": "oci-metadata-server",
+      "gateway": "",
+      "metric": "1"
+    }        
+  ]
+}
