@@ -1,0 +1,7 @@
+schema_version: 20180708
+name: ftdv_teardown_operations
+version: 0.0.0
+runtime: python
+entrypoint: /python/bin/fdk /function/ftdv_teardown_operations.py handler
+memory: 256
+timeout: 300
