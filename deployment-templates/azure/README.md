@@ -28,7 +28,8 @@ You can customize this file for your Azure deployment environment.<br>
 ```
 
 ## References
-* [Software Downloads Home](https://software.cisco.com/download/home/286306503/type/286306337/release/7.0.0)
+* [Software Downloads Home - NGFWv](https://software.cisco.com/download/home/286306503/type/286306337/release/7.1.0)
+* [Software Downloads Home - FMCv](https://software.cisco.com/download/home/286259687/type/286271056/release/7.1.0)
 * [FTDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/azure/ftdv-azure-gsg/ftdv-azure-deploy.html#id_82702)
 * [FMCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 
@@ -36,4 +37,4 @@ You can customize this file for your Azure deployment environment.<br>
 This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](../../LICENSE) file for details.
 
 ## Copyright
-Copyright (c) 2020 Cisco Systems Inc and/or its affiliates.
+Copyright (c) 2022 Cisco Systems Inc and/or its affiliates.

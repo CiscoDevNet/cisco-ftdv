@@ -1,14 +1,17 @@
-## FTDv Autoscaling
+# Cisco Secure Firewall Threat Defense Virtual (formerly FTDv/NGFWv) 
+## TDv Autoscaling
 
-This Repository provides resources to bring up FTDv Auto Scale solution.
+This Repository provides resources to bring up TDv (Threat Defence Virtual) Auto Scale solution.
 
-Some of the key features of the FTDv Auto Scale include:
+Some of the key features of the TDv Auto Scale include:
 
 * Complete serverless implementation!
-* Completely automated FTDv instance registration and de-registration with FMC.
-* NAT policy, Access Policy, IP and Routes are automatically applied to scaled-out FTDv instance.
+* Completely automated TDv instance registration and de-registration with FMC.
+* NAT policy, Access Policy, IP and Routes are automatically applied to scaled-out TDv instance.
 * Support for Enabling / Disabling Auto Scaling feature.
 
+## AWS GuardDuty Integration with Cisco Secure Firewall
+This solution make use of the threat analysis data/results from Amazon GuardDuty (malicious IPs generating threats, attacks etc.) and feeds that information(malicious IP) to the Cisco Secure Firewall Threat Defense Virtual via the managers: *Cisco Secure Firewall Management Center Virtual* , *Cisco Secure Firewall Device Manager* to protect the underlying network and applications against future threats originating from these sources(malicious IP).
 
 ## Cloud Deployment Templates
 
@@ -25,18 +28,29 @@ Azure Resource Manager templates are JSON files that contain resource descriptio
 
 ### Openstack Templates
 
-This conatains heat template files to deploy the Firepower Threat Defense Virtual (FTDv) and Firepower Management Center Virtual (FMCv) on OpenStack environment.
+This conatains heat template files to deploy the Secure Firewall Threat Defense Virtual (TDv) and Secure Firewall Management Center Virtual (MCv) on OpenStack environment.
 
 ## Resources
 
-**FTDv Auto Scaling for Azure**
-* For NGFWv6.7.0 & Above : [Code](autoscale/azure/NGFWv6.7.0/)     |     [README](autoscale/azure/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.7.0/ftdv-azure-autoscale-v67.pdf)
-* For NGFWv6.6.0 : [Code](autoscale/azure/NGFWv6.6.0/)     |     [README](autoscale/azure/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/deploy-ftdv-auto-scale-for-azure.pdf)
+### FTDv Autoscale
 
-**FTDv Auto Scaling for AWS**
-* For NGFWv6.7.0 & Above : [Code](autoscale/aws/NGFWv6.7.0/)     |     [README](autoscale/aws/NGFWv6.7.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.7.0/deploy-ftdv-auto-scale-for-aws.pdf)
-* For NGFWv6.6.0 : [Code](autoscale/aws/NGFWv6.6.0/)     |     [README](autoscale/aws/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.6.0/deploy-ftdv-auto-scale-for-aws.pdf)
+* On Azure for NGFWv6.7.0 & Above: [Code](autoscale/azure/)     |     [README](autoscale/azure/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/ftdv-azure-autoscale-v67.pdf)
 
-**Deployment Template**
-* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NGFWv/FTDv](deployment-templates/azure/NGFWv7.0.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv7.0.0/fmcv/README.md)
-* Openstack NGFWv Heat Deployment Template: [README](deployment-templates/openstack/README.md) | [NGFWv/FTDv](deployment-templates/openstack/FTDv/README.md)  |   [FMCv](deployment-templates/openstack/FMCv/README.md)
+* On AWS for NGFWv6.7.0 & Above: [Code](autoscale/aws/)     |     [README](autoscale/aws/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/deploy-ftdv-auto-scale-for-aws.pdf)
+
+* On OCI for NGFWv7.1.0 & Above: [Code](autoscale/oci/)     |     [README](autoscale/oci/README.md)     |     [Deployment/Configuration Guide](autoscale/oci/deploy_autoscale_tdv_oci.pdf)
+
+### Cloud Service Integration    
+
+* AWS Guardduty: [Code](cloud-service-integration/aws/guardduty/)     |     [README](cloud-service-integration/aws/guardduty/README.md)     |     [Deployment/Configuration Guide](cloud-service-integration/aws/guardduty/Cisco_NGFWv_AWS_GuardDuty_Integration_User_Configuration_Guide.pdf)
+
+
+### Deployment Template
+* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Openstack NGFWv Heat Deployment Template: [README](deployment-templates/openstack/README.md) | [NFWv/FTDv](deployment-templates/openstack/FTDv/README.md)  |   [FMCv](deployment-templates/openstack/FMCv/README.md)
+
+
+***Archived***
+* FTDv Auto Scaling for Azure for NGFWv6.6.0 : [Code](archive/autoscale/azure/NGFWv6.6.0/)     |     [README](autoscale/azure/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/NGFWv6.6.0/deploy-ftdv-auto-scale-for-azure.pdf)
+* FTDv Auto Scaling for AWS for NGFWv6.6.0 : [Code](archive/autoscale/aws/NGFWv6.6.0/)     |     [README](autoscale/aws/NGFWv6.6.0/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/NGFWv6.6.0/deploy-ftdv-auto-scale-for-aws.pdf)
+
