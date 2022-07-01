@@ -1,0 +1,79 @@
+#######################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: ftdv_parameters.yaml                                                           #
+# Purpose: To provide Parameters to ftdv_template.jinja for the Autoscale in GCP.      #
+########################################################################################
+#                                                                                      #
+# USER should have a minimum of 4 VPC Networks(INSIDE,OUTSIDE,MGMT,DIAG).              #
+# USER should have a VPC Connector with a /28 subnetwork in MGMT VPC Network.          #
+# Change <parameter> with your existing resources.                                     #
+#                                                                                      #
+########################################################################################
+
+imports:
+- path: ftdv_template.jinja
+resources:
+- name: Autoscale_Parameters
+  type: ftdv_template.jinja
+  properties:
+    resourceNamePrefix: <>  #auto-user
+    region: <>  #us-central1
+    serviceAccountMailId: <>  #123456-compute@developer.gserviceaccount.com
+    # VPC and Firewall Parameters
+    mgmtVpcName: <>   #vpcname
+    diagVpcName: <>   #vpcname
+    outsideVpcName: <>  #vpcname
+    insideVpcName: <>   #vpcname
+    mgmtSubnetworkName: <>  #subnetvpcname
+    diagSubnetworkName: <>  #subnetvpcname
+    outsideSubnetworkName: <>   #subnetvpcname
+    insideSubnetworkName: <>    #subnetvpcname
+    mgmtFirewallRule: <>    #firewallname
+    diagFirewallRule: <>    #firewallname
+    outsideFirewallRule: <>   #firewallname
+    insideFirewallRule: <>    #firewallname
+    healthCheckFirewallRule: <>   #firewallname
+    publicKey: <>   #publickey
+    # Instance Template
+    machineType: <>   #e2-standard-4
+    sourceImageURL: <>    #https://www.googleapis.com/compute/v1/projects/<proj-name>/global/images/<image-name>
+    # FTDv Health Check
+    ftdvHealthCheckPort: 22
+    ftdvCheckIntervalSec: 300
+    ftdvTimeoutSec: 300
+    ftdvHealthCheckProtocolName: TCP
+    ftdvUnhealthyThreshold: 3 #Count
+    # FTDv Autoscaler
+    cpuUtilizationTarget: <>  #0.5 #Percentage
+    coolDownPeriodSec: 30
+    minFTDReplicas: <>  #1
+    maxFTDReplicas: <>  #10
+    # ELB Services
+    elbPort: 80
+    elbPortName: tcp
+    elbProtocol: TCP
+    elbTimeoutSec: 5
+    elbProtocolName: TCP
+    elbUnhealthyThreshold: 2  # Count
+    elbIpProtocol: TCP
+    #elbPortRange: 80-80
+    elbFePorts: [80,22]
+    # ILB Services
+    ilbProtocol: TCP
+    ilbDrainingTimeoutSec: 60
+    ilbPort: 80
+    ilbCheckIntervalSec: 10
+    ilbTimeoutSec: 5
+    ilbProtocolName: TCP
+    ilbUnhealthyThreshold: 3 #Count
