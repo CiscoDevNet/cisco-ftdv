@@ -1,0 +1,119 @@
+########################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: ftdv_predeployment.jinja                                                       #
+# Purpose: Template for PreDeployment, takes parameters from ftdv_predeployment.yaml   #
+########################################################################################
+
+resources:
+# Sink (Logs Router)
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-insert-sink
+  type: gcp-types/logging-v2:projects.sinks
+  properties:
+    sink: {{ properties["resourceNamePrefix"] }}-ftdv-insert-sink
+    destination: pubsub.googleapis.com/$(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert.name)
+    filter: (resource.type = "gce_instance" AND protoPayload.methodName = "v1.compute.instances.insert" AND protoPayload.resourceName:"{{ properties["resourceNamePrefix"] }}" AND operation.last = "true") OR (resource.type = "cloud_function" AND resource.labels.function_name = "{{ properties["resourceNamePrefix"] }}-ftdv-scaleout-action" AND textPayload:"Second Attempt")
+    writerIdentity: {{ properties["serviceAccountMailId"] }}
+# Pub/Sub Topic
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert
+  type: pubsub.v1.topic
+  properties:
+    topic: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert
+  accessControl:
+    gcpIamPolicy:
+      bindings:
+      - members:
+        - serviceAccount:cloud-logs@system.gserviceaccount.com
+        role: roles/pubsub.publisher
+
+#Cloud functions
+# To copy code to storage bucket
+#gsutil cp <change_pass.zip> gs://<bucket-name>/
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-scaleout-action
+  type: gcp-types/cloudfunctions-v1:projects.locations.functions
+  properties:
+    parent: projects/{{ env['project'] }}/locations/{{ properties['region'] }}
+    function: {{ properties["resourceNamePrefix"] }}-ftdv-scaleout-action
+    sourceArchiveUrl: gs://{{ properties["bucketName"] }}/ftdv_scaleout.zip
+    entryPoint: scale_out
+    runtime: python37
+    timeout: 540s
+    environmentVariables:
+      FMC_IP: {{ properties["fmcIP"] }}
+      FMC_USERNAME: {{ properties["fmcUsername"] }}
+      REG_ID: {{ properties["regID"] }}
+      NAT_ID: {{ properties["natID"] }}
+      GRP_ID: {{ properties["grpID"] }}
+      POLICY_ID: {{ properties["policyID"] }}
+      FTDV_PASSWORD: {{ properties["ftdvPassword"] }}
+      LICENSE_CAPS: {{ properties["licenseCAPS"] }}
+      INSTANCE_PREFIX_IN_FMC: {{ properties["instancePrefixInFmc"] }}
+      OUTSIDE_GW_NAME: {{ properties["outsideGwName"] }}
+      INSIDE_GW_NAME: {{ properties["insideGwName"] }}
+      OUTSIDE_SEC_ZONE: {{ properties["outsideSecZone"] }}
+      INSIDE_SEC_ZONE: {{ properties["insideSecZone"] }}
+    secretEnvironmentVariables:
+    - key: FMC_PASSWORD
+      secret: {{ properties["fmcPasswordSecret"] }}
+      version: latest
+    - key: NEW_FTD_PASSWORD
+      secret: {{ properties["newFtdPasswordSecret"] }}
+      version: latest
+    maxInstances: 1
+    vpcConnector: {{ properties["vpcConnectorName"] }}
+    vpcConnectorEgressSettings: PRIVATE_RANGES_ONLY
+    ingressSettings: ALLOW_ALL
+    eventTrigger:
+      resource: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert.name)
+      eventType: google.pubsub.topic.publish
+# Sink (Logs Router)
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-delete-sink
+  type: gcp-types/logging-v2:projects.sinks
+  properties:
+    sink: {{ properties["resourceNamePrefix"] }}-ftdv-delete-sink
+    destination: pubsub.googleapis.com/$(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete.name)
+    filter: resource.type = "gce_instance" AND protoPayload.methodName = "v1.compute.instances.delete" AND protoPayload.resourceName:"{{ properties["resourceNamePrefix"] }}" AND operation.first="true"
+    writerIdentity: 340375726592-compute@developer.gserviceaccount.com
+# Pub/Sub Topic
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete
+  type: pubsub.v1.topic
+  properties:
+    topic: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete
+  accessControl:
+    gcpIamPolicy:
+      bindings:
+      - members:
+        - serviceAccount:cloud-logs@system.gserviceaccount.com
+        role: roles/pubsub.publisher
+
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-scalein-action
+  type: gcp-types/cloudfunctions-v1:projects.locations.functions
+  properties:
+    parent: projects/{{ env['project'] }}/locations/{{ properties['region'] }}
+    function: {{ properties["resourceNamePrefix"] }}-ftdv-scalein-action
+    sourceArchiveUrl: gs://{{ properties["bucketName"] }}/ftdv_scalein.zip
+    entryPoint: scale_in
+    runtime: python37
+    timeout: 540s
+    environmentVariables:
+      FMC_IP: {{ properties["fmcIP"] }}
+      FMC_USERNAME: {{ properties["fmcUsername"] }}
+      INSTANCE_PREFIX_IN_FMC: {{ properties["instancePrefixInFmc"] }}
+    secretEnvironmentVariables:
+    - key: FMC_PASSWORD
+      secret: {{ properties["fmcPasswordSecret"] }}
+      version: latest
+    maxInstances: 1
+    eventTrigger:
+      resource: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete.name)
+      eventType: google.pubsub.topic.publish

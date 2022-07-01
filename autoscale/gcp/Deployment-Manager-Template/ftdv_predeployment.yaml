@@ -1,0 +1,48 @@
+########################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: ftdv_predeployment.yaml                                                        #
+# Purpose: To provide Parameters to ftdv_predeployment.jinja                           #
+########################################################################################
+#                                                                                      #
+#                                                                                      #
+# Change <parameter> accordingly                                                       #
+#                                                                                      #
+########################################################################################
+
+imports:
+- path: ftdv_predeployment.jinja
+resources:
+- name: PreDeployment Parameters
+  type: ftdv_predeployment.jinja
+  properties:
+    resourceNamePrefix: <resourceNamePrefix>  #auto-name
+    region: <region>  #us-central1
+    serviceAccountMailId: <serviceAccountMailId>  ##123456-compute@developer.gserviceaccount.com
+    vpcConnectorName: <vpcConnectorName> #vpcconnectorname
+    bucketName: <bucketName>  #bucketname
+    fmcIP: <fmcIP>  #1.1.1.1
+    regID: <regID>  #regid
+    natID: <natID>  #natid
+    grpID: <grpID>  #grpid
+    policyID: <policyID>  #policyid
+    licenseCAPS: <licenseCAPS>  #BASE,MALWARE,URLFilter,THREAT
+    instancePrefixInFmc: <instancePrefixInFmc> #prefixname
+    fmcPasswordSecret: <fmcPasswordSecret> #secretname
+    newFtdPasswordSecret: <newFtdPasswordSecret> #secretname
+    fmcUsername: <fmcUsername>  #username
+    ftdvPassword: <ftdvPassword>  #password
+    outsideGwName: <outsideGwName>  #gatewayname
+    insideGwName: <insideGwName>  #gatewayname
+    outsideSecZone: <outsideSecZone>  #securityzonename for outside interface
+    insideSecZone: <insideSecZone>  #securityzonename for outside interface

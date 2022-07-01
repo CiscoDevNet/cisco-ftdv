@@ -39,6 +39,7 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 * On AWS for NGFWv6.7.0 & Above: [Code](autoscale/aws/)     |     [README](autoscale/aws/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/deploy-ftdv-auto-scale-for-aws.pdf)
 
 * On OCI for NGFWv7.1.0 & Above: [Code](autoscale/oci/)     |     [README](autoscale/oci/README.md)     |     [Deployment/Configuration Guide](autoscale/oci/deploy_autoscale_tdv_oci.pdf)
+* On GCP for CSF7.2.0 & Above: [Code](autoscale/gcp/)     |     [README](autoscale/gcp/README.md)     |     [Deployment/Configuration Guide](autoscale/gcp/deploy-tdv-auto-scale-for-gcp.pdf)
 
 ### Cloud Service Integration    
 
