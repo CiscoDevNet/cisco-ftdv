@@ -27,7 +27,11 @@ import time
 from fmc_functions import FirepowerManagementCenter
 import urllib3
 import os
-import paramiko
+import warnings
+from cryptography.utils import CryptographyDeprecationWarning
+with warnings.catch_warnings():
+     warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
+     import paramiko
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def scale_out(event, context):

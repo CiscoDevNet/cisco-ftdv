@@ -16,7 +16,11 @@ Purpose:    This python file has basic functions for
             SSH and running commands in FTDv.
 """
 
-import paramiko
+import warnings
+from cryptography.utils import CryptographyDeprecationWarning
+with warnings.catch_warnings():
+     warnings.filterwarnings('ignore', category=CryptographyDeprecationWarning)
+     import paramiko
 import time
 from fmc_functions import FirepowerManagementCenter
 from google.cloud import secretmanager
