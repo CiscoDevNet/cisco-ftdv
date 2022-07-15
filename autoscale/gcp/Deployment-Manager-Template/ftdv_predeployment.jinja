@@ -46,7 +46,7 @@ resources:
     function: {{ properties["resourceNamePrefix"] }}-ftdv-scaleout-action
     sourceArchiveUrl: gs://{{ properties["bucketName"] }}/ftdv_scaleout.zip
     entryPoint: scale_out
-    runtime: python37
+    runtime: python39
     timeout: 540s
     environmentVariables:
       FMC_IP: {{ properties["fmcIP"] }}
@@ -103,7 +103,7 @@ resources:
     function: {{ properties["resourceNamePrefix"] }}-ftdv-scalein-action
     sourceArchiveUrl: gs://{{ properties["bucketName"] }}/ftdv_scalein.zip
     entryPoint: scale_in
-    runtime: python37
+    runtime: python39
     timeout: 540s
     environmentVariables:
       FMC_IP: {{ properties["fmcIP"] }}
