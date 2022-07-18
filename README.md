@@ -47,7 +47,7 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 
 
 ### Deployment Template
-* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/NGFWv6.6.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/NGFWv6.6.0/fmcv/README.md)
+* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.2.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.2.0/fmcv/README.md)
 * Openstack NGFWv Heat Deployment Template: [README](deployment-templates/openstack/README.md) | [NFWv/FTDv](deployment-templates/openstack/FTDv/README.md)  |   [FMCv](deployment-templates/openstack/FMCv/README.md)
 
 
