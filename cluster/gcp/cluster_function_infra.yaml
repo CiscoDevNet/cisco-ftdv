@@ -1,0 +1,54 @@
+########################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: cluster_function_infra.yaml                                                    #
+# Purpose: To provide Parameters to cluster_function_infra.jinja for the FTDv          #
+#          cluster google function .                                                   #
+########################################################################################
+#                                                                                      #
+# USER need to create minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL).         #
+#                                                                                      #
+# Note: This is an example input parameter, user need to change required input         #
+# parameters with existing resources.                                                  #
+#                                                                                      #
+###### Make sure to set deployWithExternalIP as True if FTDv require external IP  ######
+########################################################################################
+
+imports:
+- path: cluster_function_infra.jinja
+resources:
+- name: cluster_function_infra
+  type: cluster_function_infra.jinja
+  properties:
+    region: <> #us-central1
+    # resourceNamePrefix restricted to single word 
+    resourceNamePrefix: <> #ngfwvcls
+    serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
+    vpcConnectorName: <> #ngfwvcls-ssh
+    #Google Function
+    bucketName: <> #ngfwvcls-ftdv-cluster-bucket
+    srcDirName: <> #ftdv_cluster_function.zip
+    #Environment variable
+    deployWithExternalIP: <> #False # default is False, set True if FTDv require external IP
+    retryCount: 16  #allowed range 4-16
+    regID: <> #cisco
+    natID: <> #cisco
+    clsGrpName: <> #ngfwvcls-cluster
+    policyID: <> #ftdv-acl-policy
+    fmcIP: <> #34.121.248.245
+    fmcPassword: <> #Cisco@123123
+    fmcUsername: <> #testuser
+    ftdvPassword: <> #Cisco@123123
+    licenseCAPS: <> #BASE,MALWARE,URLFilter,THREAT
+    #FTDv50 is default
+    performanceTier: <> #FTDv50 #FTDv5/10/20/30/50/100 

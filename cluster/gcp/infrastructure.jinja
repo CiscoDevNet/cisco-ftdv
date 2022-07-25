@@ -1,0 +1,171 @@
+###########################################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                                                  #
+#All Rights Reserved.                                                                                     #
+#Licensed under the Apache License, Version 2.0 (the "License");                                          #
+#you may not use this file except in compliance with the License.                                         #
+#You may obtain a copy of the License at                                                                  #
+#http://www.apache.org/licenses/LICENSE-2.0                                                               #
+#Unless required by applicable law or agreed to in writing, software                                      #
+#distributed under the License is distributed on an "AS IS" BASIS,                                        #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.                                 #
+#See the License for the specific language governing permissions and                                      #
+#limitations under the License.                                                                           #
+###########################################################################################################
+# File: infrastructure.jinja                                                                              #
+# Purpose: Template for FTDv Cluster infrastructure Deployment, takes parameters from infrastructure.yaml #
+###########################################################################################################
+
+
+resources:
+# MGMT VPC and SUBNET
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-mgmt-vpc
+  type: compute.v1.network
+  properties:
+    routingConfig:
+      routingMode: {{ properties["mgmtVpcRoutingMode"] }}
+    autoCreateSubnetworks: false
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-mgmt-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["mgmtIpCidrRange"] }}
+    gatewayAddress: {{ properties["mgmtGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-mgmt-vpc.selfLink)
+    region: {{ properties["region"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-mgmt-subnet28
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["vpcConnectorIpCidrRange"] }}
+    gatewayAddress: {{ properties["mgmtGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-mgmt-vpc.selfLink)
+    region: {{ properties["region"] }}
+# DIAG VPC and SUBNET
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-diag-vpc
+  type: compute.v1.network
+  properties:
+    routingConfig:
+      routingMode: {{ properties["diagVpcRoutingMode"] }}
+    autoCreateSubnetworks: false
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-diag-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["diagIpCidrRange"] }}
+    gatewayAddress: {{ properties["diagGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-diag-vpc.selfLink)
+    region: {{ properties["region"] }}
+# INSIDE VPC and SUBNET
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-inside-vpc
+  type: compute.v1.network
+  properties:
+    routingConfig:
+      routingMode: {{ properties["insideVpcRoutingMode"] }}
+    autoCreateSubnetworks: false
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-inside-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["insideIpCidrRange"] }}
+    gatewayAddress: {{ properties["insideGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-inside-vpc.selfLink)
+    region: {{ properties["region"] }}
+# OUTSIDE VPC and SUBNET
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-outside-vpc
+  type: compute.v1.network
+  properties:
+    routingConfig:
+      routingMode: {{ properties["outsideVpcRoutingMode"] }}
+    autoCreateSubnetworks: false
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-outside-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["outsideIpCidrRange"] }}
+    gatewayAddress: {{ properties["outsideGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-outside-vpc.selfLink)
+    region: {{ properties["region"] }}
+# CCL VPC and SUBNET
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-ccl-vpc
+  type: compute.v1.network
+  properties:
+    routingConfig:
+      routingMode: {{ properties["cclVpcRoutingMode"] }}
+    autoCreateSubnetworks: false
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-ccl-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: {{ properties["cclIpCidrRange"] }}
+    gatewayAddress: {{ properties["outsideGatewayAddress"] }}
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-ccl-vpc.selfLink)
+    region: {{ properties["region"] }}
+# FIREWALL RULES
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-mgmt-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-mgmt-vpc.selfLink)
+    sourceRanges:
+      - 0.0.0.0/0
+    priority: 1000
+    allowed:
+      - IPProtocol: tcp
+        ports:
+        - '22'
+        - '443'
+        - '8305'
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-diag-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-diag-vpc.selfLink)
+    sourceRanges:
+      - 0.0.0.0/0
+    priority: 1000
+    allowed:
+      - IPProtocol: tcp
+        ports:
+        - '22'
+        - '8305'
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-in-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-inside-vpc.selfLink)
+    sourceRanges:
+      - 0.0.0.0/0
+    priority: 1000
+    allowed:
+      - IPProtocol: tcp
+        ports:
+        - '80'
+        - '443'
+        - '22'
+      - IPProtocol: icmp
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-out-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-outside-vpc.selfLink)
+    sourceRanges:
+      - 0.0.0.0/0
+    priority: 1000
+    allowed:
+      - IPProtocol: tcp
+        ports:
+        - '80'
+        - '443'
+        - '22'
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-ccl-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-ccl-vpc.selfLink)
+    sourceRanges: 
+      - {{ properties["cclIpCidrRange"] }}
+    priority: 1000
+    allowed:
+      - IPProtocol: all
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-firewall-rule
+  type: compute.v1.firewall
+  properties:
+    network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-inside-vpc.selfLink)
+    sourceRanges:
+      - 130.211.0.0/22
+      - 35.191.0.0/16
+      - 209.85.152.0/22
+      - 209.85.204.0/22
+    priority: 1000
+    allowed:
+      - IPProtocol: all
+

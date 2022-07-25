@@ -1,0 +1,57 @@
+########################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: infrastructure.yaml                                                            #
+# Purpose: To provide Parameters to infrastructure.jinja for the FTDv cluster in GCP.  #
+########################################################################################
+#                                                                                      #
+# USER need to create minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL).         #
+#                                                                                      #
+# Note: This is an example input parameter, user need to change required input         #
+# parameters with existing resources.                                                  #
+#                                                                                      #
+########################################################################################
+
+
+imports:
+- path: infrastructure.jinja  
+resources:
+- name: infrastructure
+  type: infrastructure.jinja
+  properties:
+    region: <> #us-central1
+    # resourceNamePrefix restricted to single word
+    resourceNamePrefix: <> #ngfwvcls
+    serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
+    # Mgmt VPC
+    mgmtVpcRoutingMode: GLOBAL
+    mgmtIpCidrRange: <> #10.10.51.0/24
+    vpcConnectorIpCidrRange: <> #10.10.0.0/28 # /28 subnet IP range mandatory.
+    mgmtGatewayAddress: <> #10.10.51.1
+    # Diag VPC
+    diagVpcRoutingMode: GLOBAL
+    diagIpCidrRange: <> #10.10.52.0/24
+    diagGatewayAddress: <> #10.10.52.1
+    # Inside VPC
+    insideVpcRoutingMode: GLOBAL
+    insideIpCidrRange: <> #10.10.53.0/24
+    insideGatewayAddress: <> #10.10.53.1
+    # Outside VPC
+    outsideVpcRoutingMode: GLOBAL
+    outsideIpCidrRange: <> #10.10.54.0/24
+    outsideGatewayAddress: <> #10.10.54.1
+    # CCL VPC
+    cclVpcRoutingMode: GLOBAL
+    cclIpCidrRange: <> #10.10.55.0/24
+    cclGatewayAddress: <> #10.10.55.1
+
