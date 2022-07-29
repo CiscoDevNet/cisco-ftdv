@@ -1,3 +1,21 @@
+"""
+Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+All Rights Reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+--------------------------------------------------------------------------------
+Name:       gcp_one_click_deploy.py
+Purpose:    This python file has user input based script for deploying
+            Cloud Infrastructure, Cloud Function and multi-node FTDv Cluster.
+"""
+
 '''
 
 Single click deployment for Cisco NGFWv Clustering for GCP
@@ -81,6 +99,9 @@ resource_prefix = 'oneclicktest' #restricted to single word
 
 region = 'us-central1'
 #region code for deploying the cluster
+
+zonecode = 'c'
+#zone code for deploying the cluster
 
 mail_id = '340375726592-compute@developer.gserviceaccount.com'
 #mail ID of either the default service account for compute engine -
@@ -440,6 +461,7 @@ silent_params = [
 cluster_params = [
 	[ 'mail_id', 'serviceAccountMailId', mail_id ],
     [ 'region', 'region', region ],
+    [ 'zonecode', 'zonecode', zonecode ],
     [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
     [ 'admin_passwd', 'adminPassword', admin_passwd ],
     [ 'host_name', 'hostname', host_name ],

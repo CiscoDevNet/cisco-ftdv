@@ -48,7 +48,7 @@ resources:
     function: {{ properties["resourceNamePrefix"] }}-ftdv-cluster-action
     sourceArchiveUrl: gs://{{ properties["bucketName"] }}/{{ properties["srcDirName"] }}
     entryPoint: cluster_handler
-    runtime: python37
+    runtime: python39
     timeout: 540s
     environmentVariables:
       EXTERNAL_IP_ENABLE: '{{ properties["deployWithExternalIP"] }}'

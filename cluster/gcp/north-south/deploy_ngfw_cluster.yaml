@@ -32,6 +32,7 @@ resources:
     # resourceNamePrefix restricted to single word 
     resourceNamePrefix: <> #ngfwvcls
     region: <> #us-central1
+    zonecode: b #zone code for deploying the cluster
     serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
     #day0 startup-script input
     adminPassword: <> #Cisco@123123
