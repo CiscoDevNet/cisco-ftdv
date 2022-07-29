@@ -110,7 +110,7 @@ resources:
     # only single ZONE support for cluster.
     distributionPolicy:
       zones:
-        - zone: {{ BASE_URL }}/projects/{{ env["project"] }}/zones/{{ properties["region"] }}-b
+        - zone: {{ BASE_URL }}/projects/{{ env["project"] }}/zones/{{ properties["region"] }}-{{ properties["zonecode"] }}
     instanceTemplate: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-template.selfLink)
     baseInstanceName: {{ properties["resourceNamePrefix"] }}-ftdv-automation-instance
     targetSize: {{ properties["targetSize"] }}

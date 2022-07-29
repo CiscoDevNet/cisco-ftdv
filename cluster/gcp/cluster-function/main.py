@@ -264,13 +264,10 @@ def cluster_handler(event, context):
             print("reg_status: "+ reg_status)
             
             if reg_status != 'SUCCESS':
-                if (reg_status == 'PARTIAL'):
-                    info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
-                    bf.closeShell(ssh)
-                    print("Reattempt "+ str(info_dict))
-                    return
-                else:
-                    print('REGISTRATION FAILED')
+                info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
+                bf.closeShell(ssh)
+                print("Reattempt "+ str(info_dict))
+                return
             else:
                 print('REGISTRATION SUCCESSFUL')
                 bf.verify_cluster_member(fmc, channel,min_nodes,cls_grp_name=cls_grp_name)
