@@ -10,6 +10,10 @@ Some of the key features of the TDv Auto Scale include:
 * NAT policy, Access Policy, IP and Routes are automatically applied to scaled-out TDv instance.
 * Support for Enabling / Disabling Auto Scaling feature.
 
+## Threat Defense Virtual Cluster
+* Clustering lets you group multiple threat defense units together as a single logical device. 
+* A cluster provides all the convenience of a single device (management, integration into a network) while achieving the increased throughput and redundancy of multiple devices.
+
 ## AWS GuardDuty Integration with Cisco Secure Firewall
 This solution make use of the threat analysis data/results from Amazon GuardDuty (malicious IPs generating threats, attacks etc.) and feeds that information(malicious IP) to the Cisco Secure Firewall Threat Defense Virtual via the managers: *Cisco Secure Firewall Management Center Virtual* , *Cisco Secure Firewall Device Manager* to protect the underlying network and applications against future threats originating from these sources(malicious IP).
 
@@ -40,6 +44,12 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 
 * On OCI for NGFWv7.1.0 & Above: [Code](autoscale/oci/)     |     [README](autoscale/oci/README.md)     |     [Deployment/Configuration Guide](autoscale/oci/deploy_autoscale_tdv_oci.pdf)
 * On GCP for CSF7.2.0 & Above: [Code](autoscale/gcp/)     |     [README](autoscale/gcp/README.md)     |     [Deployment/Configuration Guide](autoscale/gcp/deploy-tdv-auto-scale-for-gcp.pdf)
+
+### Threat Defense Virtual Cluster
+
+* On GCP for CSF7.2.0: [Code](cluster/gcp/)     |     [README](cluster/gcp/README.md)         |     [Deployment/Configuration Guide](cluster/gcp/ftdv-cluster-public.pdf)
+* On AWS for CSF7.2.0: [Code](cluster/aws/)     |     [README](cluster/aws/README.md)     |     [Deployment/Configuration Guide](cluster/aws/ftdv-cluster-public.pdf)
+
 
 ### Cloud Service Integration    
 

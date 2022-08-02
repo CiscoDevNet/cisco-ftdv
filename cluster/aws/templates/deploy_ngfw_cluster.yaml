@@ -1,0 +1,919 @@
+#  Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+#
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >-
+  Deploys Cluster solution for Cisco NGFWv instances
+Parameters:
+  ClusterGrpNamePrefix:
+    Description: >-
+      This will be Cluster Group Name prefix with suffix as Cluster Number
+    Type: String
+    MaxLength: 18
+    Default: NGFWv-Cluster
+  ClusterNumber:
+    Description: >-
+      This will be suffixed to Cluster Group Name(NGFWv-Cluster), if this value is 1 then, group name will be
+      NGFWv-Cluster-1, It should be at least 1 numerical digit but not more than 3 digits.
+    Type: String
+    Default: 1
+    AllowedPattern: '^\d{1,3}$'
+    ConstraintDescription: must be a numerical string matching '^\d{1,3}$'
+  ClusterSize:
+    Description: >-
+      Total Number of FTDv Nodes in the Cluster (Min 1 and Max 16).
+    Type: Number
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+    Default: 4
+  NotifyEmailID:
+    Description: >-
+      Email address to which Cluster Events Email needs to be sent.
+      You will receive a subscription confirmation Email.
+      Click on "Confirm subscription".
+    Type: String
+  VpcId:
+    Description: >-
+      Select VPC for Cluster group
+    Type: AWS::EC2::VPC::Id
+  VpcIdLBE:
+    Description: >-
+      Select VPC to deploy Gateway Load Balancer Endpoint.
+      - *SKIP this field, if you are NOT deploying Gateway Load Balancer Endpoint.
+    Type: String
+    Default: "SKIP, if you are NOT deploying Gateway Load Balancer Endpoint."
+  LambdaSubnets:
+    Description: >-
+      Please provide at least 2 subnet for Lambda functions. Note that these 2 subnet should have NAT GW,
+      because Lambda functions should communicate with AWS Services which are public DNS.
+      Order in which, you select subnet does't matter. Reference https://docs.aws.amazon.com/lambda/latest/dg/configuration-vpc.html
+    Type: List<AWS::EC2::Subnet::Id>
+  LambdaSG:
+    Description: >-
+      Provide Security Groups for Lambda functions, Keep outbound connections to ANYWHERE.
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  NoOfAZs:
+    Description: >-
+      Only 1 AZ is supported.
+    Type: Number
+    AllowedValues:
+      - 1
+    Default: 1
+  AZ:
+    Type: CommaDelimitedList
+    Description: >-
+      Enter 1 Availability Zone
+    Default: us-east-1a
+  UseGWLB:
+    Description: >-
+      Please select "Yes", if you like to use Gateway Load Balancer.
+    Type: String
+    AllowedValues:
+     - "Yes"
+     - "No"
+    Default: "Yes"
+  DeployGWLBE:
+    Description: >-
+      Please select "Yes", if you like to deploy Gateway Load Balancer Endpoint.
+    Type: String
+    AllowedValues:
+     - "Yes"
+     - "No"
+    Default: "Yes"
+  S3BktName:
+    Description: The S3 Bucket name for lambda function
+    Type: String
+    AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: must be a valid S3 bucket name
+  TgHealthPort:
+    Description: >-
+      *SKIP this field, if you are NOT using Gateway Load Balancer.
+      - Note By default this port shouldn't be used for traffic.
+    Type: String
+    AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
+    ConstraintDescription: must be a valid TCP port
+    Default: 80
+  AssignPublicIP:
+    Description: >-
+      Please select true if  needs to have public IP address. In case NGFWv needs to have public IP then management
+      subnet should have AWS IGW as route to internet.
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: true
+  GWLBESubnetId:
+    Description: >-
+      Select only one subnet.
+      - *SKIP this field, if you are NOT deploying Gateway Load Balancer Endpoint.
+      Wrong Subnet selection will cause problems.
+      Make sure that Subnet belongs to correct VPC and Subnet should be in same AZ.
+    Type: String
+    Default: "SKIP, if you are NOT deploying Gateway Load Balancer Endpoint."
+  MgmtInterfaceSG:
+    Description: >-
+      Please select security group ID for NGFWv instances
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  MgmtSubnetId:
+    Description: >-
+      Select only one subnet. Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Make sure of adding Subnet from AZ provided.
+    Type: List<AWS::EC2::Subnet::Id>
+  InsideInterfaceSG:
+    Description: >-
+      Please select security group ID for NGFWv instances inside interface
+    Type: AWS::EC2::SecurityGroup::Id
+  InsideSubnetId:
+    Description: >-
+      Select only one subnet.
+      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Make sure of adding Subnet from AZ provided.
+    Type: List<AWS::EC2::Subnet::Id>
+  OutsideInterfaceSG:
+    Description: >-
+      Enter Security group ID for NGFWv instances outside interface.
+      - *SKIP this field, if you are using Gateway Load Balancer.
+    Type: String
+    Default: SKIP, if you are using Gateway Load Balancer.
+  OutsideSubnetId:
+    Description: >-
+      Enter Subnet ID of outside subnet.
+      - *SKIP this field, if you are using Gateway Load Balancer.
+      Wrong Subnet ID will cause problems while deploying the NGFWv instances.
+      Make sure of adding Subnet from AZ provided.
+    Type: String
+    Default: SKIP, if you are using Gateway Load Balancer.
+  CCLInterfaceSG:
+    Description: >-
+      Please select security group ID for NGFWv instances CCL interface
+    Type: AWS::EC2::SecurityGroup::Id
+  CCLSubnetId:
+    Description: >-
+      Select only one subnet.
+      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Make sure of adding Subnet from AZ provided.
+    Type: List<AWS::EC2::Subnet::Id>
+  CCLfirstIP:
+    Description: >-
+      Enter first IP of CCL subnet.
+      Exclude first 4 reserved IPs.
+      IP pool for Cluster Control Link (CCL).
+      IP will be allocated to CCL interface from CCL IP Pool.
+    Type: String
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
+    Default: 10.1.90.4
+  CCLlastIP:
+    Description: >-
+      Enter last IP of CCL subnet.
+      Exclude last broadcast IP.
+      IP pool for Cluster Control Link (CCL).
+      IP will be allocated to CCL interface from CCL IP Pool.
+    Type: String
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
+    Default: 10.1.90.254
+  InstanceType:
+    Description: >-
+      Cisco NGFWv EC2 instance type.
+      Select _.4xlarge (Which supports 5 interfaces), if you are NOT using Gateway Load Balancer.
+      Make sure that AWS Region supports selected instance type.
+    Type: String
+    AllowedValues:
+      - c3.xlarge
+      - c4.xlarge
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5d.xlarge
+      - c5d.2xlarge
+      - c5d.4xlarge
+      - c5a.xlarge
+      - c5a.2xlarge
+      - c5a.4xlarge
+      - c5ad.xlarge
+      - c5ad.2xlarge
+      - c5ad.4xlarge
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - m5n.xlarge
+      - m5n.2xlarge
+      - m5n.4xlarge
+      - m5zn.xlarge
+      - m5zn.2xlarge
+    Default: c5.4xlarge
+  LicenseType:
+    Description: >-
+      Choose Cisco NGFWv EC2 instance license type, make sure AMI ID which will be entered below is of same licensing type.
+    Type: String
+    AllowedValues:
+      - BYOL
+    Default: BYOL
+  AmiID:
+    Description: >-
+      Please choose correct AMI ID as per the region, desired version and license type(BYOL).
+      NGFWv version 7.2 onwards releases are supported.
+    Type: AWS::EC2::Image::Id
+    Default: ami-0265b4bbf47bd0171
+  KmsArn:
+    Description: >-
+      [Conditional] ARN of an existing KMS (AWS KMS key to encrypt at rest), If specified, NGFWv 'admin' Password below should be encrypted
+      Password. The Password encryption should be done only using the specified ARN.
+      Generating Encrypted Password Ex: " aws kms encrypt --key-id <KMS ARN> --plaintext <password> ", Please use such generated password in below fields.
+    Type: String
+  ngfwPassword:
+    Description: >-
+      All NGFWv instances come up with default password, which is in Userdata field of Launch Template(Cluster Group).
+      Password will be changed to given(below) password once NGFWv is accessible.
+      Since this can be a plain text password or KMS encrypted password, minimum length should be 8 characters.
+    NoEcho: true
+    MinLength: 8
+    Type: String
+    ConstraintDescription: password must be of minimum 8 characters
+  fmcServer:
+    Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
+    Type: String
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
+  fmcOperationsUsername:
+    Description: >-
+      Unique Internal user for Cluster Manager automation tasks on FMC,
+        User should have 'Administrator' Role.
+        Refer 'Firepower Management Center Configuration Guide'
+    Type: String
+  fmcOperationsPassword:
+    Description: >-
+      Please make sure you type correct password (Wrong password will result in failure in automation).
+      If KMS ARN is specified above, please provide encrypted password.
+    NoEcho: true
+    Type: String
+  fmcDeviceGrpName:
+    Description: >-
+      Enter unique name for Cluster Group in FMC
+    Type: String
+    Default: ftdv-cluster
+
+Conditions:
+  UserNotifyEmail: !Not
+    - !Equals
+      - ''
+      - !Ref NotifyEmailID
+  supportGWLB: !Not
+    - !Equals
+      - "No"
+      - !Ref UseGWLB
+  ShouldEncrypt: !Not
+    - !Equals
+      - ''
+      - !Ref KmsArn
+  addGWLBE: !Not
+    - !Equals
+      - "No"
+      - !Ref DeployGWLBE
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Cluster Configuration
+        Parameters:
+          - ClusterGrpNamePrefix
+          - ClusterNumber
+          - ClusterSize
+      - Label:
+          default: Infrastructure Details
+        Parameters:
+          - NoOfAZs
+          - AZ
+          - NotifyEmailID
+          - S3BktName
+          - UseGWLB
+          - VpcId
+          - MgmtSubnetId
+          - InsideSubnetId
+          - OutsideSubnetId
+          - LambdaSubnets
+          - CCLSubnetId
+          - CCLfirstIP
+          - CCLlastIP
+          - MgmtInterfaceSG
+          - InsideInterfaceSG
+          - OutsideInterfaceSG
+          - LambdaSG
+          - CCLInterfaceSG
+      - Label:
+          default: GWLB Configuration
+        Parameters:
+          - DeployGWLBE
+          - VpcIdLBE
+          - GWLBESubnetId
+          - TgHealthPort
+      - Label:
+          default: Cisco NGFWv Instance Configuration
+        Parameters:
+          - InstanceType
+          - LicenseType
+          - AssignPublicIP
+          - AmiID
+          - KmsArn
+          - ngfwPassword
+      - Label:
+          default: FMC Automation Configuration
+        Parameters:
+          - fmcServer
+          - fmcOperationsUsername
+          - fmcOperationsPassword
+          - fmcDeviceGrpName
+    ParameterLabels:
+      ClusterGrpNamePrefix:
+        default: Cluster Group Name Prefix
+      NotifyEmailID:
+        default: Cluster Email Notification
+      ClusterNumber:
+        default: Cluster Number
+      ClusterSize:
+        default: Cluster Size
+      VpcId:
+        default: VPC ID
+      VpcIdLBE:
+        default: VPC ID for Gateway Load Balancer Endpoint
+      DeployGWLBE:
+        default: Deploy Gateway Load Balancer Endpoint
+      UseGWLB:
+        default: Deploy Gateway Load Balancer
+      LambdaSubnets:
+        default: Subnets for Lambda Functions
+      LambdaSG:
+        default: Security Groups for Lambda Functions
+      NoOfAZs:
+        default: Number of Availibility Zones
+      AZ:
+        default: Enter Valid Availability Zone
+      S3BktName:
+        default: S3 Bucket Name
+      TgHealthPort:
+        default: Enter Health Check Port for Gateway Load Balancer
+      InstanceType:
+        default: NGFWv Instance type
+      LicenseType:
+        default: NGFWv Instance License type
+      AmiID:
+        default: NGFWv AMI-ID
+      AssignPublicIP:
+        default: Assign Public IP for NGFWv from AWS IP Pool
+      GWLBESubnetId:
+        default: Subnet for Gateway Load Balancer Endpoint
+      MgmtInterfaceSG:
+        default: Security Groups for NGFWv Instance
+      MgmtSubnetId:
+        default: Subnet for NGFWv Management Interface
+      InsideInterfaceSG:
+        default: Security Group for NGFWv Instance inside
+      InsideSubnetId:
+        default: Subnet for NGFWv Inside Interface
+      OutsideInterfaceSG:
+        default: Security Group for NGFWv Instance outside
+      OutsideSubnetId:
+        default: Subnet for NGFWv Outside Interface
+      CCLInterfaceSG:
+        default: Security Group for NGFWv CCL
+      CCLSubnetId:
+        default: Subnet for NGFWv CCL Interface
+      CCLfirstIP:
+        default: First IP of CCL Subnet (CCL IP Pool)
+      CCLlastIP:
+        default: Last IP of CCL Subnet (CCL IP Pool)
+      KmsArn:
+        default: KMS Master Key ARN
+      ngfwPassword:
+        default: NGFWv Password
+      fmcServer:
+        default: FMC host IP address
+      fmcOperationsUsername:
+        default: FMC Username for Cluster Automation
+      fmcOperationsPassword:
+        default: FMC Password for Cluster Automation
+      fmcDeviceGrpName:
+        default: FMC Device Group Name
+Resources:
+# Lambda Layer ---------------------------------------------------------
+  LambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.9
+      Content:
+        S3Bucket: !Ref S3BktName
+        S3Key: cluster_layer.zip
+      Description: Lambda Layer for Cisco NGFWv Cluster Solution
+      LayerName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lambda-layer' ] ]
+# ------------------------------------------------------------------------
+# Lambda Role & Policy
+# ------------------------------------------------------------------------
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'Role' ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+  LambdaPolicy:
+    DependsOn:
+      - LambdaRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'Policy' ] ]
+      Roles:
+        - !Ref LambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - logs:*
+              - ec2:*
+              - elasticloadbalancing:*
+              - autoscaling:*
+              - events:*
+              - s3:*
+              - cloudwatch:*
+              - cloudwatch:SetAlarmState
+              - cloudwatch:PutMetricData
+              - sns:*
+              - ssm:*
+              - lambda:*
+              - kms:Decrypt
+            Effect: Allow
+            Resource: '*'
+# ------------------------------------------------------------------------
+# User Notification SNS
+# ------------------------------------------------------------------------
+  UserNotifyTopic:
+    Condition: UserNotifyEmail
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'UserNotifyTopic']]
+  UserNotifyTopicSubscription:
+    Condition: UserNotifyEmail
+    DependsOn: UserNotifyTopic
+    DeletionPolicy: Delete
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !Ref NotifyEmailID
+      Protocol: email
+      TopicArn: !Ref UserNotifyTopic
+# ------------------------------------------------------------------------
+# GW Load Balancer & Target groups
+# ------------------------------------------------------------------------
+  gwlb:
+    Condition: supportGWLB
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'GWLB' ] ]
+      Type: gateway
+      Subnets: !Ref InsideSubnetId
+  tg:
+    Condition: supportGWLB
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn:
+      - gwlb
+    Properties:
+      Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'GWLB-tg' ] ]
+      Port: 6081
+      Protocol: GENEVE
+      HealthCheckPort: !Ref TgHealthPort
+      HealthCheckIntervalSeconds: 15
+      HealthCheckProtocol: TCP
+      VpcId: !Ref VpcId
+      TargetType: ip
+  listener:
+    Condition: supportGWLB
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref tg
+      LoadBalancerArn: !Ref gwlb
+
+# ------------------------------------------------------------------------
+# Create Lambda Custom Resource to retrieve VPC Endpoint Service Name:
+# ------------------------------------------------------------------------
+  VpceServiceLambdaExecutionRole:
+    Condition: addGWLBE
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeVpcEndpointServiceConfigurations
+                  - ec2:DescribeVpcEndpointServicePermissions
+                  - ec2:DescribeVpcEndpointServices
+                Resource: "*"
+
+  # Lambda creates CloudWatch Log Group.
+  # Since CF stack didn't explicitly create the Log Group, Log Group doesn't get deleted when stack is deleted.
+  # Hence creating Log Group though the stack for Lambda specific funciton.
+  # Their are few things to consider. For more details refer to: https://github.com/aws/serverless-application-model/issues/1216
+  VpceServiceLogGroup:
+    Condition: addGWLBE
+    Type: AWS::Logs::LogGroup
+    Properties:
+        LogGroupName: !Sub /aws/lambda/${AWS::StackName}-vpce-service
+        RetentionInDays: 1
+
+  VpceServiceName:
+    Condition: addGWLBE
+    Type: AWS::Lambda::Function
+    DependsOn: VpceServiceLogGroup
+    Properties:
+      FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'vpce-service'] ]
+      Handler: "index.handler"
+      Role: !GetAtt VpceServiceLambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import time
+          import boto3
+          import cfnresponse
+          from botocore.exceptions import ClientError
+          try:
+              ec2 = boto3.client('ec2')
+          except ClientError as e:
+              logger.error(f"ERROR: failed to connect to EC2 client: {e}")
+              sys.exit(1)
+          def handler(event, context):
+              logger = logging.getLogger()
+              logger.setLevel(logging.INFO)
+              logger.info('Received event: {}'.format(json.dumps(event)))
+              responseData = {}
+              responseStatus = cfnresponse.FAILED
+              try:
+                  serviceid = event["ResourceProperties"]["VpceServiceId"]
+              except Exception as e:
+                  logger.info('Attribute retrival failure: {}'.format(e))
+              try:
+                  if event["RequestType"] == "Delete":
+                      responseStatus = cfnresponse.SUCCESS
+                      cfnresponse.send(event, context, responseStatus, responseData)
+              except Exception:
+                  logger.exception("Signaling failure to CloudFormation.")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+              if event["RequestType"] == "Create":
+                  logger.info("Retrieving VPC Endpoint Service Name:")
+                  try:
+                      response = ec2.describe_vpc_endpoint_service_configurations(
+                          Filters=[
+                              {
+                                  'Name': 'service-id',
+                                  'Values': [serviceid]
+                              }
+                          ]
+                      )
+                  except Exception as e:
+                      logger.info('ec2.describe_vpc_endpoint_service_configurations failure: {}'.format(e))
+                  service_name = response['ServiceConfigurations'][0]['ServiceName']
+                  time.sleep(120)
+                  responseData['ServiceName'] = service_name
+                  responseStatus = cfnresponse.SUCCESS
+                  cfnresponse.send(event, context, responseStatus, responseData)
+      Runtime: python3.9
+      Timeout: 150
+
+  RetrieveVpceServiceName:
+    Condition: addGWLBE
+    Type: Custom::RetrieveAttributes
+    Properties:
+      ServiceToken: !GetAtt VpceServiceName.Arn
+      VpceServiceId: !Ref VpcEndpointService
+
+# ------------------------------------------------------------------------
+# Create VPC Endpoint Service
+# ------------------------------------------------------------------------
+  VpcEndpointService:
+    Condition: addGWLBE
+    Type: AWS::EC2::VPCEndpointService
+    Properties:
+      GatewayLoadBalancerArns:
+        - !Ref gwlb
+      AcceptanceRequired: false
+
+# ------------------------------------------------------------------------
+# Create Gateway Load Balancer Endpoint
+# ------------------------------------------------------------------------
+  GwlbEndpoint:
+    Condition: addGWLBE
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcIdLBE
+      ServiceName: !GetAtt RetrieveVpceServiceName.ServiceName
+      VpcEndpointType: GatewayLoadBalancer
+      SubnetIds:
+        - !Ref GWLBESubnetId
+# ------------------------------------------------------------------------
+# Cluster Manager Lambda
+# ------------------------------------------------------------------------
+  ClusterManager:
+   Type: AWS::Serverless::Function
+   DependsOn:
+     - LambdaRole
+     - LambdaPolicy
+     - CLSmanagerTopic
+   DeletionPolicy: Delete
+   Properties:
+     FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'manager-lambda'] ]
+     Handler: manager.lambda_handler
+     Runtime: python3.9
+     ReservedConcurrentExecutions: 1
+     CodeUri:
+       Bucket: !Ref S3BktName
+       Key: cluster_manager.zip
+     Description: 'ClusterManager Lambda is responsible to configure NGFWv'
+     MemorySize: 128
+     Timeout: 900
+     VpcConfig:
+       SecurityGroupIds: !Ref LambdaSG
+       SubnetIds: !Ref LambdaSubnets
+     KmsKeyArn: !Ref KmsArn
+     Environment:
+       Variables:
+         DEBUG_LOGS: 'enable'
+         KMS_ENC: !If
+           - ShouldEncrypt
+           - !Ref KmsArn
+           - !Ref 'AWS::NoValue'
+         ASG_NAME: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+         FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
+         FMC_SERVER: !Ref fmcServer
+         FMC_USERNAME: !Ref fmcOperationsUsername
+         FMC_PASSWORD: !Ref fmcOperationsPassword
+         NO_OF_AZs: !Ref NoOfAZs
+         FTD_LICENSE_TYPE: !Ref LicenseType
+         GWLBSUPPORT: !Ref UseGWLB
+         GWLB_ARN: !If
+           - supportGWLB
+           - !Ref gwlb
+           - !Ref 'AWS::NoValue'
+         FTD_PASSWORD: !Ref ngfwPassword
+         TG_HEALTH_PORT: !Ref TgHealthPort
+         CLS_MANAGER_TOPIC: !Ref CLSmanagerTopic
+         USER_NOTIFY_TOPIC_ARN: !If
+           - UserNotifyEmail
+           - !Ref UserNotifyTopic
+           - !Ref 'AWS::NoValue'
+     Role: !GetAtt LambdaRole.Arn
+     Layers:
+       - !Ref LambdaLayer
+     Events:
+       SNS1:
+         Type: SNS
+         Properties:
+           Topic:
+             Ref: CLSmanagerTopic
+  ClusterManagerLogGrp:
+   DependsOn: ClusterManager
+   Type: AWS::Logs::LogGroup
+   DeletionPolicy: Delete
+   Properties:
+     LogGroupName: !Join ['/', ['/aws/lambda', !Ref ClusterManager]]
+  InstanceEvent:
+   Type: AWS::Events::Rule
+   Properties:
+     Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'notify-instance-event'] ]
+     EventPattern:
+       source:
+         - aws.autoscaling
+       detail-type:
+         - EC2 Instance Launch Successful
+         - EC2 Instance Terminate Successful
+       detail:
+         AutoScalingGroupName:
+           - !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+     Targets:
+       - Id: CloudWatchEventTarget
+         Arn: !GetAtt ClusterManager.Arn
+     State: ENABLED
+  InstanceEventInvokeLambdaPermission:
+   Type: AWS::Lambda::Permission
+   DependsOn: InstanceEvent
+   Properties:
+     FunctionName: !Ref ClusterManager
+     Action: 'lambda:InvokeFunction'
+     Principal: events.amazonaws.com
+     SourceArn: !GetAtt InstanceEvent.Arn
+  CLSmanagerTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber , 'cluster-manager-topic'] ]
+# ------------------------------------------------------------------------
+# Lifecycle Action Lambda
+# ------------------------------------------------------------------------
+  LifeCycleLambda:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - LambdaRole
+      - LambdaPolicy
+      - CLSmanagerTopic
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lifecycle-lambda'] ]
+      Handler: lifecycle_ftdv.lambda_handler
+      Runtime: python3.9
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: cluster_lifecycle.zip
+      Description: 'Life Cycle Lambda is responsible to attach interfaces to new NGFWv'
+      MemorySize: 128
+      ReservedConcurrentExecutions: 16
+      Timeout: 300
+      Role: !GetAtt LambdaRole.Arn
+      VpcConfig:
+        SecurityGroupIds: !Ref LambdaSG
+        SubnetIds: !Ref LambdaSubnets
+      Layers:
+        - !Ref LambdaLayer
+      Environment:
+        Variables:
+          DEBUG_LOGS: 'enable'
+          ASG_NAME: !Join [ '-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber]]
+          FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
+          NO_OF_AZs: !Ref NoOfAZs
+          FTD_LICENSE_TYPE: !Ref LicenseType
+          GWLBSUPPORT: !Ref UseGWLB
+          INSIDE_SUBNET: !Select ['0', !Ref InsideSubnetId ]
+          SECURITY_GRP_2: !Ref InsideInterfaceSG
+          OUTSIDE_SUBNET: !If
+            - supportGWLB
+            - !Ref 'AWS::NoValue'
+            - !Ref OutsideSubnetId
+          SECURITY_GRP_3: !If
+            - supportGWLB
+            - !Ref 'AWS::NoValue'
+            - !Ref OutsideInterfaceSG
+          CCL_SUBNET: !Select ['0', !Ref CCLSubnetId ]
+          SECURITY_GRP_4: !Ref CCLInterfaceSG
+          GWLB_ARN: !If
+            - supportGWLB
+            - !Ref gwlb
+            - !Ref 'AWS::NoValue'
+          LB_DEREGISTRATION_DELAY: 180
+          USER_NOTIFY_TOPIC_ARN: !If
+            - UserNotifyEmail
+            - !Ref UserNotifyTopic
+            - !Ref 'AWS::NoValue'
+  LifeCycleLambdaLogGrp:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref LifeCycleLambda]]
+  LifeCycleEvent:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lifecycle-action' ] ]
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-launch Lifecycle Action
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt LifeCycleLambda.Arn
+      State: ENABLED
+  LifeCycleEventInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn: LifeCycleEvent
+    Properties:
+      FunctionName: !Ref LifeCycleLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LifeCycleEvent.Arn
+
+# ------------------------------------------------------------------------
+# Cluster Group & Launch Template
+# ------------------------------------------------------------------------
+  FTDvGroup:
+    DependsOn:
+      - LifeCycleEvent
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+      VPCZoneIdentifier: !Ref MgmtSubnetId
+      LaunchTemplate:
+        LaunchTemplateId: !Ref FTDvLaunchTemplate
+        Version: 1
+      MinSize: !Ref ClusterSize
+      DesiredCapacity: !Ref ClusterSize
+      MaxSize: !Ref ClusterSize
+      MetricsCollection:
+        - Granularity: 1Minute
+          Metrics:
+            - GroupDesiredCapacity
+            - GroupInServiceInstances
+            - GroupTerminatingInstances
+            - GroupTotalInstances
+            - GroupStandbyInstances
+      HealthCheckGracePeriod: 2000
+      Cooldown: 2000
+      TerminationPolicies:
+        - OldestLaunchConfiguration
+        - OldestLaunchTemplate
+        - ClosestToNextInstanceHour
+      LifecycleHookSpecificationList:
+        - DefaultResult: ABANDON
+          HeartbeatTimeout: 60
+          LifecycleHookName: Launch_LifecycleHook
+          LifecycleTransition: 'autoscaling:EC2_INSTANCE_LAUNCHING'
+        - DefaultResult: CONTINUE
+          HeartbeatTimeout: 120
+          LifecycleHookName: Terminate_LifecycleHook
+          LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
+  FTDvLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'ftd-launch-template' ] ]
+      LaunchTemplateData:
+        EbsOptimized: false
+        ImageId: !Ref AmiID
+        InstanceType: !If
+          - supportGWLB
+          - !Ref InstanceType
+          - c5.4xlarge
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: !Ref AssignPublicIP
+            DeleteOnTermination: true
+            DeviceIndex: 0
+            Groups: !Ref MgmtInterfaceSG
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+        Monitoring:
+          Enabled: true
+        UserData:
+          Fn::Base64: !Sub |
+            { "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": "${CCLfirstIP} ${CCLlastIP}", "Geneve": "${UseGWLB}","HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}
