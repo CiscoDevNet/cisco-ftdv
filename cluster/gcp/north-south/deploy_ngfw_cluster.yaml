@@ -1,0 +1,89 @@
+########################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#All Rights Reserved.                                                                  #
+#Licensed under the Apache License, Version 2.0 (the "License");                       #
+#you may not use this file except in compliance with the License.                      #
+#You may obtain a copy of the License at                                               #
+#http://www.apache.org/licenses/LICENSE-2.0                                            #
+#Unless required by applicable law or agreed to in writing, software                   #
+#distributed under the License is distributed on an "AS IS" BASIS,                     #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.              #
+#See the License for the specific language governing permissions and                   #
+#limitations under the License.                                                        #
+########################################################################################
+# File: deploy_ngfw_cluster.yaml                                                   #
+# Purpose: To provide Parameters to deploy_ngfw_cluster.jinja for the FTDv cluster #
+# in GCP.                                                                              #
+########################################################################################
+#                                                                                      #
+# USER should have a minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL).          #
+#                                                                                      #
+# Note: This is an example input parameter, user need to change required input         #
+# parameters with existing resources.                                                  #
+#                                                                                      #
+########################################################################################
+
+imports:
+- path: deploy_ngfw_cluster.jinja
+resources:
+- name: Cluster_Parameters
+  type: deploy_ngfw_cluster.jinja
+  properties:
+    # resourceNamePrefix restricted to single word 
+    resourceNamePrefix: <> #ngfwvcls
+    region: <> #us-central1
+    zonecode: b #zone code for deploying the cluster
+    serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
+    #day0 startup-script input
+    adminPassword: <> #Cisco@123123
+    hostname: <> #ciscoftdv
+    cclSubnetRange: <> #10.10.55.2 10.10.55.253 #only allowed range is x.x.x.2 x.x.x.253
+    clusterGrpName: <> #ngfwvcls-cluster
+    # VPC and Firewall Parameters
+    mgmtVpcName: <> #ngfwvcls-ftdv-mgmt-vpc
+    diagVpcName: <> #ngfwvcls-ftdv-diag-vpc
+    outsideVpcName: <> #ngfwvcls-ftdv-outside-vpc
+    insideVpcName: <> #ngfwvcls-ftdv-inside-vpc
+    cclVpcName: <> #ngfwvcls-ftdv-ccl-vpc
+    mgmtSubnetworkName: <> #ngfwvcls-ftdv-mgmt-subnet
+    diagSubnetworkName: <> #ngfwvcls-ftdv-diag-subnet
+    outsideSubnetworkName: <> #ngfwvcls-ftdv-outside-subnet
+    insideSubnetworkName: <> #ngfwvcls-ftdv-inside-subnet
+    cclSubnetworkName: <> #ngfwvcls-ftdv-ccl-subnet
+    mgmtFirewallRule: <> #ngfwvcls-ftdv-mgmt-firewall-rule
+    diagFirewallRule: <> #ngfwvcls-ftdv-diag-firewall-rule
+    outsideFirewallRule: <> #ngfwvcls-ftdv-out-firewall-rule
+    insideFirewallRule: <> #ngfwvcls-ftdv-in-firewall-rule
+    cclFirewallRule: <> #ngfwvcls-ftdv-ccl-firewall-rule
+    healthCheckFirewallRule: <> #ngfwvcls-ftdv-hc-firewall-rule
+    # Instance Template
+    machineType: <> #e2-standard-8
+    sourceImageURL: <> #projects/asavgcp-poc-4krn/global/images/cisco-secure-firewall-threat-defense-virtual-gcp-7-2-0-1553
+    targetSize: 1
+    # FTDv Health Check
+    ftdvHealthCheckPort: 22
+    ftdvCheckIntervalSec: 300
+    ftdvTimeoutSec: 300
+    ftdvHealthCheckProtocolName: TCP
+    ftdvUnhealthyThreshold: <> #4 # allowed value range 1-10
+    # FTDv Autoscaled cluster
+    cpuUtilizationTarget: <> #0.8 #Percentage
+    #coolDownPeriodSec: 30
+    ftdvReplicas: <> #4 # allowed value range 1-16
+    # ELB Services
+    elbPort: 80
+    elbPortName: tcp
+    elbProtocol: TCP
+    elbTimeoutSec: 5
+    elbProtocolName: TCP
+    elbUnhealthyThreshold: <> #4  # allowed value range 1-10
+    elbIpProtocol: TCP
+    elbFePorts: [443,80,22]
+    # ILB Services
+    ilbProtocol: TCP
+    ilbDrainingTimeoutSec: 60
+    ilbPort: 80
+    ilbCheckIntervalSec: 10
+    ilbTimeoutSec: 5
+    ilbProtocolName: TCP
+    ilbUnhealthyThreshold: <> #4 # allowed value range 1-10

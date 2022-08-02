@@ -1,0 +1,725 @@
+#  Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+#
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: NGFWv - Cluster pre-requisites
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Cluster Configurtion
+        Parameters:
+          - ClusterName
+          - ClusterNumber
+          - NoOfAZs
+          - AZ
+          - UseGWLB
+          - VpcCidr
+          - MgmtSubnetName
+          - MgmtSubnetCidr
+          - InsideSubnetName
+          - InsideSubnetCidr
+          - OutsideSubnetName
+          - OutsideSubnetCidr
+          - CCLSubnetName
+          - CCLSubnetCidr
+          - LambdaAZs
+          - LambdaSubnetName
+          - LambdaSubnetCidrs
+    ParameterLabels:
+      ClusterName:
+        default: Cluster Name
+      ClusterNumber:
+        default: Cluster Number
+      VpcCidr:
+        default: VPC CIDR
+      NoOfAZs:
+        default: Number of Availibility Zones
+      AZ:
+        default: Availibility Zone
+      UseGWLB:
+        default: Use Gateway Load Balancer
+      MgmtSubnetName:
+        default: Name of the Management Subnet
+      MgmtSubnetCidr:
+        default: Management subnet CIDR
+      InsideSubnetName:
+        default: Name of the Inside Subnet
+      InsideSubnetCidr:
+        default: Inside subnet CIDR
+      OutsideSubnetName:
+        default: Name of the Outside Subnet
+      OutsideSubnetCidr:
+        default: Outside subnet CIDR
+      CCLSubnetName:
+        default: Name of the CCL Subnet
+      CCLSubnetCidr:
+        default: CCL subnet CIDR
+      LambdaAZs:
+        default: List of Lambda AZs
+      LambdaSubnetName:
+        default: Name of the Lambda Subnets
+      LambdaSubnetCidrs:
+        default: Lambda Subnet CIDRs
+
+Conditions:
+  noGWLB: !Not
+    - !Equals
+      - "Yes"
+      - !Ref UseGWLB
+  supportGWLB: !Not
+    - !Equals
+      - "No"
+      - !Ref UseGWLB
+Parameters:
+  ClusterName:
+    Description: Enter unique Cluster name
+    Type: String
+    Default: cluster-infra
+    MinLength: 3
+    MaxLength: 15
+  ClusterNumber:
+    Description: Enter unique Cluster number
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 99
+  VpcCidr:
+    Description: Enter the CIDR block for a new VPC
+    Type: String
+    AllowedPattern: >-
+      ^((25[0-5]|2[0-4][0-9]|[1]?[0-9][0-9]?)(\.|\/)){4}([0-9]|[1-2][0-9]|3[0-2])$
+    Default: 10.1.0.0/16
+  NoOfAZs:
+    Description: Only 1 AZ is supported.
+    Type: Number
+    AllowedValues:
+      - 1
+    Default: 1
+  AZ:
+    Description: Enter 1 valid Availability Zone
+    Type: CommaDelimitedList
+    Default: us-east-1a
+  UseGWLB:
+    Description: >-
+      Please select "Yes", if you like to use Gateway Load Balancer.
+    Type: String
+    AllowedValues:
+     - "Yes"
+     - "No"
+    Default: "Yes"
+  MgmtSubnetName:
+    Description: Enter Management subnet name (With Internet GW as Route)
+    Type: String
+    Default: ManagementSubnet
+  MgmtSubnetCidr:
+    Description: Enter Management subnet CIDR
+    Type: CommaDelimitedList
+    Default: 10.1.250.0/24
+  InsideSubnetName:
+    Description: Enter Inside subnet name (With Private Route)
+    Type: String
+    Default: InsideSubnet
+  InsideSubnetCidr:
+    Description: Enter Inside subnet CIDR
+    Type: CommaDelimitedList
+    Default: 10.1.100.0/24
+  OutsideSubnetName:
+    Description: >-
+      Enter Outside subnet name (With Internet GW as Route)
+      - *SKIP this field, if you are using Gateway Load Balancer.
+    Type: String
+    Default: OutsideSubnet
+  OutsideSubnetCidr:
+    Description: >-
+      Enter Outside subnet CIDR
+      - *SKIP this field, if you are using Gateway Load Balancer.
+    Type: CommaDelimitedList
+    Default: 10.1.200.0/24
+  CCLSubnetName:
+    Description: Enter CCL subnet name
+    Type: String
+    Default: CCLSubnet
+  CCLSubnetCidr:
+    Description: Enter CCL subnet CIDR
+    Type: CommaDelimitedList
+    Default: 10.1.90.0/24
+  LambdaAZs:
+    Description: Enter 2 Lambda Availability Zones
+    Type: CommaDelimitedList
+    Default: us-east-1a,us-east-1b
+  LambdaSubnetName:
+    Description: Enter Lambda Subnets name (With NAT GW as Route), for Lambda Functions
+    Type: CommaDelimitedList
+    Default: LambdaSubnet-1,LambdaSubnet-2
+  LambdaSubnetCidrs:
+    Description: Enter Lambda Subnet CIDRs
+    Type: CommaDelimitedList
+    Default: 10.1.50.0/24,10.1.51.0/24
+Resources:
+  VpcCluster:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'vpc' ] ]
+  subnetMgmt0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref MgmtSubnetCidr ]
+      AvailabilityZone: !Select ['0', !Ref AZ ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, MgmtSubnetName ] ]
+
+  subnetInside0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref InsideSubnetCidr ]
+      AvailabilityZone: !Select ['0', !Ref AZ ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, InsideSubnetName ] ]
+
+  subnetOutside0:
+    Condition: noGWLB
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref OutsideSubnetCidr ]
+      AvailabilityZone: !Select ['0', !Ref AZ ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, OutsideSubnetName ] ]
+
+  subnetCCL0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref CCLSubnetCidr ]
+      AvailabilityZone: !Select ['0', !Ref AZ ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, CCLSubnetName ] ]
+
+# -------------------------------------------
+# Lambda Subnet
+# -------------------------------------------
+  subnetLambda0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref LambdaAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref LambdaSubnetName ] ] ]
+  subnetLambda1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref LambdaAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref LambdaSubnetName ] ] ]
+# -------------------------------------------
+  igwf952ea9c:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'internet-gw' ] ]
+  gw1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcCluster
+      InternetGatewayId: !Ref igwf952ea9c
+  eipNat:
+     Type: AWS::EC2::EIP
+     Properties:
+        Domain: vpc
+  ngwf952ea10:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt eipNat.AllocationId
+      SubnetId: !Ref subnetMgmt0
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'nat-gw' ] ]
+  dopt3a55d05f:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Join ['', [!Ref ClusterName, !Ref ClusterNumber, '.compute.internal' ]]
+      DomainNameServers:
+        - AmazonProvidedDNS
+  dchpassoc1:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      VpcId: !Ref VpcCluster
+      DhcpOptionsId: !Ref dopt3a55d05f
+# -------------------------------------------
+# Route Table
+  routeTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'with-internet-gw' ] ]
+  routeTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'with-nat-gw' ] ]
+  routeTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-rt' ] ]
+  routeTable4:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ccl-rt' ] ]
+# -------------------------------------------
+# Route
+  route1:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable1
+      GatewayId: !Ref igwf952ea9c
+    DependsOn: gw1
+  routeNGW:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable2
+      NatGatewayId: !Ref ngwf952ea10
+# -------------------------------------------
+# Network ACls for Subnets
+  aclOutside:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VpcCluster
+  aclOutsideEgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclOutside
+  aclOutsideIgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclOutside
+  aclInside:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VpcCluster
+  aclInsideEgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclInside
+  aclInsideIgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclInside
+# -------------------------------------------
+# NGFWv Subnet ACl
+  subnetaclMgmt0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclOutside
+      SubnetId: !Ref subnetMgmt0
+  subnetAclInside0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside0
+  subnetAclOutside0:
+    Condition: noGWLB
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclOutside
+      SubnetId: !Ref subnetOutside0
+  CCLAclSubnet0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL0
+# -------------------------------------------
+# Lambda Subnet ACl
+  subnetAclLambda0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclOutside
+      SubnetId: !Ref subnetLambda0
+  subnetAclLambda1:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclOutside
+      SubnetId: !Ref subnetLambda1
+# -------------------------------------------
+# Security Groups for Lambda & Instances
+  InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for NGFWv Instance Management Interface
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ftdv-instance-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8305
+          ToPort: 8305
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  InsideInterfaceSGwithGWLB:
+    Condition: supportGWLB
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Inside interface (GWLB)
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  InsideInterfaceSGwithoutGWLB:
+    Condition: noGWLB
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Inside interface (No GWLB)
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  OutsideInterfaceSG:
+    Condition: noGWLB
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Outside interface
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'outside-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  CCLInterfaceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances CCL interface
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'CCL-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !Select ['0', !Ref CCLSubnetCidr ]
+        SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !Select ['0', !Ref CCLSubnetCidr ]
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Lambda functions
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'lambda-functions-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  FmcSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Cisco FMCv device
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'fmcv-instance-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+# -------------------------------------------
+# Public Subnet Route Table Association
+  subnetrouteMgmt0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt0
+  subnetrouteOutside0:
+    Condition: noGWLB
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetOutside0
+# -------------------------------------------
+# Private Subnet Route Table Association
+  subnetrouteinside:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside0
+  subnetrouteccl:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL0
+# -------------------------------------------
+# NATed Lambda Subnet Route Table Association
+  subnetLambda0Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda0
+  subnetLambda1Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda1
+# -------------------------------------------
+# S3 Bucket for Cluster
+  S3bucketCluster:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: 'true'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  S3bucketClusterPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3bucketCluster
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketCluster, "/*"] ]
+            Principal: "*"
+            Condition:
+              StringEquals:
+                aws:SourceVpce:
+                  - !Ref VpcEndpointS3
+# -------------------------------------------
+# VPC Endpoint Creation
+  VpcEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketCluster, "/*"] ]
+            Principal: "*"
+      RouteTableIds:
+        - !Ref routeTable1
+        - !Ref routeTable2
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VpcCluster
+# -------------------------------------------
+# Launch Template for FMCv, won't launch instance, needs to update with required AMI ID
+  FmclaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn:
+      - FmcSG
+      - subnetMgmt0
+    Properties:
+      LaunchTemplateName: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'fmc-launch-template' ] ]
+      LaunchTemplateData:
+        EbsOptimized: false
+        InstanceType: c5.4xlarge
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeleteOnTermination: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref FmcSG
+            SubnetId: !Ref subnetMgmt0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+              VolumeSize: 300
+        UserData:
+          Fn::Base64: !Sub |
+            { "AdminPassword": "Cisco123789!", "Hostname": "FMCv" }
+Outputs:
+  BucketName:
+    Value: !Ref S3bucketCluster
+    Description: Name of the Amazon S3 bucket
+  BucketUrl:
+    Value: !GetAtt S3bucketCluster.WebsiteURL
+    Description: URL of S3 Bucket Static Website
+  VpcName:
+    Description: Name of the VPC created
+    Value: !Ref VpcCluster
+  AZ:
+    Value: !Join [',', [!Select ['0', !Ref AZ]]]
+    Description: Availability zone
+  UseGWLB:
+      Value: !Ref UseGWLB
+      Description: Use Gateway Load Balancer
+  MgmtSubnetIds:
+    Value: !Ref subnetMgmt0
+    Description: Mangement subnet ID
+  InsideSubnetIds:
+    Value: !Ref subnetInside0
+    Description: Inside subnet ID
+  OutsideSubnetIds:
+    Condition: noGWLB
+    Value: !Ref subnetOutside0
+    Description: Outside subnet ID
+  CCLSubnetId:
+    Value: !Ref subnetCCL0
+    Description: CCL subnet ID
+  LambdaSubnetIds:
+    Value: !Join [',', [!Ref subnetLambda0, !Ref subnetLambda1 ]]
+    Description: List of lambda subnet IDs (comma seperated)
+  InstanceSGId:
+    Value: !Ref InstanceSG
+    Description: Security Group ID for Instances Management Interface
+  InInterfaceSGId:
+    Value: !If
+      - noGWLB
+      - !Ref InsideInterfaceSGwithoutGWLB
+      - !Ref InsideInterfaceSGwithGWLB
+    Description: Security Group ID for Instances Inside Interface
+  OutInterfaceSGId:
+    Condition: noGWLB
+    Value: !Ref OutsideInterfaceSG
+    Description: Security Group ID for Instances Outside Interface
+  LambdaSecurityGroupId:
+    Value: !Ref LambdaSecurityGroup
+    Description: Security Group ID for Lambda Functions
+  FmcInstanceSGID:
+    Value: !Ref FmcSG
+    Description: Security Group ID for FMC if user would like to launch in this VPC itself
+  EIPforNATgw:
+    Value: !Ref eipNat
+    Description: EIP reserved for NAT GW

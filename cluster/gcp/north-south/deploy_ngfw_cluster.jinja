@@ -1,0 +1,234 @@
+#####################################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                                             #
+#All Rights Reserved.                                                                                #
+#Licensed under the Apache License, Version 2.0 (the "License");                                     #
+#you may not use this file except in compliance with the License.                                    #
+#You may obtain a copy of the License at                                                             #
+#http://www.apache.org/licenses/LICENSE-2.0                                                          #
+#Unless required by applicable law or agreed to in writing, software                                 #
+#distributed under the License is distributed on an "AS IS" BASIS,                                   #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.                            #
+#See the License for the specific language governing permissions and                                 #
+#limitations under the License.                                                                      #
+######################################################################################################
+# File: deploy_ngfw_cluster.jinja                                                                    #
+# Purpose: Template for FTDv Cluster Deployment, takes parameters from deploy_ngfw_cluster.yaml      #
+################### Uncomment lines [58-62] for deploying with public/external IP ####################
+## Before uncommenting make sure to set deployWithExternalIP as True in cluster_function_infra.yaml ##
+######################################################################################################
+
+resources:
+# Instance Template
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-instance-template
+  type: compute.v1.instanceTemplate
+  properties:
+    properties:
+      tags:
+        items:
+          - {{ properties["mgmtFirewallRule"] }}
+          - {{ properties["diagFirewallRule"] }}
+          - {{ properties["outsideFirewallRule"] }}
+          - {{ properties["insideFirewallRule"] }}
+          - {{ properties["cclFirewallRule"] }}
+          - {{ properties["healthCheckFirewallRule"] }}
+      machineType: {{ properties["machineType"] }}
+      canIpForward: true
+      disks:
+      - deviceName: boot
+        type: PERSISTENT
+        boot: true
+        autoDelete: true
+        initializeParams:
+          sourceImage: {{ properties["sourceImageURL"] }}
+          diskType: pd-standard
+          diskSizeGb: 49
+      networkInterfaces:
+        - name: nic0
+          network: projects/{{ env["project"] }}/global/networks/{{ properties["outsideVpcName"] }}
+          subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["outsideSubnetworkName"] }}
+          kind: compute#networkInterface
+        - name: nic1
+          network: projects/{{ env["project"] }}/global/networks/{{ properties["insideVpcName"] }}
+          subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["insideSubnetworkName"] }}
+          kind: compute#networkInterface
+        - name: nic2
+          network: projects/{{ env["project"] }}/global/networks/{{ properties["mgmtVpcName"] }}
+          subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["mgmtSubnetworkName"] }}
+          ####################### Uncomment below lines [58-62] for deploying with public/external IP ########################
+          #accessConfigs:
+          #- kind: compute#accessConfig
+            #name: External NAT
+            #type: ONE_TO_ONE_NAT
+            #networkTier: PREMIUM
+          ###### After uncommenting make sure EXTERNAL_IP_ENABLE set as True in cloud function environment variable if cloud function already deployed #######
+          kind: compute#networkInterface
+        - name: nic3
+          network: projects/{{ env["project"] }}/global/networks/{{ properties["diagVpcName"] }}
+          subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["diagSubnetworkName"] }}
+          kind: compute#networkInterface
+        - name: nic4
+          network: projects/{{ env["project"] }}/global/networks/{{ properties["cclVpcName"] }}
+          subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["cclSubnetworkName"] }}
+          kind: compute#networkInterface
+
+      reservationAffinity:
+        consumeReservationType: ANY_RESERVATION
+      metadata:
+        kind: compute#metadata
+        items:
+          - value:  |-
+                {
+                   "AdminPassword": "{{ properties["adminPassword"] }}",
+                   "Hostname": "{{ properties["hostname"] }}",
+                   "FirewallMode": "routed",
+                   "ManageLocally": "No",
+                   "Cluster": {
+                   "CclSubnetRange": "{{ properties["cclSubnetRange"] }}",
+                   "ClusterGroupName": "{{ properties["clusterGrpName"] }}"
+                   }
+                }
+            key: startup-script
+      labels:
+        autostop: 'false'
+      scheduling:
+        onHostMaintenance: MIGRATE
+        automaticRestart: true
+      serviceAccounts: 
+        - email: {{ properties["serviceAccountMailId"] }}
+          scopes:
+          - https://www.googleapis.com/auth/devstorage.read_only
+          - https://www.googleapis.com/auth/logging.write
+          - https://www.googleapis.com/auth/monitoring.write
+          - https://www.googleapis.com/auth/service.management.readonly
+          - https://www.googleapis.com/auth/servicecontrol
+          - https://www.googleapis.com/auth/trace.append
+# Instance Group
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-instance-group
+  type: compute.v1.regionInstanceGroupManager
+  properties:
+    region: {{ properties["region"] }}
+    # only single ZONE support for cluster.
+    distributionPolicy:
+      zones:
+        - zone: {{ BASE_URL }}/projects/{{ env["project"] }}/zones/{{ properties["region"] }}-{{ properties["zonecode"] }}
+    instanceTemplate: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-template.selfLink)
+    baseInstanceName: {{ properties["resourceNamePrefix"] }}-ftdv-automation-instance
+    targetSize: {{ properties["targetSize"] }}
+    #autoHealingPolicies:
+    #- initialDelaySec: 120
+      #healthCheck: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-health-check.selfLink)
+# ftdv Health Check
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-health-check
+  type: compute.v1.healthCheck
+  properties:
+    tcpHealthCheck:
+      port: {{ properties["ftdvHealthCheckPort"] }}
+    checkIntervalSec: {{ properties["ftdvCheckIntervalSec"] }}
+    timeoutSec: {{ properties["ftdvTimeoutSec"] }}
+    type: {{ properties["ftdvHealthCheckProtocolName"] }}
+    unhealthyThreshold: {{ properties["ftdvUnhealthyThreshold"] }}
+# Autoscaled cluster
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-cluster
+  type: compute.v1.regionAutoscaler
+  properties:
+    target: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.selfLink)
+    region: {{ properties["region"] }}
+    autoscalingPolicy:
+      cpuUtilization:
+        utilizationTarget: {{ properties["cpuUtilizationTarget"] }}
+      mode: 'ON'
+      #coolDownPeriodSec: {{ properties["coolDownPeriodSec"] }}
+      minNumReplicas: {{ properties["ftdvReplicas"] }}
+      maxNumReplicas: {{ properties["ftdvReplicas"] }}
+
+# ILB Services-South
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-south
+  type: compute.v1.regionBackendService 
+  properties:
+    region: {{ properties["region"] }}
+    protocol: {{ properties["ilbProtocol"] }}
+    loadBalancingScheme: INTERNAL
+    backends:
+    - group: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.instanceGroup)
+    healthChecks:
+    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-south.selfLink)
+    connectionDraining:
+      drainingTimeoutSec: {{ properties["ilbDrainingTimeoutSec"] }}
+    network: projects/{{ env["project"] }}/global/networks/{{ properties["insideVpcName"] }}
+    sessionAffinity: CLIENT_IP_PROTO # This value may vary 
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-south
+  type: compute.v1.healthCheck
+  properties:
+    tcpHealthCheck:
+      port: {{ properties["ilbPort"] }}
+    checkIntervalSec: {{ properties["ilbCheckIntervalSec"] }}
+    timeoutSec: {{ properties["ilbTimeoutSec"] }}
+    type: {{ properties["ilbProtocolName"] }}
+    unhealthyThreshold: {{ properties["ilbUnhealthyThreshold"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-ilb-south
+  type: compute.v1.forwardingRule
+  properties:
+    region: {{ properties["region"] }}
+    allPorts: true
+    loadBalancingScheme: INTERNAL
+    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-ilb-ip-south.selfLink)
+    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-south.selfLink)
+    network: projects/{{ env["project"] }}/global/networks/{{ properties["insideVpcName"] }}
+    subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["insideSubnetworkName"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ilb-ip-south
+  type: compute.v1.address
+  properties:
+    addressType: INTERNAL
+    region: {{ properties["region"] }}
+    subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["insideSubnetworkName"] }}
+
+# ELB Services-north
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-north
+  type: compute.v1.regionBackendService #compute.v1.regionBackendService
+  properties:
+    region: {{ properties["region"] }}
+    port: {{ properties["elbPort"] }}
+    portName: {{ properties["elbPortName"] }}
+    protocol: {{ properties["elbProtocol"] }}
+    loadBalancingScheme: EXTERNAL
+    backends:
+    - name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-backends
+      group: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.instanceGroup)
+    healthChecks:
+    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-elb-north.selfLink)
+    sessionAffinity: CLIENT_IP_PROTO # This value may vary
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-elb-north
+  type: compute.v1.regionHealthChecks
+  properties:
+    region: {{ properties["region"] }}
+    tcpHealthCheck:
+      port: {{ properties["elbPort"] }}
+      proxyHeader: NONE
+    timeoutSec: {{ properties["elbTimeoutSec"] }}
+    type: {{ properties["elbProtocolName"] }}
+    unhealthyThreshold: {{ properties["elbUnhealthyThreshold"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-elb-north
+  type: compute.v1.forwardingRule
+  properties:
+    IPProtocol: {{ properties["elbIpProtocol"] }}
+    region: {{ properties["region"] }}
+    #allPorts: true
+    ports: {{ properties["elbFePorts"] }}
+    loadBalancingScheme: EXTERNAL
+    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-elb-ip-north.selfLink)
+    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-north.selfLink)
+- name: {{ properties["resourceNamePrefix"] }}-elb-ip-north
+  type: compute.v1.address
+  properties:
+    addressType: EXTERNAL
+    region: {{ properties["region"] }}
+# Cloud NAT
+- name: {{ properties["resourceNamePrefix"] }}-cloud-nat-router
+  type: gcp-types/compute-v1:routers
+  properties:
+    network: projects/{{ env["project"] }}/global/networks/{{ properties["outsideVpcName"] }}
+    region: {{ properties["region"] }}
+    nats:
+    - name: {{ properties["resourceNamePrefix"] }}-cloud-nat
+      sourceSubnetworkIpRangesToNat: ALL_SUBNETWORKS_ALL_IP_RANGES
+      natIpAllocateOption: AUTO_ONLY

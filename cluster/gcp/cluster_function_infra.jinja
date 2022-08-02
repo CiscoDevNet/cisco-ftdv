@@ -1,0 +1,72 @@
+###########################################################################################################
+#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                                                  #
+#All Rights Reserved.                                                                                     #
+#Licensed under the Apache License, Version 2.0 (the "License");                                          #
+#you may not use this file except in compliance with the License.                                         #
+#You may obtain a copy of the License at                                                                  #
+#http://www.apache.org/licenses/LICENSE-2.0                                                               #
+#Unless required by applicable law or agreed to in writing, software                                      #
+#distributed under the License is distributed on an "AS IS" BASIS,                                        #
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.                                 #
+#See the License for the specific language governing permissions and                                      #
+#limitations under the License.                                                                           #
+###########################################################################################################
+# File: cluster_function_infra.jinja                                                                      #
+# Purpose: Template for FTDv Cluster google function infrastructure Deployment, takes parameters from     #
+#          cluster_function_infra.yaml                                                                    #
+###########################################################################################################
+
+
+resources:
+# Sink (Logs Router)
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-insert-sink
+  type: gcp-types/logging-v2:projects.sinks
+  properties:
+    sink: {{ properties["resourceNamePrefix"] }}-ftdv-insert-sink
+    destination: pubsub.googleapis.com/$(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert.name)
+    filter: (resource.type="gce_instance_group_manager" AND resource.labels.instance_group_manager_name = "{{ properties["resourceNamePrefix"] }}-ftdv-instance-group" AND protoPayload.methodName = "v1.compute.regionInstanceGroupManagers.insert" AND operation.last = true)  OR (resource.type = "cloud_function" AND resource.labels.function_name = "{{ properties["resourceNamePrefix"] }}-ftdv-cluster-action" AND textPayload:"Reattempt")
+    writerIdentity: {{ properties["serviceAccountMailId"] }}
+# Pub/Sub Topic
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert
+  type: pubsub.v1.topic
+  properties:
+    topic: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert
+  accessControl:
+    gcpIamPolicy:
+      bindings:
+      - members:
+        - serviceAccount:cloud-logs@system.gserviceaccount.com
+        role: roles/pubsub.publisher
+
+#Cloud functions
+# To copy code to storage bucket
+#gsutil cp <change_pass.zip> gs://<bucket-name>/
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-cluster-action
+  type: gcp-types/cloudfunctions-v1:projects.locations.functions
+  properties:
+    parent: projects/{{ env['project'] }}/locations/{{ properties['region'] }}
+    function: {{ properties["resourceNamePrefix"] }}-ftdv-cluster-action
+    sourceArchiveUrl: gs://{{ properties["bucketName"] }}/{{ properties["srcDirName"] }}
+    entryPoint: cluster_handler
+    runtime: python39
+    timeout: 540s
+    environmentVariables:
+      EXTERNAL_IP_ENABLE: '{{ properties["deployWithExternalIP"] }}'
+      RETRY_COUNT: '{{ properties["retryCount"] }}'
+      REG_ID: {{ properties["regID"] }}
+      NAT_ID: {{ properties["natID"] }}
+      CLS_GRP_NAME: {{ properties["clsGrpName"] }}
+      POLICY_ID: {{ properties["policyID"] }}
+      FMC_IP: {{ properties["fmcIP"] }}
+      FMC_PASSWORD: {{ properties["fmcPassword"] }}
+      FMC_USERNAME: {{ properties["fmcUsername"] }}
+      FTDV_PASSWORD: {{ properties["ftdvPassword"] }}
+      LICENSE_CAPS: {{ properties["licenseCAPS"] }}
+      PERF_TIER: {{ properties["performanceTier"] }}
+    maxInstances: 1
+    vpcConnector: {{ properties["vpcConnectorName"] }}
+    vpcConnectorEgressSettings: PRIVATE_RANGES_ONLY
+    ingressSettings: ALLOW_ALL
+    eventTrigger:
+      resource: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-insert.name)
+      eventType: google.pubsub.topic.publish
