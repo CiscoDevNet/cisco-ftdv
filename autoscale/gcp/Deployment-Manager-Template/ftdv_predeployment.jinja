@@ -83,7 +83,7 @@ resources:
     sink: {{ properties["resourceNamePrefix"] }}-ftdv-delete-sink
     destination: pubsub.googleapis.com/$(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete.name)
     filter: resource.type = "gce_instance" AND protoPayload.methodName = "v1.compute.instances.delete" AND protoPayload.resourceName:"{{ properties["resourceNamePrefix"] }}" AND operation.first="true"
-    writerIdentity: 340375726592-compute@developer.gserviceaccount.com
+    writerIdentity: {{ properties["serviceAccountMailId"] }}
 # Pub/Sub Topic
 - name: {{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete
   type: pubsub.v1.topic
