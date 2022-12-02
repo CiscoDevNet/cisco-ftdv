@@ -105,7 +105,7 @@ Parameters:
     Type: String
     AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
     ConstraintDescription: must be a valid TCP port
-    Default: 7777
+    Default: 22
   AssignPublicIP:
     Description: >-
       Please select true if  needs to have public IP address. In case NGFWv needs to have public IP then management
@@ -555,7 +555,7 @@ Resources:
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
-        - python3.6
+        - python3.9
       Content:
         S3Bucket: !Ref S3BktName
         S3Key: autoscale_layer.zip
@@ -728,7 +728,7 @@ Resources:
    Properties:
      FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'manager-lambda'] ]
      Handler: manager.lambda_handler
-     Runtime: python3.6
+     Runtime: python3.9
      ReservedConcurrentExecutions: 1
      CodeUri:
        Bucket: !Ref S3BktName
@@ -839,7 +839,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'lifecycle-lambda'] ]
       Handler: lifecycle_ftdv.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.9
       CodeUri:
         Bucket: !Ref S3BktName
         Key: lifecycle_ftdv.zip
@@ -926,7 +926,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'publish-custom-metrics'] ]
       Handler: custom_metric_fmc.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.9
       CodeUri:
         Bucket: !Ref S3BktName
         Key: custom_metric_fmc.zip

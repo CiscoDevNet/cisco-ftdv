@@ -214,7 +214,8 @@ def get_memory_metric_pair(fmc, pair_of_metric_name_value, intersection_list, qu
         if response is None:
             logger.error("Unable to get metrics for instance: " + device_name)
         try:
-            metric_value = response["items"][0]["healthMonitorMetric"]["value"]
+            # metric_value = response["items"][0]["healthMonitorMetric"]["value"]
+            metric_value = float(json.loads(response["items"][0]["response"])["data"]["result"][0]["values"][-1][1])
             ftdv_memory_metric_dict.update({device_name: metric_value})
             if i == 0:
                 max_memory = metric_value
