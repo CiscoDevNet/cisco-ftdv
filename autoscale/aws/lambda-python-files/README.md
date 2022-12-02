@@ -12,22 +12,22 @@ Below mentioned libraries needs to be available to lambda function.
     jsonschema==3.2.0 <br>
 
 
-It can be created in Linux environment such as Ubuntu 18.04 environment with Python 3.6 installed. <br>
+It can be created in Linux environment such as Ubuntu 18.04 environment with Python 3.9 installed. <br>
 Example:
 ```bash
 #!/bin/bash
 mkdir -p layer
-virtualenv -p /usr/bin/python3.6 ./layer/
+virtualenv -p /usr/bin/python3.9 ./layer/
 source ./layer/bin/activate
-pip3 install pycrypto==2.6.1
+pip3 install cffi==1.15.1
+pip3 install cryptography==2.9.1
 pip3 install paramiko==2.7.1
 pip3 install requests==2.23.0
 pip3 install scp==0.13.2
 pip3 install jsonschema==3.2.0
+pip3 install pycryptodome==3.15.0
 echo "Copy from ./layer directory to ./python\n"
-mkdir -p ./python/.libs_cffi_backend/
-cp -r ./layer/lib/python3.6/site-packages/* ./python/
-cp -r ./layer/lib/python3.6/site-packages/.libs_cffi_backend/* ./python/.libs_cffi_backend/
+cp -r ./layer/lib/python3.9/site-packages/* ./python/
 zip -r autoscale_layer.zip ./python
 ```
 
