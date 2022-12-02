@@ -765,9 +765,23 @@ class FirepowerManagementCenter:
         Raises:
         """
         try:
-            api_path = '/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/'
-            api_suffix = '/operational/metrics?filter=metric%3Amemory&offset=0&limit=1&expanded=true'
-            url = self.server + api_path + device_id + api_suffix
+            # api_path = '/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/'
+            # api_suffix = '/operational/metrics?filter=metric%3Amemory&offset=0&limit=1&expanded=true'
+            # url = self.server + api_path + device_id + api_suffix
+
+            # New Health Monitoring API
+            api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/health/metrics'
+            # Values are fetched from last one minute at interval of 10 sec (step).
+            end_time = int(time.time())
+            start_time = end_time - 60
+            step_size = 10
+            regex_filter = "used_percentage_system_and_swap"
+            api_suffix = \
+                f'?offset=0&limit=100&filter=deviceUUIDs%3A{device_id}%3Bmetric%3Amem%3B' + \
+                f"startTime%3A{start_time}%3BendTime%3A{end_time}%3Bstep%3A{step_size}%3B" + \
+                f"regexFilter%3A{regex_filter}&expanded=true"
+            url = self.server + api_path + api_suffix
+
             r = self.rest_get(url)
             resp = r.text
             return json.loads(resp)
