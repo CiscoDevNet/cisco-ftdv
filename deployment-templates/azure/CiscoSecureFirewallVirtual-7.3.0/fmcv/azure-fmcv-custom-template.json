@@ -1,0 +1,279 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "type": "string",
+            "defaultValue": "cisco-mcv",
+            "metadata": {
+                "description": "Name of the CSF-MCv VM"
+            }
+        },
+        "vmImageId": {
+            "type": "string",
+            "defaultValue": "/subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage",
+            "metadata": {
+                "description": "The ID of the image used for deployment.  /subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Username for the Virtual Machine. 'admin, Administrator' among other values are disallowed - see Azure docs"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "defaultValue" : "",
+            "metadata": {
+                "description": "Password for the Virtual Machine. Passwords must be 12 to 72 chars and have at least 3 of the following: Lowercase, uppercase, numbers, special chars"
+            }
+        },
+        "customData": {
+            "type": "string",
+            "defaultValue": "{\"AdminPassword\": \"Password@2023\",\"Hostname\": \"cisco-mcv\"}",
+            "metadata": {
+                "description": "Custom Data (Day 0 config) passed to the CSF-TDv."
+            }
+        },
+        "availabilityZone": {
+            "type": "int",
+            "defaultValue": 0,
+            "minValue": 0,
+            "maxValue": 3,
+            "metadata": {
+                "description": "Specify the availability zone for deployment. Ensure that selected region supports availability zones and value provided is correct. Set to 0 if you do not want to use Availability Zones"
+            }
+        },
+        "vmStorageAccount": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "A storage account name (boot diags require a storage account). Between 3 and 24 characters. Lowercase letters and numbers only"
+            }
+        },
+        "virtualNetworkResourceGroup": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Name of the virtual network's Resource Group"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Name of the virtual network"
+            }
+        },
+        "mgmtSubnetName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The CSF-MCv management interface will attach to this subnet"
+            }
+        },
+        "mgmtSubnetIP": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "CSF-MCv IP on the mgmt interface (example: 192.168.0.10)"
+            }
+        },
+        "VmSize": {
+            "type": "string",
+            "defaultValue": "Standard_D4_v2",
+            "allowedValues": [ "Standard_D4_v2" , "Standard_D4" ],
+            "metadata": {
+                "description": "CSF-MCv VM Size (Standard_D4_v2 or Standard_D4)"
+            }
+        },
+        "location": {
+          "type": "string",
+          "defaultValue": "[resourceGroup().location]",
+          "metadata": {
+            "description": "Location for all resources."
+          }
+        },
+        "baseStorageURI": {
+           "type": "string",
+           "defaultValue": ".blob.core.windows.net",
+           "metadata": {
+              "description": "Base suffix for Azure storage URIs."
+           }
+        }
+    },
+    "variables": {
+        "subnet1Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('mgmtSubnetName'))]",
+        "vmNic0Name":"[concat(parameters('vmName'),'-nic0')]",
+        "vmNic0NsgName":"[concat(variables('vmNic0Name'),'-NSG')]",
+        "vmMgmtPublicIPAddressName": "[concat(parameters('vmName'),'nic0-ip')]",
+        "vmMgmtPublicIPAddressType": "Static",
+        "vmMgmtPublicIPAddressDnsName": "[variables('vmMgmtPublicIPAddressName')]",
+        "selectedAvailZone":"[if(equals(parameters('availabilityZone'), 0), json('null'), array(parameters('availabilityZone')))]",
+        "pipSku": "Standard"
+    },
+    "resources": [
+        {
+            "apiVersion": "2021-08-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('vmMgmtPublicIPAddressName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[variables('pipSku')]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "[variables('vmMgmtPublicIpAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('vmMgmtPublicIPAddressDnsName')]"
+                }
+            },
+            "zones": "[variables('selectedAvailZone')]"
+        },
+        {
+            "apiVersion": "2022-07-01",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('vmNic0NsgName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "SSH-Rule",
+                        "properties": {
+                            "description": "Allow SSH",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "Internet",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "SFtunnel-Rule",
+                        "properties": {
+                            "description": "Allow tcp 8305",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "8305",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Inbound"
+                        }
+                    }
+                    ,
+                    {
+                        "name": "HTTPs-Rule",
+                        "properties": {
+                            "description": "Allow tcp 443",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 102,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2021-08-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic0Name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups',variables('vmNic0NsgName'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', variables('vmMgmtPublicIPAddressName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress" : "[parameters('mgmtSubnetIP')]",
+                            "subnet": {
+                                "id": "[variables('subnet1Ref')]"
+                            },
+                            "publicIPAddress":{
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+                            }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('vmNic0NsgName'))]"
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[concat(parameters('vmStorageAccount'))]",
+            "apiVersion": "2021-09-01",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "location": "[parameters('location')]",
+            "kind": "Storage",
+            "properties": {}
+        },
+        {
+            "apiVersion": "2022-03-01",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vmName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('vmStorageAccount'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic0Name'))]"            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[parameters('vmName')]",
+                    "adminUsername": "[parameters('AdminUsername')]",
+                    "adminPassword": "[parameters('AdminPassword')]",
+                    "customData": "[base64(parameters('customData'))]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "id": "[parameters('vmImageId')]"
+                    },
+                    "osDisk": {
+                        "osType": "Linux",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "properties": {
+                                "primary": true
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic0Name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[uri(concat('http://',parameters('vmStorageAccount'),parameters('baseStorageURI')), '')]"
+                    }
+                }
+            },
+            "zones": "[variables('selectedAvailZone')]"
+        }
+    ],
+    "outputs": {  }
+}
