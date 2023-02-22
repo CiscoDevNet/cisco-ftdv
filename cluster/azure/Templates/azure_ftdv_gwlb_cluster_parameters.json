@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceNamePrefix": {
+      "value": "gwlbtmp"
+    },
+    "virtualNetworkRg": {
+      "value": "ftdv-gwlb-template-verification"
+    },
+    "virtualNetworkName": {
+      "value": "ftdv-gwlb-template-vnet"
+    },
+    "virtualNetworkCidr": {
+      "value": "10.7.0.0/16"
+    },
+    "mgmtSubnet": {
+      "value": "mgmt"
+    },
+    "diagSubnet": {
+      "value": "diag"
+    },
+    "dataInterfaceSubnet": {
+      "value": "data"
+    },
+    "dataNetworkGatewayIp": {
+      "value": "10.7.3.1"
+    },
+    "gatewayLoadBalancerIP": {
+      "value": "10.7.3.4"
+    },
+    "cclSubnet": {
+      "value": "ccl"
+    },
+    "cclSubnetStartAddr": {
+      "value": "10.7.4.4"
+    },
+    "cclSubnetEndAddr": {
+      "value": "10.7.4.253"
+    },
+    "internalPortNumber": {
+      "value": "2000"
+    },
+    "externalPortNumber": {
+      "value": "2001"
+    },
+    "internalSegmentId": {
+      "value": "800"
+    },
+    "externalSegmentId": {
+      "value": "801"
+    },
+    "healthCheckPortNumber": {
+      "value": "7777"
+    },
+    "clusterGroupName": {
+      "value": "ngfwv-gwlb-cluster"
+    },
+    "softwareVersion": {
+      "value": "73069.0.0"
+    },
+    "vmSize": {
+      "value": "Standard_D4_v2"
+    },
+    "ftdLicensingSku": {
+      "value": "ftdv-azure-byol"
+    },
+    "ftdVmManagementUserName": {
+      "value": "cisco"
+    },
+    "ftdVmManagementUserPassword": {
+      "value": ""
+    },
+    "ftdAdminUserPassword": {
+      "value": ""
+    },
+    "fmcIpAddress": {
+      "value": "1.2.3.4"
+    },
+    "fmcUserName": {
+      "value": "fmcUser"
+    },
+    "fmcPassword": {
+      "value": ""
+    },
+    "policyName": {
+      "value": "myPolicy"
+    },
+    "licenseCapability": {
+      "value": "BASE,MALWARE,THREAT"
+    },
+    "ftdvNodeCount": {
+      "value": "4"
+    }
+  }
+}
