@@ -111,11 +111,9 @@
         },
         "softwareVersion": {
             "type": "string",
-            "defaultValue": "730.44.0",
+            "defaultValue": "73069.0.0",
             "allowedValues": [
-                "730.44.0",
-                "730.33.0",
-                "730.8.0"
+                "73069.0.0"
             ],
             "metadata": {
                 "description": "FTD Software version to use."
@@ -215,10 +213,12 @@
             }
         },
         "ftdvClusterNodeCount": {
-            "type": "string",
-            "defaultValue": "4",
+            "type": "int",
+            "minValue": 1,
+            "maxValue": 16,
+            "defaultValue": 4,
             "metadata": {
-                "description": "Number of NGFWs in Scale Set"
+                "description": "Cluster Node count"
             }
         }
     },
@@ -842,6 +842,7 @@
                                 "name": "[variables('vmssVmOutsideNicName')]",
                                 "properties": {
                                     "primary": false,
+                                    "enableAcceleratedNetworking" : true,
                                     "enableIPForwarding": true,
             					    "networkSecurityGroup": {
                                         "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
