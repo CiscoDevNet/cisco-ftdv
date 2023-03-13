@@ -53,10 +53,11 @@ resources:
           network: projects/{{ env["project"] }}/global/networks/{{ properties["mgmtVpcName"] }}
           subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["mgmtSubnetworkName"] }}
           kind: compute#networkInterface
-          # External IP for Management if the User wants it
-          #accessConfigs:
-           #- name: External NAT
-             #type: ONE_TO_ONE_NAT
+          {% if properties["deployUsingExternalIP"] %}
+          accessConfigs:
+           - name: External NAT
+             type: ONE_TO_ONE_NAT
+          {% endif %}
         - name: nic3
           network: projects/{{ env["project"] }}/global/networks/{{ properties["diagVpcName"] }}
           subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["diagSubnetworkName"] }}
@@ -68,7 +69,7 @@ resources:
         items:
           - value: |-
                 {
-                  "AdminPassword": "Cisco@123123",
+                  "AdminPassword": "{{ properties["adminPassword"] }}",
                   "Hostname": "ftdv-gcp",
                   "DNS1": "8.8.8.8",
                   "FirewallMode": "routed",

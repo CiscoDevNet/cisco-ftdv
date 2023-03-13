@@ -29,6 +29,7 @@ resources:
     resourceNamePrefix: <resourceNamePrefix>  #auto-name
     region: <region>  #us-central1
     serviceAccountMailId: <serviceAccountMailId>  ##123456-compute@developer.gserviceaccount.com
+    sshUsingExternalIP: <>   #True, False
     vpcConnectorName: <vpcConnectorName> #vpcconnectorname
     bucketName: <bucketName>  #bucketname
     fmcIP: <fmcIP>  #1.1.1.1
