@@ -123,10 +123,19 @@ def check_cluster_nodes(channel, min_nodes):
 def check_cluster_slave_nodes(channel, min_nodes):
      cmd = 'show cluster info'
      msg = send_cmd_and_wait_for_execution(channel, cmd)
-     slave_nodes = msg.count('in state SLAVE\r\n') 
-     print("Available SLAVE nodes : "+ str(slave_nodes))
+     master_slave_cls = msg.count('in state MASTER\r\n')
+     slave_nodes = 0
+     if  master_slave_cls:
+         slave_nodes = msg.count('in state SLAVE\r\n')
+         print("Available DATA nodes : "+ str(slave_nodes))
 
-     if (min_nodes-1)  == slave_nodes:
+     control_data_cls = msg.count('in state CONTROL_NODE\r\n')
+     data_nodes = 0
+     if  control_data_cls:
+         data_nodes = msg.count('in state DATA_NODE\r\n')
+         print("Available DATA nodes : "+ str(data_nodes))
+
+     if ((min_nodes-1)  == slave_nodes) or ((min_nodes-1)  == data_nodes):
           print("Healthy : All Cluster Nodes Ready for Registration")
           return "Healthy"
      else:
@@ -220,7 +229,7 @@ def get_master_node_unit(channel):
      msg = send_cmd_and_wait_for_execution(channel, cmd)
 
      for line in msg.splitlines():
-         if 'MASTER' in line :
+         if ('MASTER' in line) or ('CONTROL_NODE' in line):
              if ((line.strip()).startswith('This')):
                  numbers=re.findall('[0-9]+', line)
                  return numbers[0]

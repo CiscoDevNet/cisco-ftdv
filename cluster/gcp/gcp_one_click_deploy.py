@@ -92,6 +92,10 @@ deploy_only_cluster = ''
 #---------------------------------COMMON_PARAMS--------------------------------#
 #These params are required for infrastructure, function and cluster deployments
 
+deploy_topology = 'NS' # case sensitive input
+#Use deploy_topology = 'NS' for 'north-south' topology deployment or 
+#Use deploy_topology = 'EW' for 'east-west' topology deployment
+
 resource_prefix = 'oneclicktest' #restricted to single word 
 #prefix for all the resources to be created (or already existing if
 #'deploy_only_function_and_cluster' set to '1' or deploy_only_cluster
@@ -103,7 +107,7 @@ region = 'us-central1'
 zonecode = 'c'
 #zone code for deploying the cluster
 
-mail_id = '340375726592-compute@developer.gserviceaccount.com'
+mail_id = ''
 #mail ID of either the default service account for compute engine -
 #of the form : '<project-number>-compute@developer.gserviceaccount.com'
 #or any other service account with relevant permissions
@@ -142,22 +146,17 @@ function_deployment_name = resource_prefix + '-function'
 fmc_ip = ''
 #FMC ip address - leave this empty ('') if FMC is to yet to be deployed
 #This field will be asked for only if left empty
-######## Uncomment below lines [58-62] in north-south/deploy_ngfw_cluster.jinja for deploying with public/external IP #######
-          #accessConfigs:
-          #- kind: compute#accessConfig
-            #name: External NAT
-            #type: ONE_TO_ONE_NAT
-            #networkTier: PREMIUM
-########################## After uncommenting make sure 'deploy_with_externalIP' set as True ################################
 deploy_with_externalIP = 'False' #default is FTDv with only private IP
 # False: only private IP required for FTDv: make sure FMC should be available in same private network.
+enableExternalIP = '0'
+
 retry_count = '10' #allowed range >=6 (Min 6 retry_count required for 4-nodes cluster and 10 retry_count required for 16-nodes cluster)
 #auto-registration google function ececution retry count
 registration_id = 'cisco'
 #for registration to FMC
 nat_id = 'cisco'
 #for registration to FMC
-cluster_grp_name = 'oneclicktest-cluster'
+cluster_grp_name = resource_prefix + '-cluster'
 #for registration to FMC
 policy_id = 'ftdv-acl-policy'
 #for registration to FMC
@@ -245,9 +244,22 @@ import platform
 
 #______________________________________________________________________________#
 
-while resource_prefix == '':
-	print("resource_prefix cannot be left empty")
+prefix_invalid = False
+while resource_prefix == '' or not resource_prefix.isalnum():
+	prefix_invalid = True
+	if not resource_prefix:
+		print("Error: resource_prefix cannot be empty")
+	else:
+		print("Error: resource_prefix should be a single word; should contain only alphabets and numbers")
 	resource_prefix = str(input("Enter resource_prefix: "))
+
+if prefix_invalid:
+	infra_deployment_name = resource_prefix + '-infra'
+	function_deployment_name = resource_prefix + '-function'
+	cluster_deployment_name = resource_prefix + '-cluster'
+	cluster_grp_name = resource_prefix + '-cluster'
+	print("Setting deployment names to " + infra_deployment_name + ", " + function_deployment_name + ", " + cluster_deployment_name)
+	print("Setting cluster_grp_name to " + cluster_grp_name)
 
 while region == '':
 	print("region cannot be left empty")
@@ -265,6 +277,11 @@ if deploy_only_function_and_cluster == '1':
 bucket_name = resource_prefix + '-ftdv-cluster-bucket'
 connector_name = resource_prefix + '-ssh'
 subnet28 = resource_prefix + '-ftdv-mgmt-subnet28'
+
+if deploy_with_externalIP == 'True':
+	enableExternalIP = '1'
+else:
+	enableExternalIP = '0'
 
 if deploy_only_function_and_cluster != '1' and deploy_only_cluster != '1':
 
@@ -458,35 +475,60 @@ silent_params = [
     [ 'ftdvUnhealthyThreshold', '10' ]
 ]
 
-cluster_params = [
-	[ 'mail_id', 'serviceAccountMailId', mail_id ],
-    [ 'region', 'region', region ],
-    [ 'zonecode', 'zonecode', zonecode ],
-    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
-    [ 'admin_passwd', 'adminPassword', admin_passwd ],
-    [ 'host_name', 'hostname', host_name ],
-    [ 'ccl_range', 'cclSubnetRange', ccl_range ],
-    [ 'cluster_grp_name', 'clusterGrpName', cluster_grp_name],
-    [ 'machine_type', 'machineType', machine_type ],
-    [ 'src_img_url', 'sourceImageURL', src_img_url ],
-    [ 'cpu_util', 'cpuUtilizationTarget', cpu_util ],
-    [ 'ftdv_count', 'ftdvReplicas', ftdv_count ],
-    [ 'elb_port', 'elbPort', elb_port ],
-    [ 'elb_port_name', 'elbPortName', elb_port_name ],
-    [ 'elb_protocol', 'elbProtocol', elb_protocol ],
-    [ 'elb_timeout', 'elbTimeoutSec', elb_timeout ],
-    [ 'elb_health_protocol', 'elbProtocolName', elb_health_protocol ],
-    [ 'elb_threshold', 'elbUnhealthyThreshold', elb_threshold ],
-    [ 'elb_rule_protocol', 'elbIpProtocol', elb_rule_protocol ],
-    [ 'elb_rule_ports', 'elbFePorts', elb_rule_ports ],
-    [ 'ilb_protocol', 'ilbProtocol', ilb_protocol ],
-    [ 'ilb_drain_timeout', 'ilbDrainingTimeoutSec', ilb_drain_timeout ],
-    [ 'ilb_port', 'ilbPort', ilb_port ],
-    [ 'ilb_check_interval', 'ilbCheckIntervalSec', ilb_check_interval ],
-    [ 'ilb_timeout', 'ilbTimeoutSec', ilb_timeout ],
-    [ 'ilb_health_protocol', 'ilbProtocolName', ilb_health_protocol ],
-    [ 'ilb_threshold', 'ilbUnhealthyThreshold', ilb_threshold ]
-]
+if deploy_topology == 'NS':
+	cluster_params = [
+		[ 'mail_id', 'serviceAccountMailId', mail_id ],
+	    [ 'region', 'region', region ],
+	    [ 'zonecode', 'zonecode', zonecode ],
+	    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
+	    [ 'admin_passwd', 'adminPassword', admin_passwd ],
+	    [ 'host_name', 'hostname', host_name ],
+	    [ 'ccl_range', 'cclSubnetRange', ccl_range ],
+	    [ 'cluster_grp_name', 'clusterGrpName', cluster_grp_name],
+	    [ 'machine_type', 'machineType', machine_type ],
+	    [ 'src_img_url', 'sourceImageURL', src_img_url ],
+	    [ 'enableExternalIP', 'deployUsingExternalIP', enableExternalIP ],
+	    [ 'cpu_util', 'cpuUtilizationTarget', cpu_util ],
+	    [ 'ftdv_count', 'ftdvReplicas', ftdv_count ],
+	    [ 'elb_port', 'elbPort', elb_port ],
+	    [ 'elb_port_name', 'elbPortName', elb_port_name ],
+	    [ 'elb_protocol', 'elbProtocol', elb_protocol ],
+	    [ 'elb_timeout', 'elbTimeoutSec', elb_timeout ],
+	    [ 'elb_health_protocol', 'elbProtocolName', elb_health_protocol ],
+	    [ 'elb_threshold', 'elbUnhealthyThreshold', elb_threshold ],
+	    [ 'elb_rule_protocol', 'elbIpProtocol', elb_rule_protocol ],
+	    [ 'elb_rule_ports', 'elbFePorts', elb_rule_ports ],
+	    [ 'ilb_protocol', 'ilbProtocol', ilb_protocol ],
+	    [ 'ilb_drain_timeout', 'ilbDrainingTimeoutSec', ilb_drain_timeout ],
+	    [ 'ilb_port', 'ilbPort', ilb_port ],
+	    [ 'ilb_check_interval', 'ilbCheckIntervalSec', ilb_check_interval ],
+	    [ 'ilb_timeout', 'ilbTimeoutSec', ilb_timeout ],
+	    [ 'ilb_health_protocol', 'ilbProtocolName', ilb_health_protocol ],
+	    [ 'ilb_threshold', 'ilbUnhealthyThreshold', ilb_threshold ]
+	]
+else:
+    cluster_params = [
+		[ 'mail_id', 'serviceAccountMailId', mail_id ],
+	    [ 'region', 'region', region ],
+	    [ 'zonecode', 'zonecode', zonecode ],
+	    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
+	    [ 'admin_passwd', 'adminPassword', admin_passwd ],
+	    [ 'host_name', 'hostname', host_name ],
+	    [ 'ccl_range', 'cclSubnetRange', ccl_range ],
+	    [ 'cluster_grp_name', 'clusterGrpName', cluster_grp_name],
+	    [ 'machine_type', 'machineType', machine_type ],
+	    [ 'src_img_url', 'sourceImageURL', src_img_url ],
+	    [ 'enableExternalIP', 'deployUsingExternalIP', enableExternalIP ],
+	    [ 'cpu_util', 'cpuUtilizationTarget', cpu_util ],
+	    [ 'ftdv_count', 'ftdvReplicas', ftdv_count ],
+	    [ 'ilb_protocol', 'ilbProtocol', ilb_protocol ],
+	    [ 'ilb_drain_timeout', 'ilbDrainingTimeoutSec', ilb_drain_timeout ],
+	    [ 'ilb_port', 'ilbPort', ilb_port ],
+	    [ 'ilb_check_interval', 'ilbCheckIntervalSec', ilb_check_interval ],
+	    [ 'ilb_timeout', 'ilbTimeoutSec', ilb_timeout ],
+	    [ 'ilb_health_protocol', 'ilbProtocolName', ilb_health_protocol ],
+	    [ 'ilb_threshold', 'ilbUnhealthyThreshold', ilb_threshold ]
+    ]	
 
 pstr = ''
 
@@ -502,7 +544,14 @@ for p in cluster_params:
 		p[2] = str(input('Enter a valid value for ' + p[0] + ': '))
 	pstr = pstr + '!@#' + p[1] + ':' + p[2]
 
-os.system('gcloud deployment-manager deployments create ' +
-	cluster_deployment_name +
-	' --template north-south/deploy_ngfw_cluster.jinja --properties ' +
-	delim + pstr)
+if deploy_topology == 'NS':
+	os.system('gcloud deployment-manager deployments create ' +
+		cluster_deployment_name +
+		' --template north-south/deploy_ngfw_cluster.jinja --properties ' +
+		delim + pstr)
+else:
+	os.system('gcloud deployment-manager deployments create ' +
+		cluster_deployment_name +
+		' --template east-west/deploy_ngfw_cluster.jinja --properties ' +
+		delim + pstr)
+

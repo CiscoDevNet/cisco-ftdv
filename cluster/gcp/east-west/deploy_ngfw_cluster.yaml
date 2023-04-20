@@ -71,15 +71,6 @@ resources:
     cpuUtilizationTarget: <> #0.8 #Percentage
     #coolDownPeriodSec: 30
     ftdvReplicas: <> #4 # allowed value range 1-16
-    # ELB Services
-    elbPort: 80
-    elbPortName: tcp
-    elbProtocol: TCP
-    elbTimeoutSec: 5
-    elbProtocolName: TCP
-    elbUnhealthyThreshold: <> #4  # allowed value range 1-10
-    elbIpProtocol: TCP
-    elbFePorts: [443,80,22]
     # ILB Services
     ilbProtocol: TCP
     ilbDrainingTimeoutSec: 60

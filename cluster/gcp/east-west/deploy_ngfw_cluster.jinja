@@ -140,8 +140,10 @@ resources:
       minNumReplicas: {{ properties["ftdvReplicas"] }}
       maxNumReplicas: {{ properties["ftdvReplicas"] }}
 
-# ILB Services-South
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-south
+
+
+# ILB Services-East
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-east
   type: compute.v1.regionBackendService 
   properties:
     region: {{ properties["region"] }}
@@ -150,12 +152,12 @@ resources:
     backends:
     - group: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.instanceGroup)
     healthChecks:
-    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-south.selfLink)
+    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-east.selfLink)
     connectionDraining:
       drainingTimeoutSec: {{ properties["ilbDrainingTimeoutSec"] }}
     network: projects/{{ env["project"] }}/global/networks/{{ properties["insideVpcName"] }}
     sessionAffinity: CLIENT_IP_PROTO # This value may vary 
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-south
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-east
   type: compute.v1.healthCheck
   properties:
     tcpHealthCheck:
@@ -164,70 +166,61 @@ resources:
     timeoutSec: {{ properties["ilbTimeoutSec"] }}
     type: {{ properties["ilbProtocolName"] }}
     unhealthyThreshold: {{ properties["ilbUnhealthyThreshold"] }}
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-ilb-south
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-ilb-east
   type: compute.v1.forwardingRule
   properties:
     region: {{ properties["region"] }}
     allPorts: true
     loadBalancingScheme: INTERNAL
-    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-ilb-ip-south.selfLink)
-    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-south.selfLink)
+    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-ilb-ip-east.selfLink)
+    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-east.selfLink)
     network: projects/{{ env["project"] }}/global/networks/{{ properties["insideVpcName"] }}
     subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["insideSubnetworkName"] }}
-- name: {{ properties["resourceNamePrefix"] }}-ilb-ip-south
+- name: {{ properties["resourceNamePrefix"] }}-ilb-ip-east
   type: compute.v1.address
   properties:
     addressType: INTERNAL
     region: {{ properties["region"] }}
     subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["insideSubnetworkName"] }}
 
-# ELB Services-north
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-north
-  type: compute.v1.regionBackendService #compute.v1.regionBackendService
+# ILB Services-West
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-west
+  type: compute.v1.regionBackendService 
   properties:
     region: {{ properties["region"] }}
-    port: {{ properties["elbPort"] }}
-    portName: {{ properties["elbPortName"] }}
-    protocol: {{ properties["elbProtocol"] }}
-    loadBalancingScheme: EXTERNAL
+    protocol: {{ properties["ilbProtocol"] }}
+    loadBalancingScheme: INTERNAL
     backends:
-    - name: {{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-backends
-      group: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.instanceGroup)
+    - group: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-instance-group.instanceGroup)
     healthChecks:
-    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-elb-north.selfLink)
-    sessionAffinity: CLIENT_IP_PROTO # This value may vary
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-elb-north
-  type: compute.v1.regionHealthChecks
+    - $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-west.selfLink)
+    connectionDraining:
+      drainingTimeoutSec: {{ properties["ilbDrainingTimeoutSec"] }}
+    network: projects/{{ env["project"] }}/global/networks/{{ properties["outsideVpcName"] }}
+    sessionAffinity: CLIENT_IP_PROTO # This value may vary 
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-hc-ilb-west
+  type: compute.v1.healthCheck
   properties:
-    region: {{ properties["region"] }}
     tcpHealthCheck:
-      port: {{ properties["elbPort"] }}
-      proxyHeader: NONE
-    timeoutSec: {{ properties["elbTimeoutSec"] }}
-    type: {{ properties["elbProtocolName"] }}
-    unhealthyThreshold: {{ properties["elbUnhealthyThreshold"] }}
-- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-elb-north
+      port: {{ properties["ilbPort"] }}
+    checkIntervalSec: {{ properties["ilbCheckIntervalSec"] }}
+    timeoutSec: {{ properties["ilbTimeoutSec"] }}
+    type: {{ properties["ilbProtocolName"] }}
+    unhealthyThreshold: {{ properties["ilbUnhealthyThreshold"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ftdv-fr-ilb-west
   type: compute.v1.forwardingRule
   properties:
-    IPProtocol: {{ properties["elbIpProtocol"] }}
     region: {{ properties["region"] }}
-    #allPorts: true
-    ports: {{ properties["elbFePorts"] }}
-    loadBalancingScheme: EXTERNAL
-    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-elb-ip-north.selfLink)
-    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-elb-north.selfLink)
-- name: {{ properties["resourceNamePrefix"] }}-elb-ip-north
+    allPorts: true
+    loadBalancingScheme: INTERNAL
+    IPAddress: $(ref.{{ properties["resourceNamePrefix"] }}-ilb-ip-west.selfLink)
+    backendService: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-backend-service-ilb-west.selfLink)
+    network: projects/{{ env["project"] }}/global/networks/{{ properties["outsideVpcName"] }}
+    subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["outsideSubnetworkName"] }}
+- name: {{ properties["resourceNamePrefix"] }}-ilb-ip-west
   type: compute.v1.address
   properties:
-    addressType: EXTERNAL
+    addressType: INTERNAL
     region: {{ properties["region"] }}
-# Cloud NAT
-- name: {{ properties["resourceNamePrefix"] }}-cloud-nat-router
-  type: gcp-types/compute-v1:routers
-  properties:
-    network: projects/{{ env["project"] }}/global/networks/{{ properties["outsideVpcName"] }}
-    region: {{ properties["region"] }}
-    nats:
-    - name: {{ properties["resourceNamePrefix"] }}-cloud-nat
-      sourceSubnetworkIpRangesToNat: ALL_SUBNETWORKS_ALL_IP_RANGES
-      natIpAllocateOption: AUTO_ONLY
+    subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["outsideSubnetworkName"] }}
+

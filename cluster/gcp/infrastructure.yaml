@@ -32,7 +32,7 @@ resources:
     region: <> #us-central1
     # resourceNamePrefix restricted to single word
     resourceNamePrefix: <> #ngfwvcls
-    serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
+    serviceAccountMailId: <> #<project-number>-compute@developer.gserviceaccount.com
     # Mgmt VPC
     mgmtVpcRoutingMode: GLOBAL
     mgmtIpCidrRange: <> #10.10.51.0/24
