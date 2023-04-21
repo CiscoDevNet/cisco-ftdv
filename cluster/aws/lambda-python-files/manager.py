@@ -159,7 +159,7 @@ def handle_sns_event(sns_data):
     fmc = fmc_cls_init()
     # FTD class initialization
     ftd = ftd_cls_init(_m_attr['instance_id'], fmc)
-
+    
     try:
         if int(_m_attr['counter']) <= 0 and _m_attr['to_function'] != 'cluster_delete':
             logger.critical("Lambda has ran out of retries..")
@@ -245,12 +245,20 @@ def handle_sns_event(sns_data):
                 sns.publish_to_topic(e_var['ClusterManagerTopic'], message_subject, msg_body)
 
     elif _m_attr['to_function'] == 'cluster_status':
+        logger.info("Checking ftdv version...")
+        version = ftd.showVersion()
+        if int(version) < 730:
+            const.CONTROL_NODE = 'MASTER'
+            const.DATA_NODE = 'SLAVE'
+        else:
+            const.CONTROL_NODE = 'CONTROL_NODE'
+            const.DATA_NODE = 'DATA_NODE'
         if check_cluster_status(aws_grp,ftd) == 'SUCCESS':
             logger.info("Cluster is successfully formed..!!")
-            logger.info("Checking device for MASTER Role..")
+            logger.info("Checking device for Control Role..")
             status = ftd.connect_cluster()
             logger.info("Cluster Info: {}".format(status))
-            found = re.search('This is .* state MASTER', status)
+            found = re.search('This is .* state '+const.CONTROL_NODE, status)
             if found:
                 const.DISABLE_CLUSTER_REGISTER_FUNC = False
             if not const.DISABLE_CLUSTER_REGISTER_FUNC:
@@ -357,25 +365,25 @@ def check_cluster_status(aws_grp,ftd):
         count=0
         while count<20:
             status = ftd.connect_cluster()
-            members = status.count('in state SLAVE\r\n')
-            if members is (mins - 1):
+            data = status.count('in state '+const.DATA_NODE+'\r\n')
+            if data is (mins - 1):
                 break
             logger.info("Waiting for cluster to be formed..")
-            logger.info("Number of Slave joined: {}".format(members))
+            logger.info("Number of data node joined: {}".format(data))
             time.sleep(30)
             count+=1
-        master = status.count('in state MASTER')
-        members = status.count('in state SLAVE')
-        if (master != 1 and members != (mins - 1)) or count == 10:
+        control = status.count('in state '+const.CONTROL_NODE)
+        data = status.count('in state '+const.DATA_NODE)
+        if (control != 1 or data != (mins - 1)):
             logger.info('Cluster is not properly formed..!!')
             return 'FAILURE'
-        logger.info("Master: {}".format(master))
-        logger.info("Slaves: {}".format(members))
+        logger.info("Control: {}".format(control))
+        logger.info("Data: {}".format(data))
     else:
         count=0
         while count<10:
             status = ftd.connect_cluster()
-            if "in state MASTER\r\n" in status:
+            if "in state "+const.CONTROL_NODE+"\r\n" in status:
                 break
             logger.info("Waiting for cluster to be formed..")
             time.sleep(20)

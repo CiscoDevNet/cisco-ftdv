@@ -44,6 +44,8 @@ resources:
     outsideFirewallRule: <>   #firewallname
     insideFirewallRule: <>    #firewallname
     healthCheckFirewallRule: <>   #firewallname
+    deployUsingExternalIP: <> #True, False
+    adminPassword: <> #FTDv Admin Password
     publicKey: <>   #publickey
     # Instance Template
     machineType: <>   #e2-standard-4

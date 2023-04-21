@@ -10,7 +10,7 @@ supported. <br>
 Deployment can be run on any macOS/Linux/Windows machine with Google SDK installed OR using google cloud shell. <br>
 
 ## Pre-deployment Steps:
-Step-1: Edit "infrastructure.yaml" , "cluster_function_infra.yaml" and "north-south/deploy_ngfw_cluster.yaml" for resourceNamePrefix and provide required user inputs.<br>
+Step-1: Edit "infrastructure.yaml" , "cluster_function_infra.yaml" and "north-south/deploy_ngfw_cluster.yaml" or "east-west/deploy_ngfw_cluster.yaml" as applicable for resourceNamePrefix and provide required user inputs.<br>
 e.g: resourceNamePrefix = ngfwvcls <br>
 
 Step-2: Create Bucket with name "ngfwvcls-ftdv-cluster-bucket" for uploading google function src archieve "ftdv_cluster_function.zip" file <br>
@@ -48,16 +48,15 @@ Step-5: <br>
 	'gcloud deployment-manager deployments create <name> --config cluster_function_infra.yaml'
 <br>
 Step-6: <br>
-Uncomment below lines [58-62] in north-south/deploy_ngfw_cluster.jinja for deploying with public/external IP<br>
-          #accessConfigs:<br>
-          #- kind: compute#accessConfig<br>
-            #name: External NAT<br>
-            #type: ONE_TO_ONE_NAT<br>
-            #networkTier: PREMIUM<br>
-After uncommenting make sure EXTERNAL_IP_ENABLE set as True in cloud function environment variable if cloud function already deployed.<br>
 
 Deploy FTDv cluster using below CLI on Google Cloud Shell:<br>
+a) For North-South topology deployment<br>
 
 	'gcloud deployment-manager deployments create <name> --config north-south/deploy_ngfw_cluster.yaml'
+<br>
+
+b) For East-West topology deployment<br>
+
+	'gcloud deployment-manager deployments create <name> --config east-west/deploy_ngfw_cluster.yaml'
 <br>
 

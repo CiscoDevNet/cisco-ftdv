@@ -38,7 +38,7 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 
 ### FTDv Autoscale
 
-* On Azure for NGFWv6.7.0 & Above: [Code](autoscale/azure/)     |     [README](autoscale/azure/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/ftdv-azure-autoscale-v67.pdf)
+* On Azure for NGFWv6.7.0 & Above: [Code](autoscale/azure/)     |     [README](autoscale/azure/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/ftdv-azure-autoscale-v73.pdf)
 
 * On AWS for NGFWv6.7.0 & Above: [Code](autoscale/aws/)     |     [README](autoscale/aws/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/deploy-ftdv-auto-scale-for-aws.pdf)
 

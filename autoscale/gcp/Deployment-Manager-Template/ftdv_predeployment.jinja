@@ -56,6 +56,7 @@ resources:
       GRP_ID: {{ properties["grpID"] }}
       POLICY_ID: {{ properties["policyID"] }}
       FTDV_PASSWORD: {{ properties["ftdvPassword"] }}
+      SSH_USING_EXTERNAL_IP: '{{ properties["sshUsingExternalIP"] }}'
       LICENSE_CAPS: {{ properties["licenseCAPS"] }}
       INSTANCE_PREFIX_IN_FMC: {{ properties["instancePrefixInFmc"] }}
       OUTSIDE_GW_NAME: {{ properties["outsideGwName"] }}
@@ -114,6 +115,9 @@ resources:
       secret: {{ properties["fmcPasswordSecret"] }}
       version: latest
     maxInstances: 1
+    vpcConnector: {{ properties["vpcConnectorName"] }}
+    vpcConnectorEgressSettings: PRIVATE_RANGES_ONLY
+    ingressSettings: ALLOW_ALL
     eventTrigger:
       resource: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-pubsub-topic-delete.name)
       eventType: google.pubsub.topic.publish

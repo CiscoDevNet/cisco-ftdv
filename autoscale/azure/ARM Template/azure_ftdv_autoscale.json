@@ -10,7 +10,7 @@
         "metadata": {
             "description": "Prefix used in resource names created by this template(Use only lowercase letters)"
         }
-      },	
+      },
       "virtualNetworkRg": {
         "type": "string",
         "defaultValue": "cisco-virtualnet-rg",
@@ -59,7 +59,7 @@
         "metadata": {
             "description": "Inside Subnet Gateway IP"
         }
-      },	 
+      },
       "internalLbIP": {
         "type": "string",
         "defaultValue": "1.2.3.5",
@@ -80,14 +80,14 @@
         "metadata": {
             "description": "Outside Subnet Gateway IP"
         }
-      },	  
+      },
       "insideZoneName": {
         "type": "string",
         "defaultValue": "inside",
         "metadata": {
             "description": "Inside Zone Name"
         }
-      },	  
+      },
       "outsideZoneName": {
         "type": "string",
         "defaultValue": "outside",
@@ -97,8 +97,10 @@
       },
       "softwareVersion": {
         "type": "string",
-        "defaultValue": "67065.0.0",
+        "defaultValue": "73069.0.0",
         "allowedValues": [
+            "73069.0.0",
+            "700.94.0",
             "67065.0.0",
             "66459.0.0",
             "640110.0.0"
@@ -130,7 +132,7 @@
         "metadata" : {
             "description" : "Licensing model (ftdv-azure-byol : Bring-your-own-license, ftdv-azure-payg : Pay-as-you-go)"
         }
-      },	  
+      },
       "ftdVmManagementUserName": {
         "type": "string",
         "defaultValue": "cisco",
@@ -165,7 +167,7 @@
         "metadata": {
             "description": "FMC User name"
         }
-      },	  
+      },
       "fmcPassword": {
         "type": "securestring",
         "defaultValue": "",
@@ -200,11 +202,11 @@
         "allowedValues" : [
             "CPU",
             "CPU,MEMORY"
-        ],		
+        ],
         "metadata": {
             "description": "Metrics used in taking scaling decision"
         }
-      },	  
+      },
       "cpuScaleInThreshold": {
         "type": "string",
         "defaultValue": "10",
@@ -232,7 +234,7 @@
         "metadata": {
             "description": "Scale-OUT threshold in % for Memory Metrics"
         }
-      },	  
+      },
       "minFtdCount": {
         "type": "string",
         "defaultValue": "1",
@@ -255,7 +257,7 @@
             "5",
             "15",
             "30"
-        ],		
+        ],
         "metadata": {
             "description": "Duration in minutes for which metrics samples are collected and averaged"
         }
@@ -266,7 +268,7 @@
         "allowedValues" : [
             "BULK",
             "STEP"
-        ],		
+        ],
         "metadata": {
             "description": "Initial deployment mode BULK/STEP"
         }
@@ -277,18 +279,18 @@
         "allowedValues" : [
             "POLICY-1",
             "POLICY-2"
-        ],		
+        ],
         "metadata": {
             "description": "Scaling Policy.. Refer user guide for details"
         }
-      }	  
+      }
     },
     "variables": {
 	  "vmssName" :        "[concat(parameters('resourceNamePrefix'),'-vmss')]",
 	  "elbName"  :        "[concat(parameters('resourceNamePrefix'),'-elb')]",
-	  "ilbName"  :        "[concat(parameters('resourceNamePrefix'),'-ilb')]",	
+	  "ilbName"  :        "[concat(parameters('resourceNamePrefix'),'-ilb')]",
       "dataSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-dataIntfSecGrp')]",
-      "mgmtSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-mgmtIntfSecGrp')]",	  
+      "mgmtSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-mgmtIntfSecGrp')]",
       "logicAppName" : 	  "[concat(parameters('resourceNamePrefix'),'-logic-app')]",
 	  "functionAppName" : "[concat(parameters('resourceNamePrefix'),'-function-app')]",
 	  "appInsightsName" : "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
@@ -299,7 +301,7 @@
       "mgmtSubnetId":     "[concat(variables('vnetID'),'/subnets/', parameters('mgmtSubnet'))]",
       "diagSubnetId":     "[concat(variables('vnetID'),'/subnets/', parameters('diagSubnet'))]",
       "insideSubnetId":   "[concat(variables('vnetID'),'/subnets/', parameters('insideSubnet'))]",
-      "outsideSubnetId":  "[concat(variables('vnetID'),'/subnets/', parameters('outsideSubnet'))]",	  
+      "outsideSubnetId":  "[concat(variables('vnetID'),'/subnets/', parameters('outsideSubnet'))]",
       "storageAccountName": "[concat(parameters('resourceNamePrefix'), uniquestring(resourceGroup().id))]",
       "storageAccountid": "[concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
       "hostingPlanName":  "[variables('functionAppName')]",
@@ -318,7 +320,7 @@
       "offer":            "cisco-ftdv",
       "sku":              "[parameters('ftdLicensingSku')]",
       "customData": "[concat('{\"AdminPassword\":\"', parameters('ftdAdminUserPassword'), '\",\"Hostname\": \"cisco-ftdv\", \"FmcIp\": \"DONTRESOLVE\", \"FmcRegKey\":\"1234\", \"FmcNatId\":\"5678\"}')]"
-    },	
+    },
     "resources": [
       {
         "name": "[variables('LogicAppName')]",
@@ -348,7 +350,7 @@
           },
           "parameters": {}
         }
-      },	  
+      },
       {
          "apiVersion": "2015-06-15",
          "type": "Microsoft.Network/networkSecurityGroups",
@@ -397,10 +399,10 @@
                      "priority": 102,
                      "direction": "Inbound"
                   }
-               }			   
+               }
             ]
          }
-      },	  
+      },
       {
          "apiVersion": "2015-06-15",
          "type": "Microsoft.Network/networkSecurityGroups",
@@ -424,7 +426,7 @@
                }
             ]
          }
-      },	
+      },
       {
         "type": "Microsoft.Storage/storageAccounts",
         "name": "[variables('storageAccountName')]",
@@ -536,7 +538,7 @@
               {
                 "name": "AZURE_UTILITY_IP_NAME",
                 "value": "azure-utility-ip"
-              },  
+              },
               {
                 "name": "FMC_DOMAIN_UUID",
                 "value": "e276abec-e0f2-11e3-8169-6d9ed49b625f"
@@ -604,7 +606,7 @@
               {
                 "name": "OUTSIDE_ZONE",
                 "value": "[parameters('outsideZoneName')]"
-              },  
+              },
               {
                 "name": "MAX_FTD_COUNT",
                 "value": "[parameters('maxFtdCount')]"
@@ -672,7 +674,7 @@
               {
                 "name": "SCALE_OUT_THRESHLD_MEM",
                 "value": "[parameters('memoryScaleOutThreshold')]"
-              },			  
+              },
               {
                 "name": "VMSS_NAME",
                 "value": "[variables('vmssName')]"
@@ -688,7 +690,7 @@
               {
                 "name": "SCALING_POLICY",
                 "value": "[parameters('scalingPolicy')]"
-              },			  
+              },
               {
                 "name": "DEVICE_GROUP_NAME",
                 "value": "[parameters('deviceGroupName')]"
@@ -704,7 +706,11 @@
               {
                 "name": "SCALING_METRICS_LIST",
                 "value": "[parameters('scalingMetricsList')]"
-              }			  
+              },
+              {
+                "name": "GWLB_SUPPORT",
+                "value": "NO"
+              }
             ]
           }
         }
@@ -762,7 +768,7 @@
           "name": "Standard"
         },
         "dependsOn": [
-          "[concat('Microsoft.Network/publicIPAddresses/', variables('elbPublicIpName'))]"             
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('elbPublicIpName'))]"
         ],
         "properties": {
           "frontendIPConfigurations": [
@@ -810,7 +816,7 @@
               },
               "name": "lbprobe"
             }
-          ] 
+          ]
         }
       },
       {
@@ -871,7 +877,7 @@
               },
               "name": "lbprobe"
             }
-          ] 
+          ]
         }
       },
       {
@@ -883,7 +889,7 @@
             "[concat('Microsoft.Network/loadBalancers/', variables('elbName'))]",
             "[concat('Microsoft.Network/loadBalancers/', variables('ilbName'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
-            "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataSecGrp'))]"			
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataSecGrp'))]"
         ],
         "sku": {
           "name": "[parameters('vmSize')]",
@@ -893,7 +899,7 @@
             "1",
             "2",
             "3"
-        ],		
+        ],
         "plan": {
           "name": "[variables('sku')]",
           "publisher": "[variables('publisher')]",
@@ -974,7 +980,8 @@
                     "primary": false,
 					"networkSecurityGroup": {
                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
-                    },					
+                    },
+                    "enableIPForwarding": true,
                     "ipConfigurations": [
                       {
                         "name": "myIpConfig",
@@ -998,7 +1005,8 @@
                     "primary": false,
 					"networkSecurityGroup": {
                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
-                    },						
+                    },
+                    "enableIPForwarding": true,
                     "ipConfigurations": [
                       {
                         "name": "myIpConfig",
@@ -1023,4 +1031,3 @@
       }
     ]
   }
-  
