@@ -97,6 +97,8 @@ def cluster_handler(event, context):
             instanceCreation[creationTime]= response
             if IsFTDvWithExternalIP is True:
                 ipTable[response['networkInterfaces'][2]['networkIP']]= response['networkInterfaces'][2]['accessConfigs'][0]['natIP']
+            else:
+                ipTable[response['networkInterfaces'][2]['networkIP']]= response['networkInterfaces'][2]['networkIP']    
             
         firstInstanceCreationTime = min(instanceCreation)
         response = instanceCreation[firstInstanceCreationTime]
@@ -199,7 +201,7 @@ def cluster_handler(event, context):
                     print("Wait For All Cluster Nodes To Join")
                     bf.wait_multi_10sec(30)
                     health_status = bf.check_cluster_slave_nodes(channel, min_nodes)
-                    print("Cluster SLAVE Nodes Health Status:"+ health_status)
+                    print("Cluster DATA Nodes Health Status:"+ health_status)
                     if health_status =="Healthy" :
                         break
                     counter = counter + 1
@@ -217,7 +219,7 @@ def cluster_handler(event, context):
         if (time.time() - start_time) <= timeout_time:
             if reg_status != 'PARTIAL' and r=="SUCCESS" and health_status=="Healthy" :
                 unit = bf.get_master_node_unit(channel)
-                print('MASTER Unit '+ str(unit))
+                print('CONTROL Unit '+ str(unit))
                 octets = management_ip.split('.')
                 if octets[-1] == unit:
                     bf.configureManager(channel, fmc_ip, reg_id, nat_id)

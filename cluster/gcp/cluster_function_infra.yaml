@@ -33,7 +33,7 @@ resources:
     region: <> #us-central1
     # resourceNamePrefix restricted to single word 
     resourceNamePrefix: <> #ngfwvcls
-    serviceAccountMailId: <> #340375726592-compute@developer.gserviceaccount.com
+    serviceAccountMailId: <> #<project-number>-compute@developer.gserviceaccount.com
     vpcConnectorName: <> #ngfwvcls-ssh
     #Google Function
     bucketName: <> #ngfwvcls-ftdv-cluster-bucket

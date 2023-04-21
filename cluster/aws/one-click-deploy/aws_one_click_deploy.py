@@ -1,6 +1,46 @@
 '''
+Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+--------------------------------------------------------------------------------
 
 Single click deployment for Cisco NGFWv Clustering for AWS
+
+DEFAULT DEPLOYMENT mode:
+
+This script deploys infrastructure stack and uploads lambda-zips to the
+bucket created.
+(1) If the fmc_ip is assigned a non-empty string, then that value will be
+    used for cluster deployment.
+	fmc_ip should be assigned a value only if FMC is already deployed, or to be
+	deployed with the fixed assigned IP.
+	If the user plans to deploy the FMC after infrastructure creation, the
+	fmc_ip parameter must be left blank
+(2) If fmc_ip is empty (''), user will be given 2 options-
+   	(a) Leave the script running but waiting until user enters the fmc_ip. In
+	    this time, FMC can be deployed, after which fmc_ip and any parameter
+		left empty in the NGFWV_CLUSTER_STACK_PARAMS can be entered.
+	    After this, the script will continue deploy the cluster stack
+	(b) Exit the execution, use CLUSTER_ONLY_DEPLOYMENT after FMC deployment
+
+CLUSTER_ONLY_DEPLOYMENT mode:
+
+Only cluster stack is deployed in this mode.
+However, an infrastructure stack must have been deployed already with this
+script, with the same set of PRIME_INFRA_PARAMS as assigned below
+
 
 System requirements: macOS/Linux/Windows machine with python3 (and hence pip3)
 	command working
@@ -28,61 +68,83 @@ aws_access_key_id = ''
 aws_secret_access_key = ''
 #secret_access_key for AWS account: to unset, assign ''
 
-aws_region_code = 'ap-northeast-3'
+aws_region_code = 'us-east-1'
 #region code: to unset, assign ''
 #make sure to select region which supports atleast 1 new VPC, 1 new Elastic IP
 #and a valid NGFWv AmiID for deployment
 
-#---------------INFRASTRUCTURE_STACK_PARAMS_FOR_POD_CONFIGURATION--------------#
-#to unset, assign ''
+#--------------------------------DEPLOYMENT_MODE-------------------------------#
+#choose whether to deploy one or two stacks
 
-infra_stack_name = 'neo-cls-infra-yn'
+deployment_mode = ''
+#set to '1' to deploy only cluster stack over existing infrastructure stack
+#set to anything else to deploy both infrastructure and cluster stacks
+#when set to '1', make sure that an infrastructure stack has already been
+#deployed with the same PRIME_INFRA_PARAMS as assigned in the below section
+
+#------------------------------PRIME_INFRA_PARAMS------------------------------#
+#parameters required in both the deployment modes
+#these are used for creating infrastructure in DEFAULT_DEPLOYMENT mode,
+#and to identify valid existing stack in CLUSTER_ONLY_DEPLOYMENT mode
+
+infra_stack_name = 'cisco-infra'
 #name of infrastructure stack
-
-pod_name = 'infrastructure'
-#used in the names of infrastructure stack resources
-
-pod_number = '1'
-#used in the names of infrastructure stack resources
-
-vpc_cidr = '10.2.0.0/16'
-#vpc to deploy the cluster
-
-availability_zone = 'ap-northeast-3a'
-#make sure its valid in the region selected
+#used for infrastructure creation in DEFAULT_DEPLOYMENT mode,
+#and for identifying existing infrastructure in CLUSTER_ONLY_DEPLOYMENT mode
+#in the region specified in AWS_SESSION_PARAMS
 
 use_gwlb = 'y'
-#decide if gateway load balancer is to be deployed: to unset, assign ''
+#common parameter used for both the stacks
+#In DEFAULT_DEPLOYMENT mode, decide if gateway load balancer is to be deployed:
 #set to any string starting with 'y' or 'Y' to deploy gateway load balancer
-#set to any other non-empty string, otherwise
+#set to any other non-empty string, otherwise.
+#In CLUSTER_ONLY_DEPLOYMENT mode, make sure the stack mentioned above was
+#deployed in the region specified in AWS_SESSION_PARAMS, with the same use_gwlb
+#value as assigned here,
+
+#---------------INFRASTRUCTURE_STACK_PARAMS_FOR_POD_CONFIGURATION--------------#
+#ignored in CLUSTER_ONLY_DEPLOYMENT mode
+#to unset, assign ''
+
+infra_prefix = 'cisco-infra'
+#used in the names of infrastructure stack resources
+
+infra_number = '1'
+#used in the names of infrastructure stack resources
+
+vpc_cidr = '10.0.0.0/16'
+#vpc to deploy the cluster
+
+availability_zone = 'us-east-1a'
+#make sure its valid in the region selected
 
 mgmt_subnet_name = 'ManagementSubnet'
 #name of management subnet (with internet gateway as Route)
 
-mgmt_subnet_cidr = '10.2.250.0/24'
+mgmt_subnet_cidr = '10.0.1.0/24'
 #CIDR block for management subnet
 
 inside_subnet_name = 'InsideSubnet'
 #name of inside subnet (with private route)
 
-inside_subnet_cidr = '10.2.100.0/24'
+inside_subnet_cidr = '10.0.2.0/24'
 #CIDR block for inside subnet
 
 outside_subnet_name = 'OutsideSubnet'
 #name of outside subnet
 #ignored if gateway load balancer is deployed
 
-outside_subnet_cidr = '10.2.200.0/24'
+outside_subnet_cidr = '10.0.3.0/24'
 #CIDR block of outside subnet
 #ignored if gateway load balancer is deployed
 
 ccl_subnet_name = 'CCLSubnet'
 #name of CCL subnet
 
-ccl_subnet_cidr = '10.2.90.0/24'
+ccl_subnet_cidr = '10.0.4.0/24'
 #CIDR block of CCL subnet
 
-lambda_azs = 'ap-northeast-3a,ap-northeast-3b'
+lambda_azs = 'us-east-1a,us-east-1b'
 #comma seperated availability zones for Lambda Subnets
 #enter exactly 2 zones
 
@@ -90,29 +152,26 @@ lambda_subnet_names = 'LambdaSubnet-1,LambdaSubnet-2'
 #comma seperated subnet names for Lambda functions
 #enter exactly 2 subnets
 
-lambda_subnet_cidrs = '10.2.50.0/24,10.2.51.0/24'
+lambda_subnet_cidrs = '10.0.5.0/24,10.0.6.0/24'
 #comma seperated subnet CIDRs for Lambda functions
 #enter exactly 2 CIDR blocks
-
-app_subnet_name = 'AppSubnet'
-#name of Application subnet (with private route)
-
-app_subnet_cidr = '10.2.70.0/24'
-#CIDR block for application subnet
 
 #--------------------------NGFWV_CLUSTER_STACK_PARAMS--------------------------#
 #to unset, assign ''
 
-ngfwv_stack_name = 'neo-cls-ngfw-yn'
+ngfwv_stack_name = 'cisco-ngfw'
 #name of the ngfw stack
 
 #POD_CONFIGURATION
 
-cluster_prefix = 'NGFWv-Clustering'
+cluster_prefix = 'cisco-cluster'
 #used in the names of NGFWv cluster stack resources
 
-cluster_podnum = '1'
+cluster_number = '1'
 #used in the names of NGFWv cluster stack resources
+
+cluster_size = '3'
+#number of NGFWv instances in the cluster
 
 email_for_notif = ''
 #Ignored if empty ('')
@@ -120,15 +179,15 @@ email_for_notif = ''
 
 #INFRSTRUCTURE_DETAILS
 
-ccl_first = '10.2.90.4'
+ccl_first = '10.0.4.4'
 #CCL pool first IP
 
-ccl_last = '10.2.90.254'
+ccl_last = '10.0.4.254'
 #CCL Pool last IP
 
 #GWLB_CONFIGURATION
 
-deploy_gwlbe = 'n'
+deploy_gwlbe = 'y'
 #decide if gateway load balancer endpoint is to be deployed
 #set to any string starting with 'y' or 'Y' to deploy gateway load balancer
 #set to any other non-empty string, otherwise
@@ -149,20 +208,18 @@ health_port = '80'
 
 #CISCO NGFWV INSTANCE CONFIGURATION
 
-ngfwv_instance_type = 'c5.4xlarge'
-#choose one of 'c3.xlarge', 'c4.xlarge', 'c5.xlarge', 'c5.2xlarge', 'c5.4xlarge'
+ngfwv_instance_type = 'c5.xlarge'
+#choose one of 'c3.xlarge', 'c4.xlarge', 'c5.xlarge', 'c5.2xlarge', 'c5.4xlarge', 
+#'c5d.xlarge', 'c5d.2xlarge', 'c5d.4xlarge', 'c5a.xlarge', 'c5a.2xlarge', 'c5a.4xlarge', 
+#'c5ad.xlarge', 'c5ad.2xlarge', 'c5ad.4xlarge', 'c5n.xlarge', 'c5n.2xlarge', 'c5n.4xlarge', 
+#'m5n.xlarge', 'm5n.2xlarge', 'm5n.4xlarge', 'm5zn.xlarge', 'm5zn.2xlarge'
 #if gateway load balancer is not deployed, 'c5.4xlarge' will be forced
 #make sure the instance type is supported in the region specified
 
-ngfwv_ami_ID = 'ami-0980f05af85a4b216'
+ngfwv_ami_ID = 'ami-033dfrgbghyhhfuda'
 #Ami Id used to launch FTDv instances: to unset, assign ''
 #make sure this AMI has the status of 'available' in the selected region
-#to use the AMI with name 'ftdv-7.2.0-1365-ENA' use the ami IDs:
-#'ami-0265b4bbf47bd0171' for region code: 'me-south-1' (Bahrain)
-#'ami-0e94f6226b069e2cc' for region code: 'ap-northeast-2' (Seoul)
-#'ami-0980f05af85a4b216' for region code: 'ap-northeast-3' (Osaka)
-#'ami-06d759781d0672de4' for region code: 'ap-south-1' (Mumbai)
-#'ami-029254ef480d17e57' for region code: 'ap-southeast-2' (Sydney)
+#use the AMI with ENA type.
 
 public_ip_assign = 'Yes'
 #decide if NGFWv instances need a public IP
@@ -178,24 +235,25 @@ kms_arn = ''
 #" aws kms encrypt --key-id <KMS ARN> --plaintext <password> "
 #use such passwords for ngfwv_passwd if kms_arn is nonempty
 
-ngfwv_passwd = 'Cisco@123123'
+ngfwv_passwd = 'Yu0rPass@344'
 #plain text or KMS encrypted password, min length: 8
 
 #FMC_AUTOMATION_CONFIGURATION
 
-fmc_ip = '10.2.1.5'
+fmc_ip = '1.1.1.1'
+#Leave this blank if FMC is to be deployed after infrastructure creation
 #should be reachable from management subnet
 
-fmc_uname = 'CiscoUser'
+fmc_uname = 'restuser'
 #Unique Internal user for Cluster Manager automation tasks on FMC
 #User should have roles system provided 'Network Admin' and 'Maintenance User'
 #Refer 'Firepower Management Center Configuration Guide' for more details
 
-fmc_passwd = 'Cisco@123123'
+fmc_passwd = 'Yu0rPass@344'
 #if KMS ARN provided above, enter encrypted password
 #otherwise, enter plaintext password
 
-fmc_group_name = 'ftdvcluster'
+fmc_group_name = 'cisco-cluster'
 #Device Group Name for FMC
 
 #______________________________________________________________________________#
@@ -320,130 +378,155 @@ while use_gwlb == '':
 if use_gwlb[0] == 'y' or use_gwlb[0] == 'Y': use_gwlb = 'Yes'
 else: use_gwlb = 'No'
 
-req_params = [
-	['pod_name', pod_name, 'PodName'],
-	['pod_number', pod_number, 'PodNumber'],
-	['vpc_cidr', vpc_cidr, 'VpcCidr'],
-	['availability_zone', availability_zone, 'AZ'],
-	['use_gwlb', use_gwlb, 'UseGWLB'],
-	['mgmt_subet_name', mgmt_subnet_name, 'MgmtSubnetName'],
-	['mgmt_subnet_cidr', mgmt_subnet_cidr, 'MgmtSubnetCidr'],
-	['inside_subnet_name', inside_subnet_name, 'InsideSubnetName'],
-	['inside_subnet_cidr', inside_subnet_cidr, 'InsideSubnetCidr'],
-	['ccl_subnet_name', ccl_subnet_name, 'CCLSubnetName'],
-	['ccl_subnet_cidr', ccl_subnet_cidr, 'CCLSubnetCidr'],
-	['lambda_azs', lambda_azs, 'LambdaAZs'],
-	['lambda_subnet_names', lambda_subnet_names, 'LambdaSubnetName'],
-	['lambda_subnet_cidrs', lambda_subnet_cidrs, 'LambdaSubnetCidrs'],
-	['app_subnet_name', app_subnet_name, 'ApplicationSubnetName'],
-	['app_subnet_cidr', app_subnet_cidr, 'ApplicationSubnetCidr']
-]
+if deployment_mode != '1':
 
-cond_params = [
-	['outside_subnet_name', outside_subnet_name, 'OutsideSubnetName'],
-	['outside_subnet_cidr', outside_subnet_cidr, 'OutsideSubnetCidr']
-]
+    print('Executing in DEFAULT_DEPLOYMENT mode\n')
 
-input_params = [
-	{ 'ParameterKey': 'NoOfAZs', 'ParameterValue': '1' }
-]
+    req_params = [
+    	['infra_prefix', infra_prefix, 'ClusterName'],
+    	['infra_number', infra_number, 'ClusterNumber'],
+    	['vpc_cidr', vpc_cidr, 'VpcCidr'],
+    	['availability_zone', availability_zone, 'AZ'],
+    	['use_gwlb', use_gwlb, 'UseGWLB'],
+    	['mgmt_subet_name', mgmt_subnet_name, 'MgmtSubnetName'],
+    	['mgmt_subnet_cidr', mgmt_subnet_cidr, 'MgmtSubnetCidr'],
+    	['inside_subnet_name', inside_subnet_name, 'InsideSubnetName'],
+    	['inside_subnet_cidr', inside_subnet_cidr, 'InsideSubnetCidr'],
+    	['ccl_subnet_name', ccl_subnet_name, 'CCLSubnetName'],
+    	['ccl_subnet_cidr', ccl_subnet_cidr, 'CCLSubnetCidr'],
+    	['lambda_azs', lambda_azs, 'LambdaAZs'],
+    	['lambda_subnet_names', lambda_subnet_names, 'LambdaSubnetName'],
+    	['lambda_subnet_cidrs', lambda_subnet_cidrs, 'LambdaSubnetCidrs']
+    ]
 
-for i in range(len(req_params)):
-	while req_params[i][1] == '':
-		print('Parameter ' + req_params[i][0] + ' cannot be empty')
-		req_params[i][1] = str(input('Enter a valid value for '
-			+ req_params[i][0] + ': '))
-		if req_params[i][0] == 'availability_zone':
-			availability_zone = req_params[i][1]
-	input_params.append(
-		{
-			'ParameterKey': req_params[i][2],
-			'ParameterValue': req_params[i][1]
-		})
+    cond_params = [
+    	['outside_subnet_name', outside_subnet_name, 'OutsideSubnetName'],
+    	['outside_subnet_cidr', outside_subnet_cidr, 'OutsideSubnetCidr']
+    ]
 
-if use_gwlb == 'No':
-	for i in range(len(cond_params)):
-		while cond_params[i][1] == '':
-			print('Parameter ' + cond_params[i][0] +
-				' cannot be empty if not using gateway load balancer')
-			cond_params[i][1] = str(input('Enter a valid value for '
-				+ cond_params[i][0] + ': '))
-		input_params.append(
-			{
-				'ParameterKey': cond_params[i][2],
-				'ParameterValue': cond_params[i][1]
-			})
+    input_params = [
+    	{ 'ParameterKey': 'NoOfAZs', 'ParameterValue': '1' }
+    ]
 
-with open('infrastructure.yaml') as yaml_data: template = load_yaml(yaml_data)
-tbody = dump_yaml(template)
-print("\nParameters input for deployment: \n")
-for param in input_params:
-	print(param['ParameterKey'] + ': ' + param['ParameterValue'])
-print("\n")
-print("Deploying infrastructure stack..")
+    for i in range(len(req_params)):
+    	while req_params[i][1] == '':
+    		print('Parameter ' + req_params[i][0] + ' cannot be empty')
+    		req_params[i][1] = str(input('Enter a valid value for '
+    			+ req_params[i][0] + ': '))
+    		if req_params[i][0] == 'availability_zone':
+    			availability_zone = req_params[i][1]
+    	input_params.append(
+    		{
+    			'ParameterKey': req_params[i][2],
+    			'ParameterValue': req_params[i][1]
+    		})
 
-params = {
-			'StackName': infra_stack_name,
-         	'TemplateBody': tbody,
-            'Capabilities':
-				[	'CAPABILITY_IAM',
-					'CAPABILITY_AUTO_EXPAND',
-					'CAPABILITY_NAMED_IAM'
-				],
-			'Parameters': input_params
-         }
+    if use_gwlb == 'No':
+    	for i in range(len(cond_params)):
+    		while cond_params[i][1] == '':
+    			print('Parameter ' + cond_params[i][0] +
+    				' cannot be empty if not using gateway load balancer')
+    			cond_params[i][1] = str(input('Enter a valid value for '
+    				+ cond_params[i][0] + ': '))
+    		input_params.append(
+    			{
+    				'ParameterKey': cond_params[i][2],
+    				'ParameterValue': cond_params[i][1]
+    			})
 
-try:
-	v.cf_template.create_stack(**params)
+    with open('infrastructure.yaml') as yaml_data: template = load_yaml(yaml_data)
+    tbody = dump_yaml(template)
+    print("\nParameters input for deployment: \n")
+    for param in input_params:
+    	print(param['ParameterKey'] + ': ' + param['ParameterValue'])
+    print("\n")
+    print("Deploying infrastructure stack..")
 
-except v.cf_template.exceptions.AlreadyExistsException:
-	exists = 1
-	while exists == 1:
-		print('Stack name already exists in the region')
-		print('Try again or press CTRL+C to quit')
-		infra_stack_name = str(input("Enter infrastructure stack name: "))
-		try:
-			params['StackName'] = infra_stack_name
-			v.cf_template.create_stack(**params)
-			exists = 0
-			print("Deploying infrastructure stack..")
-		except v.cf_template.exceptions.AlreadyExistsException:
-			pass
+    params = {
+    			'StackName': infra_stack_name,
+             	'TemplateBody': tbody,
+                'Capabilities':
+    				[	'CAPABILITY_IAM',
+    					'CAPABILITY_AUTO_EXPAND',
+    					'CAPABILITY_NAMED_IAM'
+    				],
+    			'Parameters': input_params
+             }
 
-except:
-	print("Unable to deploy infrastructure stack.\n{}".format(
-		traceback.format_exc()))
+    try:
+    	v.cf_template.create_stack(**params)
 
-waiter = v.cf_template.get_waiter('stack_create_complete')
-waiter.wait(StackName=infra_stack_name)
-print("Infrastructure stack deployment complete")
+    except v.cf_template.exceptions.AlreadyExistsException:
+    	exists = 1
+    	while exists == 1:
+    		print('Stack name already exists in the region')
+    		print('Try again or press CTRL+C to quit')
+    		infra_stack_name = str(input("Enter infrastructure stack name: "))
+    		try:
+    			params['StackName'] = infra_stack_name
+    			v.cf_template.create_stack(**params)
+    			exists = 0
+    			print("Deploying infrastructure stack..")
+    		except v.cf_template.exceptions.AlreadyExistsException:
+    			pass
 
-#______________________________________________________________________________#
-#upload to s3 bucket
+    except:
+    	print("Unable to deploy infrastructure stack.\n{}".format(
+    		traceback.format_exc()))
 
-r = v.cf_template.describe_stack_resource(
-	StackName = infra_stack_name,
-	LogicalResourceId = 'S3bucketCluster'
-)
-v.bucketname = r['StackResourceDetail']['PhysicalResourceId']
+    waiter = v.cf_template.get_waiter('stack_create_complete')
+    waiter.wait(StackName=infra_stack_name)
+    print("Infrastructure stack deployment complete")
 
-print('Uploding cluster_manager.zip')
-response = v.s3_client.upload_file('cluster_manager.zip', v.bucketname,
-	'cluster_manager.zip')
-print("Upload Complete")
+    #__________________________________________________________________________#
+    #upload to s3 bucket
 
-print('Uploding cluster_layer.zip')
-response = v.s3_client.upload_file('cluster_layer.zip', v.bucketname,
-	'cluster_layer.zip')
-print("Upload Complete")
+    r = v.cf_template.describe_stack_resource(
+    	StackName = infra_stack_name,
+    	LogicalResourceId = 'S3bucketCluster'
+    )
+    v.bucketname = r['StackResourceDetail']['PhysicalResourceId']
 
-print('Uploding cluster_lifecycle.zip')
-response = v.s3_client.upload_file('cluster_lifecycle.zip', v.bucketname,
-	'cluster_lifecycle.zip')
-print("Upload Complete")
+    print('Uploding cluster_manager.zip')
+    response = v.s3_client.upload_file('cluster_manager.zip', v.bucketname,
+    	'cluster_manager.zip')
+    print("Upload Complete")
+
+    print('Uploding cluster_layer.zip')
+    response = v.s3_client.upload_file('cluster_layer.zip', v.bucketname,
+    	'cluster_layer.zip')
+    print("Upload Complete")
+
+    print('Uploding cluster_lifecycle.zip')
+    response = v.s3_client.upload_file('cluster_lifecycle.zip', v.bucketname,
+    	'cluster_lifecycle.zip')
+    print("Upload Complete")
+
+    if fmc_ip == '':
+    	print('\nfmc_ip is empty')
+    	print("If FMC is available now, press Enter and enter fmc_ip when asked")
+    	print("\nOtherwise, the user has two options:")
+    	print("1. Keep this process running but waiting until FMC is deployed")
+    	print("\tPress 'Enter' once the FMC is available, process will continue")
+    	print("\tAfter that, user will be asked to enter the FMC IP ")
+    	print("2. Press CTRL+C to terminate this process")
+    	print("\tAfter the FMC is deployed, rerun this script after changing only:")
+    	print("\ta. deployment_mode = '1' in DEPLOYMENT_MODE section")
+    	print("\tb. fmc_ip = '<FMC_IP_ADDRESS>' in NGFWV_CLUSTER_STACK_PARAMS")
+    	print("\tc. any other required changes in the NGFWV_CLUSTER_STACK_PARAMS")
+    	print("\t   but not other sections")
+    	print("\nPress 'Enter' to choose (1) and continue OR")
+    	input("Press 'CTRL+C' to choose (2) and quit")
+    	while fmc_ip == '':
+    		fmc_ip = str(input("Enter fmc_ip: "))
+    else:
+    	print("Proceeding to cluster deployment using the assigned fmc_ip: " + fmc_ip)
 
 #______________________________________________________________________________#
 #prepare input_params for ngfw stack
+
+if deployment_mode == '1':
+    print('Executing in CLUSTER_ONLY_DEPLOYMENT mode')
 
 while ngfwv_stack_name == '':
 	print("ngfwv_stack_name cannot be left empty")
@@ -472,14 +555,14 @@ if public_ip_assign[0] == 'y' or public_ip_assign[0] == 'Y':
 else: public_ip_assign = 'false'
 
 valid_itypes = [
-	'c3.xlarge', 'c4.xlarge', 'c5.xlarge', 'c5.2xlarge', 'c5.4xlarge'
+	'c3.xlarge', 'c4.xlarge', 'c5.xlarge', 'c5.2xlarge', 'c5.4xlarge', 'c5d.xlarge', 'c5d.2xlarge', 'c5d.4xlarge', 'c5a.xlarge', 'c5a.2xlarge', 'c5a.4xlarge', 'c5ad.xlarge', 'c5ad.2xlarge', 'c5ad.4xlarge', 'c5n.xlarge', 'c5n.2xlarge', 'c5n.4xlarge', 'm5n.xlarge', 'm5n.2xlarge', 'm5n.4xlarge', 'm5zn.xlarge', 'm5zn.2xlarge'
 	]
 
 while ngfwv_instance_type not in valid_itypes:
 	print('Invalid value for ngfwv_instance_type')
 	print('Enter the instance type of NGFWv to be deployed\nEnter one of')
 	nngfwv_instance_type = str(input(
-		"c3.xlarge, c4.xlarge, c5.xlarge, c5.2xlarge, c5.4xlarge: "))
+		"c3.xlarge, c4.xlarge, c5.xlarge, c5.2xlarge, c5.4xlarge, c5d.xlarge, c5d.2xlarge, c5d.4xlarge, c5a.xlarge, c5a.2xlarge, c5a.4xlarge, c5ad.xlarge, c5ad.2xlarge, c5ad.4xlarge, c5n.xlarge, c5n.2xlarge, c5n.4xlarge, m5n.xlarge, m5n.2xlarge, m5n.4xlarge, m5zn.xlarge, m5zn.2xlarge: "))
 
 empty_ok_params = [
 	['email_for_notif', email_for_notif, 'NotifyEmailID'],
@@ -488,7 +571,8 @@ empty_ok_params = [
 
 req_params = [
 	['cluster_prefix', cluster_prefix, 'ClusterGrpNamePrefix'],
-	['cluster_podnum', cluster_podnum, 'PodNumber'],
+	['cluster_number', cluster_number, 'ClusterNumber'],
+	['cluster_size', cluster_size, 'ClusterSize'],
 	['deploy_gwlbe', deploy_gwlbe, 'DeployGWLBE'],
 	['availability_zone', availability_zone, 'AZ'],
 	['ccl_first', ccl_first, 'CCLfirstIP'],
@@ -505,8 +589,7 @@ req_params = [
 
 cond_params = [
 	['gwlbe_vpc', gwlbe_vpc, 'VpcIdLBE'],
-	['gwlbe-subnet', gwlbe_subnet, 'GWLBESubnetId'],
-	['health_port', health_port, 'TgHealthPort'],
+	['gwlbe-subnet', gwlbe_subnet, 'GWLBESubnetId']
 ]
 
 input_params = [
@@ -520,6 +603,13 @@ for p in empty_ok_params:
 			'ParameterKey': p[2],
 			'ParameterValue': p[1]
 		})
+
+if use_gwlb == 'Yes':
+    input_params.append(
+        {
+            'ParameterKey': 'TgHealthPort',
+            'ParameterValue': health_port
+        })
 
 for i in range(len(req_params)):
 	while req_params[i][1] == '':
@@ -616,6 +706,14 @@ print("\n")
 with open('deploy_ngfw_cluster.yaml') as yaml_data:
 	template = load_yaml(yaml_data)
 tbody = dump_yaml(template)
+
+if email_for_notif != '':
+    print("Please lookout for a subscription confirmation mail in the account")
+    print(email_for_notif)
+    print("Sender: AWS Notifications")
+    print("Mail Subject: AWS-Notification - Subscription Confirmation")
+    print("Click on the subscription confirmation link to start recieving")
+    print("cluster event notifications\n")
 
 print("Deploying NGFWv Stack")
 

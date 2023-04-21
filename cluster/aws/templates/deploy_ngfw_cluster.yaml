@@ -133,7 +133,7 @@ Parameters:
     Default: true
   GWLBESubnetId:
     Description: >-
-      Select only one subnet.
+      Enter only one subnet ID.
       - *SKIP this field, if you are NOT deploying Gateway Load Balancer Endpoint.
       Wrong Subnet selection will cause problems.
       Make sure that Subnet belongs to correct VPC and Subnet should be in same AZ.
@@ -213,8 +213,6 @@ Parameters:
       Make sure that AWS Region supports selected instance type.
     Type: String
     AllowedValues:
-      - c3.xlarge
-      - c4.xlarge
       - c5.xlarge
       - c5.2xlarge
       - c5.4xlarge
@@ -242,10 +240,11 @@ Parameters:
     Type: String
     AllowedValues:
       - BYOL
+      - PAYG
     Default: BYOL
   AmiID:
     Description: >-
-      Please choose correct AMI ID as per the region, desired version and license type(BYOL).
+      Please choose correct AMI ID as per the region, desired version and license type(BYOL/PAYG).
       NGFWv version 7.2 onwards releases are supported.
     Type: AWS::EC2::Image::Id
     Default: ami-0265b4bbf47bd0171
@@ -397,7 +396,7 @@ Metadata:
       AssignPublicIP:
         default: Assign Public IP for NGFWv from AWS IP Pool
       GWLBESubnetId:
-        default: Subnet for Gateway Load Balancer Endpoint
+        default: Subnet ID for Gateway Load Balancer Endpoint
       MgmtInterfaceSG:
         default: Security Groups for NGFWv Instance
       MgmtSubnetId:
@@ -523,7 +522,10 @@ Resources:
       Port: 6081
       Protocol: GENEVE
       HealthCheckPort: !Ref TgHealthPort
-      HealthCheckIntervalSeconds: 15
+      HealthCheckIntervalSeconds: 5
+      HealthCheckTimeoutSeconds: 2
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
       HealthCheckProtocol: TCP
       VpcId: !Ref VpcId
       TargetType: ip

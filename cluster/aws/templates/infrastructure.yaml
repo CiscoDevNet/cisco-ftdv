@@ -188,7 +188,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, MgmtSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref MgmtSubnetName ] ]
 
   subnetInside0:
     Type: AWS::EC2::Subnet
@@ -198,7 +198,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, InsideSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref InsideSubnetName ] ]
 
   subnetOutside0:
     Condition: noGWLB
@@ -209,7 +209,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, OutsideSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref OutsideSubnetName ] ]
 
   subnetCCL0:
     Type: AWS::EC2::Subnet
@@ -219,7 +219,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, CCLSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref CCLSubnetName ] ]
 
 # -------------------------------------------
 # Lambda Subnet

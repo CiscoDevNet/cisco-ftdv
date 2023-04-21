@@ -226,7 +226,21 @@ class NgfwInstance (CiscoEc2Instance):
         r, output, error = self.run_ftdv_command(cmd)
         logger.debug(output)
         return r, output, error
-
+    
+    def showVersion(self):
+         """
+         Purpose:    To check the version of FTDv
+         Parameters: 
+         Returns:    Version in format "a.b.c"
+         Raises:
+         """
+         cmd = 'show version'
+         r, output, error = self.run_ftdv_command(cmd)
+         pos = output.find("Version ")
+         version = output[pos+len("Version "):pos+len("Version ")+len("a.b.c")] #format of version
+         logger.debug("FTDv Version: " +version.replace('.',''))
+         return version.replace('.','')
+     
     # Function to configure manager
     def configure_manager(self):
         """

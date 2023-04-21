@@ -69,11 +69,14 @@ def scale_out(event, context):
           response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
           
           # mgmt ip -> nic2
-          #internal ip
-          #ssh_ip = response['networkInterfaces'][2]['networkIP']
-          # this will fetch external ip, when FMCv is on other platform
-          #external ip
-          ssh_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP'] #external
+          if  eval(os.getenv('SSH_USING_EXTERNAL_IP')) is False:
+               #internal ip
+               ssh_ip = response['networkInterfaces'][2]['networkIP']
+          else:
+               # this will fetch external ip, when FMCv is on other platform
+               #external ip
+               ssh_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP'] #external
+
           print("FTDv Name: "+instanceName+ " IP for Login: "+ssh_ip)
 
           info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone}

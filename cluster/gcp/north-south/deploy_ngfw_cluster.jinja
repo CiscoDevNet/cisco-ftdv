@@ -13,8 +13,6 @@
 ######################################################################################################
 # File: deploy_ngfw_cluster.jinja                                                                    #
 # Purpose: Template for FTDv Cluster Deployment, takes parameters from deploy_ngfw_cluster.yaml      #
-################### Uncomment lines [58-62] for deploying with public/external IP ####################
-## Before uncommenting make sure to set deployWithExternalIP as True in cluster_function_infra.yaml ##
 ######################################################################################################
 
 resources:
@@ -54,13 +52,14 @@ resources:
         - name: nic2
           network: projects/{{ env["project"] }}/global/networks/{{ properties["mgmtVpcName"] }}
           subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["mgmtSubnetworkName"] }}
-          ####################### Uncomment below lines [58-62] for deploying with public/external IP ########################
-          #accessConfigs:
-          #- kind: compute#accessConfig
-            #name: External NAT
-            #type: ONE_TO_ONE_NAT
-            #networkTier: PREMIUM
-          ###### After uncommenting make sure EXTERNAL_IP_ENABLE set as True in cloud function environment variable if cloud function already deployed #######
+          # External IP for Management if the User wants it
+          {% if properties["deployUsingExternalIP"] %}
+          accessConfigs:
+          - kind: compute#accessConfig
+            name: External NAT
+            type: ONE_TO_ONE_NAT
+            networkTier: PREMIUM
+          {% endif %}
           kind: compute#networkInterface
         - name: nic3
           network: projects/{{ env["project"] }}/global/networks/{{ properties["diagVpcName"] }}

@@ -66,6 +66,9 @@ DISABLE_CLUSTER_REGISTER_FUNC = True # This will be enabled by the lambda functi
 DISABLE_CLUSTER_STATUS_FUNC = False
 DISABLE_CLUSTER_DELETE_FUNC = False
 
+CONTROL_NODE = ""
+DATA_NODE = ""
+
 TO_FUN_RETRY_COUNT = [3, 5, 5, 3]
 REG_TASK_ID = ""
 # Configuration File Name

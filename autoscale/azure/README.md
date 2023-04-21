@@ -15,7 +15,7 @@ Some of the key features of the FTDv Auto Scale for Azure implementation include
 *	Support to deploy FTDv with PAYG or BYOL licensing mode 
    (Note: PAYG is applicable only for FTDv software version 6.5 and onwards)
 *   Memory matrix is added as part of latest release.
-
+*   Support for Standard Load Balancers and Gateway Load Balance
 ## Deployment
 
 ARM template is used to deploy resources required by FTDv Auto Scale feature in Azure
@@ -25,8 +25,8 @@ ARM template is used to deploy resources required by FTDv Auto Scale feature in 
    (Note: User needs to build Function App from the source code using Visual Studio)
 *  Logic App acts as an Orchestrator to sequence the operation
 
-Please refer [Deployment Guide](./ftdv-azure-autoscale-v67.pdf) for detailed instructions on how to Build, Deploy, Configure and Manage Auto Scale solution. 
-Also please refer [Deployment Guide](./ftdv-azure-autoscale-v67.pdf) to understand the known limitations of this feature.
+Please refer [Deployment Guide](./ftdv-azure-autoscale-v73.pdf) for detailed instructions on how to Build, Deploy, Configure and Manage Auto Scale solution. 
+Also please refer [Deployment Guide](./ftdv-azure-autoscale-v73.pdf) to understand the known limitations of this feature.
 
 ## License
 

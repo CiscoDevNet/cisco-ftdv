@@ -23,7 +23,6 @@ with warnings.catch_warnings():
      import paramiko
 import time
 from fmc_functions import FirepowerManagementCenter
-from google.cloud import secretmanager
 
 fmc = FirepowerManagementCenter()
 

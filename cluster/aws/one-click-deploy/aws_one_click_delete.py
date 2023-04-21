@@ -1,4 +1,20 @@
 '''
+Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+--------------------------------------------------------------------------------
 
 Single click delete for Cisco NGFWv Cluster Stacks for AWS
 
@@ -36,10 +52,10 @@ aws_region_code = 'us-east-1'
 #--------------------------------STACK_PARAMS----------------------------------#
 #to unset, assign ''
 
-ngfwv_stack_name = 'neo-cls-ngfw-stack'
+ngfwv_stack_name = 'cisco-ngfw'
 #name of the ngfw stack
 
-infra_stack_name = 'neo-cls-infra-stack'
+infra_stack_name = 'cisco-infra'
 #name of infrastructure stack
 
 control_delete = '4'
@@ -192,8 +208,8 @@ print('NGFWv stack deleted succesfully')
 if control_delete == '1' or control_delete == '2':
 	sys.exit(0)
 
-v.cf_template.delete_stack(StackName=infra_stack_name)
 input('press enter to delete stack: ' + infra_stack_name + ' or CTRL+C to quit')
+v.cf_template.delete_stack(StackName=infra_stack_name)
 waiter = v.cf_template.get_waiter('stack_delete_complete')
 waiter.wait(StackName=infra_stack_name)
 print('Infrastructure stack deleted succesfully')
