@@ -269,6 +269,7 @@ class ManagedDevice(NgfwInstance):
         super().__init__(instance_id)
         # Will be available from json
         self.l_caps = ''
+        self.performance_tier = ''
         self.traffic_routes = []
         self.interface_config = []
         self.in_nic = ''
@@ -388,7 +389,7 @@ class ManagedDevice(NgfwInstance):
         Returns:    SUCCESS, FAIL
         Raises:
         """
-        reg_task_id = self.fmc.register_ftdv(self.vm_name, self.mgmt_ip, self.reg_id, self.nat_id, self.l_caps)
+        reg_task_id = self.fmc.register_ftdv(self.vm_name, self.mgmt_ip, self.reg_id, self.nat_id, self.l_caps, self.performance_tier)
         if reg_task_id is not None:
             self.ftdv_reg_polling(4)  # 4 minutes polling
             if self.reg_sts == 'ONGOING':
@@ -417,6 +418,8 @@ class ManagedDevice(NgfwInstance):
                         rt_type = 'Host'
                     elif self.fmc.get_network_objectid_by_name(static_route['network']) != '':
                         rt_type = 'Network'
+                    elif self.fmc.get_group_objectid_by_name(static_route['network']) != '':
+                        rt_type = 'Group'
                     else:
                         logger.error("trafficRoutes.network value in Configuration json is not correct")
                         return 'FAIL'

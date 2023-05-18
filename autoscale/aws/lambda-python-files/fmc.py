@@ -278,6 +278,62 @@ class FirepowerManagementCenter:
                     return str(item['id'])
         return None
 
+    def get_network_host_objectids(self):
+        """
+        Purpose:    Get Network & Host objects present in the FMCv
+        Parameters: None
+        Returns:    Network & Host Object Name & Ids
+        Raises:
+        """
+        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/object/networkaddresses"
+        url = self.server + api_path + '?offset=0&limit=10000'
+        network_obj = {}
+        host_obj = {}
+        group_obj = {}
+        r = self.rest_get(url)
+        for item in r.json()['items']:
+            if item['type'] == 'Network':
+                network_obj[item['name']] = str(item['id'])
+            elif item['type'] == 'Host':
+                host_obj[item['name']] = str(item['id'])
+
+        return network_obj, host_obj
+    
+
+    def get_group_objects(self):
+        """
+        Purpose: Get the Group objects in the FMCv
+        Parameters: None
+        Returns: Group Object Name & Ids
+        Raises:
+        """
+        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/object/networkgroups"
+        url = self.server + api_path + '?offset=0&limit=10000'
+        group_obj = {}
+        r = self.rest_get(url)
+        for item in r.json()['items']:
+            group_obj[item['name']] = str(item['id'])
+      
+        return group_obj
+    
+    def get_group_objectid_by_name(self, name):
+        """
+        Purpose: Get the Group objects in the FMCv
+        Parameters: None
+        Returns: Group Object Name & Ids
+        Raises:
+        """
+        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/object/networkgroups"
+        url = self.server + api_path + '?offset=0&limit=10000'
+        group_obj = {}
+        r = self.rest_get(url)
+        for item in r.json()['items']:
+            group_obj[item['name']] = str(item['id'])
+            if item['name'] == name:
+                return str(item['id'])
+        return ''
+
+
     # Get network objects (all network and host objects)
     def get_network_objectid_by_name(self, name):
         """
@@ -608,6 +664,7 @@ class FirepowerManagementCenter:
 		
         r = self.rest_put(url, put_data)
         return r
+
     def create_static_route(self, device_id, interface_name, _type, _object_name, _object_id, gate_way, metric):
         """
         Purpose:    To create static route on device
@@ -637,7 +694,7 @@ class FirepowerManagementCenter:
         r = self.rest_post(url, post_data)
         return r
 
-    def register_device(self, name, mgmt_ip, policy_id, reg_id, nat_id, license_caps, device_grp_id):
+    def register_device(self, name, mgmt_ip, policy_id, reg_id, nat_id, license_caps, performance_tier, device_grp_id):
         """
         Purpose:    Register the device to FMC
         Parameters: Name of device, Mgmt ip, Access Policy Id, Registration & NAT id, Licenses Caps, Group Id
@@ -654,6 +711,7 @@ class FirepowerManagementCenter:
             "natID": nat_id,
             "type": "Device",
             "license_caps": license_caps,
+            "performanceTier": performance_tier,
             "accessPolicy": {
                 "id": policy_id,
                 "type": "AccessPolicy"
@@ -862,6 +920,10 @@ class DerivedFMC(FirepowerManagementCenter):
         self.configuration = {}
         self.configuration_status = ""
 
+        self.network_objects = {}
+        self.host_objects = {}
+        self.group_objects = {}
+
     def reach_fmc_(self):
         """
         Purpose:    To get Auth token & update self.reachable value
@@ -907,11 +969,15 @@ class DerivedFMC(FirepowerManagementCenter):
             for i in self.host_obj_name:
                 self.host_obj_pair.update({i: self.get_host_objectid_by_name(i)})
             self.configuration.update({"host_objects": self.host_obj_pair})
+
+        self.network_objects, self.host_objects = self.get_network_host_objectids()
+        self.group_objects = self.get_group_objects()
         logger.info(json.dumps(self.configuration, separators=(',', ':')))
+
         return
 
-    def update_fmc_config_user_input(self, d_grp_name, a_policy_name, nat_policy_name,
-                                     l_seczone_name, l_network_obj_name, l_host_obj_name):
+    def update_fmc_config_user_input(self, d_grp_name, a_policy_name, l_seczone_name,
+                                     l_network_obj_name, l_host_obj_name = None, nat_policy_name = None):
         """
         Purpose:    To take parameters to DerivedFMC class
         Parameters:
@@ -924,9 +990,10 @@ class DerivedFMC(FirepowerManagementCenter):
         self.seczone_name = l_seczone_name
         self.network_obj_name = l_network_obj_name
         self.host_obj_name = l_host_obj_name
+
         return
 
-    def check_fmc_configuration(self):
+    def check_fmc_configuration(self, is_geneve_support):
         """
         Purpose:    To inspect if Derived FMC class has all required variables
         Parameters:
@@ -944,12 +1011,6 @@ class DerivedFMC(FirepowerManagementCenter):
                 r = self.get_policy_assign_targets(self.a_policy_id)
                 if not utl.find_value_in_list(r, self.d_grp_id):
                     return self.configuration_status
-            if self.nat_policy_id == '':
-                return self.configuration_status
-            else:
-                r = self.get_policy_assign_targets(self.nat_policy_id)
-                if not utl.find_value_in_list(r, self.d_grp_id):
-                    return self.configuration_status
 
             for (k, v) in self.seczone_obj_pair.items():
                 if v is None:
@@ -957,15 +1018,28 @@ class DerivedFMC(FirepowerManagementCenter):
             for (k, v) in self.network_obj_pair.items():
                 if v is None:
                     return self.configuration_status
-            for (k, v) in self.host_obj_pair.items():
-                if v is None:
+                
+            if is_geneve_support == "enable":
+                pass
+            else:
+                for (k, v) in self.host_obj_pair.items():
+                    if v is None:
+                        return self.configuration_status
+
+            if is_geneve_support == "enable": 
+                pass
+            elif self.nat_policy_id == '':
+                return self.configuration_status
+            else:
+                r = self.get_policy_assign_targets(self.nat_policy_id)
+                if not utl.find_value_in_list(r, self.d_grp_id):
                     return self.configuration_status
 
         self.configuration_status = 'CONFIGURED'
         self.configuration.update({'fmc_configuration_status': self.configuration_status})
         return self.configuration_status
 
-    def register_ftdv(self, vm_name, mgmt_ip, reg_id, nat_id, license_caps):
+    def register_ftdv(self, vm_name, mgmt_ip, reg_id, nat_id, license_caps, performance_tier):
         """
         Purpose:    Register the device to FMC
         Parameters: Device Name, Mgmgt Ip, Registration & NAT id, Licenses cap
@@ -974,7 +1048,7 @@ class DerivedFMC(FirepowerManagementCenter):
         """
         try:
             logger.info("Registering FTDv: " + vm_name + " to FMC with policy id: " + self.a_policy_name)
-            r = self.register_device(vm_name, mgmt_ip, self.a_policy_id, reg_id, nat_id, license_caps, self.d_grp_id)
+            r = self.register_device(vm_name, mgmt_ip, self.a_policy_id, reg_id, nat_id, license_caps, performance_tier, self.d_grp_id)
             logger.debug("Register response was: " + str(r.json()))
             if 'type' in r.json():
                 if r.json()['type'] == 'Device':
@@ -992,7 +1066,17 @@ class DerivedFMC(FirepowerManagementCenter):
         Returns:    response
         Raises:
         """
-        net_id = self.get_host_objectid_by_name(net_name)
+        # Get the type of the net_name
+        if net_name in self.host_objects:
+            logger.info(net_name + " is present in host object")
+            net_id = self.get_host_objectid_by_name(net_name)
+        elif net_name in self.network_objects:
+            logger.info(net_name + " is present in network object")
+            net_id = self.get_network_objectid_by_name(net_name)
+        elif net_name in self.group_objects:
+            logger.info(net_name + " is present in Group Object")
+            net_id = self.group_objects[net_name]
+
         gateway_id = self.get_host_objectid_by_name(gateway)
         # Gateway can be an object or IP literal
         if gateway_id != '':
