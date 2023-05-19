@@ -88,7 +88,7 @@ Parameters:
     AllowedValues:
       - true
       - false
-    Default: true    
+    Default: true
   MgmtInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances
@@ -180,6 +180,17 @@ Parameters:
     Description: >-
       Please make sure correct Device Group Name in FMC is provided
     Type: String
+  fmcPerformanceLicenseTier:
+    Description: >-
+      Please make sure you select the correct performance Tier License to be used while registering the ftdv device to the FMCv.
+      FTDv5 & FTDv10 do not support Amazon Web Services (AWS) Gateway Load Balancer.
+    Type: String
+    AllowedValues:
+      - FTDv
+      - FTDv20
+      - FTDv30
+      - FTDv50
+      - FTDv100
   fmcPublishMetrics:
     Description: >-
       Please select true if you would like to create a Lambda Function to poll FMC,
@@ -424,6 +435,7 @@ Metadata:
           - fmcOperationsUsername
           - fmcOperationsPassword
           - fmcDeviceGrpName
+          - fmcPerformanceLicenseTier
       - Label:
           default: FMC Device Group Metrics Publish Configuration
         Parameters:
@@ -488,6 +500,8 @@ Metadata:
         default: FMC Password for AutoScale Automation
       fmcDeviceGrpName:
         default: FMC Device Group Name
+      fmcPerformanceLicenseTier:
+        default: Performance Tier value for FMCv licensing
       fmcPublishMetrics:
         default: Publish Custom Metrics from FMC
       fmcMetricsUsername:
@@ -648,6 +662,7 @@ Resources:
            - !Ref 'AWS::NoValue'
          ASG_NAME: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber ] ]
          FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
+         FMC_PERFORMANCE_TIER: !Ref fmcPerformanceLicenseTier
          FMC_SERVER: !Ref fmcServer
          FMC_USERNAME: !Ref fmcOperationsUsername
          FMC_PASSWORD: !Ref fmcOperationsPassword
@@ -758,6 +773,7 @@ Resources:
           GENEVE_SUPPORT: 'enable'
           ASG_NAME: !Join [ '-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber]]
           FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
+          FMC_PERFORMANCE_TIER: !Ref fmcPerformanceLicenseTier
           NO_OF_AZs: !Ref NoOfAZs
           FTD_LICENSE_TYPE: !Ref LicenseType
           INSIDE_SUBNET: !If
@@ -1131,3 +1147,13 @@ Resources:
         UserData:
           Fn::Base64: !Sub |
             { "AdminPassword": "FtDv_AuT0Scale"}
+
+  OutsideInterfaceSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      Description: Ingress Rule to Allow Health Check traffic
+      FromPort: !Ref TgHealthPort
+      ToPort: !Ref TgHealthPort
+      GroupId: !Ref OutsideInterfaceSG
+      IpProtocol: tcp

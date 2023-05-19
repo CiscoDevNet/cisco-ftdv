@@ -99,6 +99,7 @@ def get_user_input_lifecycle_ftdv():
     user_input = {
         "AutoScaleGrpName": "",
         "fmcDeviceGroupName": "",
+        "fmcPerformanceLicenseTier": "",
         "max_number_of_interfaces": "4",
         "NO_OF_AZs": "",
         "SUBNET_ID_LIST_2": [],
@@ -115,6 +116,7 @@ def get_user_input_lifecycle_ftdv():
     try:
         user_input['AutoScaleGrpName'] = os.environ['ASG_NAME']
         user_input['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
+        user_input['fmcPerformanceLicenseTier'] = os.environ['FMC_PERFORMANCE_TIER']
         if re.match(r'..*', user_input['fmcDeviceGroupName']) is None:
             raise ValueError("Unable to find valid FMC Device Group Name")
         user_input['max_number_of_interfaces'] = '4'
@@ -209,6 +211,7 @@ def get_user_input_manager():
     env_var = {
         "AutoScaleGrpName": "",
         "fmcDeviceGroupName": "",
+        "fmcPerformanceLicenseTier": "",
         "AutoScaleManagerTopic": "",
         "USER_NOTIFY_TOPIC_ARN": "",
         "A_CRON_JOB_NAME": "",
@@ -222,233 +225,469 @@ def get_user_input_manager():
 		"GENEVE_SUPPORT": ""
     }
 
-    schema1 = {
-        "type": "object",
-        "properties": {
-            "AutoScaleGrpName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcDeviceGroupName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "AutoScaleManagerTopic": {
-                "type": "string",
-                "pattern": "^arn:aws:sns:.*:.*:.*$"
-            },
-            "USER_NOTIFY_TOPIC_ARN": {
-                "type": "string",
-                "pattern": "(^$|^arn:aws:sns:.*:.*:.*)$"
-            },
-            "A_CRON_JOB_NAME": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "LB_ARN_OUTSIDE": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "FmcIp": {
-                "type": "string",
-                "pattern": "^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$"
-            },
-            "FmcUserName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "FmcPassword": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "NgfwUserName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "NgfwPassword": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "TargetGrpHealthPort": {
-                "type": "string",
-                "pattern": "^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[0-5])$"
-            }
-        },
-        "required": [
-            "AutoScaleGrpName",
-            "fmcDeviceGroupName",
-            "AutoScaleManagerTopic",
-            "USER_NOTIFY_TOPIC_ARN",
-            "A_CRON_JOB_NAME",
-            "LB_ARN_OUTSIDE",
-            "FmcIp",
-            "FmcUserName",
-            "FmcPassword",
-            "NgfwUserName",
-            "NgfwPassword",
-            "TargetGrpHealthPort"
-        ]
-    }
+    try:
+        geneve_support = os.environ["GENEVE_SUPPORT"]
+    except:
+        geneve_support = "disable"
 
-    schema2 = {
-        "type": "object",
-        "properties": {
-            "licenseCaps": {
-                "type": "array",
-                "items": {
+    if geneve_support == "enable":
+        schema1 = {
+            "type": "object",
+            "properties": {
+                "AutoScaleGrpName": {
                     "type": "string",
-                    "pattern": "^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
+                    "pattern": "^...*$"
+                },
+                "fmcDeviceGroupName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "AutoScaleManagerTopic": {
+                    "type": "string",
+                    "pattern": "^arn:aws:sns:.*:.*:.*$"
+                },
+                "USER_NOTIFY_TOPIC_ARN": {
+                    "type": "string",
+                    "pattern": "(^$|^arn:aws:sns:.*:.*:.*)$"
+                },
+                "A_CRON_JOB_NAME": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "LB_ARN_OUTSIDE": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "FmcIp": {
+                    "type": "string",
+                    "pattern": "^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$"
+                },
+                "FmcUserName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "FmcPassword": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "NgfwUserName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "NgfwPassword": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "TargetGrpHealthPort": {
+                    "type": "string",
+                    "pattern": "^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[0-5])$"
+                },
+                "fmcPerformanceLicenseTier": {
+                    "type": "string",
+                    "pattern": "^((FTDv)|(FTDv20)|(FTDv30)|(FTDv50)|(FTDv100))$"
                 }
             },
-            "fmcIpforDeviceReg": {
-                "type": "string",
-                "pattern": "^((DONTRESOLVE)|((?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}))$"
-            },
-            "RegistrationId": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "NatId": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcAccessPolicyName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcNatPolicyName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcInsideNicName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcOutsideNicName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcInsideNic": {
-                "type": "string",
-                "pattern": "^.*0/(0|1)$"
-            },
-            "fmcOutsideNic": {
-                "type": "string",
-                "pattern": "^.*0/(0|1)$"
-            },
-            "fmcOutsideZone": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "fmcInsideZone": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "MetadataServerObjectName": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "interfaceConfig": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "managementOnly": {
-                            "type": "string",
-                            "pattern": "^...*$"
-                        },
-                        "MTU": {
-                            "type": "string",
-                            "pattern": "^[1-9][0-9][0-9][0-9]$"
-                        },
-                        "securityZone": {
-                            "type": "object",
-                            "properties": {
-                                "name": {
-                                    "type": "string",
-                                    "pattern": "^...*$"
-                                }
+            "required": [
+                "AutoScaleGrpName",
+                "fmcDeviceGroupName",
+                "fmcPerformanceLicenseTier",
+                "AutoScaleManagerTopic",
+                "USER_NOTIFY_TOPIC_ARN",
+                "A_CRON_JOB_NAME",
+                "LB_ARN_OUTSIDE",
+                "FmcIp",
+                "FmcUserName",
+                "FmcPassword",
+                "NgfwUserName",
+                "NgfwPassword",
+                "TargetGrpHealthPort"
+            ]
+        }
+            
+        schema2 = {
+            "type":"object",
+            "properties": {
+                "licenseCaps":{
+                    "type":"array",
+                    "items":{
+                        "type":"string",
+                        "pattern":"^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
+                    }
+                },
+                "fmcIpforDeviceReg":{
+                    "type":"string",
+                    "pattern":"^((DONTRESOLVE)|((?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}))$"
+                },
+                "RegistrationId":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "NatId":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "fmcAccessPolicyName":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "fmcInsideNicName":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "fmcOutsideNicName":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "fmcInsideNic":{
+                    "type":"string",
+                    "pattern":"^.*0/(0|1)$"
+                },
+                "fmcOutsideNic":{
+                    "type":"string",
+                    "pattern":"^.*0/(0|1)$"
+                },
+                "fmcOutsideZone":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "fmcInsideZone":{
+                    "type":"string",
+                    "pattern":"^...*$"
+                },
+                "MetadataServerObjectName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "interfaceConfig":{
+                    "type":"array",
+                    "items":{
+                        "type":"object",
+                        "properties":{
+                            "managementOnly": {
+                                "type":"string",
+                                "pattern":"^...*$"
                             },
-                            "required": [
-                                "name"
-                            ]
+                            "MTU":{
+                                "type":"string",
+                                "pattern":"^[1-9][0-9][0-9][0-9]$"
+                            },
+                            "securityZone":{
+                                "type":"object",
+                                "properties":{
+                                    "name":{
+                                        "type":"string",
+                                        "pattern":"^...*$"
+                                    }
+                                },
+                                "required":[
+                                    "name"
+                                ]
+                            },
+                            "mode":{
+                                "type":"string",
+                                "pattern":"^...*$"
+                            },
+                            "ifname":{
+                                "type":"string",
+                                "pattern":"^...*$"
+                            },
+                            "name":{
+                                "type":"string",
+                                "pattern":"^.*0/(0|1)$"
+                            }
                         },
-                        "mode": {
-                            "type": "string",
-                            "pattern": "^...*$"
+                        "required":[
+                            "managementOnly",
+                            "MTU",
+                            "securityZone",
+                            "mode",
+                            "ifname",
+                            "name"
+                        ]
+                    }
+                },
+                "trafficRoutes":{
+                    "type":"array",
+                    "items":{
+                        "type":"object",
+                        "properties":{
+                            "interface":{
+                                "type":"string",
+                                "pattern":"^...*$"
+                            },
+                            "network":{
+                                "type":"string",
+                                "pattern":"^...*$"
+                            },
+                            "gateway":{
+                                "type":"string",
+                                "pattern":"(^$|^..*$|^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$)"
+                            },
+                            "metric":{
+                                "type":"string",
+                                "pattern":"^[1-9]\\d*$"
+                            }
                         },
-                        "ifname": {
-                            "type": "string",
-                            "pattern": "^...*$"
-                        },
-                        "name": {
-                            "type": "string",
-                            "pattern": "^.*0/(0|1)$"
-                        }
-                    },
-                    "required": [
-                        "managementOnly",
-                        "MTU",
-                        "securityZone",
-                        "mode",
-                        "ifname",
-                        "name"
-                    ]
+                        "required":[
+                            "interface",
+                            "network",
+                            "gateway",
+                            "metric"
+                        ]
+                    }
                 }
             },
-            "trafficRoutes": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "interface": {
-                            "type": "string",
-                            "pattern": "^...*$"
-                        },
-                        "network": {
-                            "type": "string",
-                            "pattern": "^...*$"
-                        },
-                        "gateway": {
-                            "type": "string",
-                            "pattern": "(^$|^..*$|^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$)"
-                        },
-                        "metric": {
-                            "type": "string",
-                            "pattern": "^[1-9]\\d*$"
-                        }
-                    },
-                    "required": [
-                        "interface",
-                        "network",
-                        "gateway",
-                        "metric"
-                    ]
+            "required":[
+                "licenseCaps",
+                "fmcIpforDeviceReg",
+                "RegistrationId",
+                "NatId",
+                "fmcAccessPolicyName",
+                "fmcInsideNicName",
+                "fmcOutsideNicName",
+                "fmcInsideNic",
+                "fmcOutsideNic",
+                "fmcOutsideZone",
+                "fmcInsideZone",
+                "MetadataServerObjectName",
+                "interfaceConfig",
+                "trafficRoutes"
+            ]
+        }
+    else:
+        schema1 = {
+            "type": "object",
+            "properties": {
+                "AutoScaleGrpName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcDeviceGroupName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "AutoScaleManagerTopic": {
+                    "type": "string",
+                    "pattern": "^arn:aws:sns:.*:.*:.*$"
+                },
+                "USER_NOTIFY_TOPIC_ARN": {
+                    "type": "string",
+                    "pattern": "(^$|^arn:aws:sns:.*:.*:.*)$"
+                },
+                "A_CRON_JOB_NAME": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "LB_ARN_OUTSIDE": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "FmcIp": {
+                    "type": "string",
+                    "pattern": "^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$"
+                },
+                "FmcUserName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "FmcPassword": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "NgfwUserName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "NgfwPassword": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "TargetGrpHealthPort": {
+                    "type": "string",
+                    "pattern": "^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[0-5])$"
+                },
+                "fmcPerformanceLicenseTier": {
+                    "type": "string",
+                    "pattern": "^((FTDv)|(FTDv5)|(FTDv10)|(FTDv20)|(FTDv30)|(FTDv50)|(FTDv100))$"
                 }
-            }
-        },
-        "required": [
-            "licenseCaps",
-            "fmcIpforDeviceReg",
-            "RegistrationId",
-            "NatId",
-            "fmcAccessPolicyName",
-            "fmcNatPolicyName",
-            "fmcInsideNicName",
-            "fmcOutsideNicName",
-            "fmcInsideNic",
-            "fmcOutsideNic",
-            "fmcOutsideZone",
-            "fmcInsideZone",
-            "MetadataServerObjectName",
-            "interfaceConfig",
-            "trafficRoutes"
-        ]
-    }
+            },
+            "required": [
+                "AutoScaleGrpName",
+                "fmcDeviceGroupName",
+                "fmcPerformanceLicenseTier",
+                "AutoScaleManagerTopic",
+                "USER_NOTIFY_TOPIC_ARN",
+                "A_CRON_JOB_NAME",
+                "LB_ARN_OUTSIDE",
+                "FmcIp",
+                "FmcUserName",
+                "FmcPassword",
+                "NgfwUserName",
+                "NgfwPassword",
+                "TargetGrpHealthPort"
+            ]
+        }
+
+        schema2 = {
+            "type": "object",
+            "properties": {
+                "licenseCaps": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
+                    }
+                },
+                "fmcIpforDeviceReg": {
+                    "type": "string",
+                    "pattern": "^((DONTRESOLVE)|((?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}))$"
+                },
+                "RegistrationId": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "NatId": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcAccessPolicyName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcNatPolicyName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcInsideNicName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcOutsideNicName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcInsideNic": {
+                    "type": "string",
+                    "pattern": "^.*0/(0|1)$"
+                },
+                "fmcOutsideNic": {
+                    "type": "string",
+                    "pattern": "^.*0/(0|1)$"
+                },
+                "fmcOutsideZone": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "fmcInsideZone": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "MetadataServerObjectName": {
+                    "type": "string",
+                    "pattern": "^...*$"
+                },
+                "interfaceConfig": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "managementOnly": {
+                                "type": "string",
+                                "pattern": "^...*$"
+                            },
+                            "MTU": {
+                                "type": "string",
+                                "pattern": "^[1-9][0-9][0-9][0-9]$"
+                            },
+                            "securityZone": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^...*$"
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ]
+                            },
+                            "mode": {
+                                "type": "string",
+                                "pattern": "^...*$"
+                            },
+                            "ifname": {
+                                "type": "string",
+                                "pattern": "^...*$"
+                            },
+                            "name": {
+                                "type": "string",
+                                "pattern": "^.*0/(0|1)$"
+                            }
+                        },
+                        "required": [
+                            "managementOnly",
+                            "MTU",
+                            "securityZone",
+                            "mode",
+                            "ifname",
+                            "name"
+                        ]
+                    }
+                },
+                "trafficRoutes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "interface": {
+                                "type": "string",
+                                "pattern": "^...*$"
+                            },
+                            "network": {
+                                "type": "string",
+                                "pattern": "^...*$"
+                            },
+                            "gateway": {
+                                "type": "string",
+                                "pattern": "(^$|^..*$|^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$)"
+                            },
+                            "metric": {
+                                "type": "string",
+                                "pattern": "^[1-9]\\d*$"
+                            }
+                        },
+                        "required": [
+                            "interface",
+                            "network",
+                            "gateway",
+                            "metric"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "licenseCaps",
+                "fmcIpforDeviceReg",
+                "RegistrationId",
+                "NatId",
+                "fmcAccessPolicyName",
+                "fmcNatPolicyName",
+                "fmcInsideNicName",
+                "fmcOutsideNicName",
+                "fmcInsideNic",
+                "fmcOutsideNic",
+                "fmcOutsideZone",
+                "fmcInsideZone",
+                "MetadataServerObjectName",
+                "interfaceConfig",
+                "trafficRoutes"
+            ]
+        }
 
     try:
         env_var['AutoScaleGrpName'] = os.environ['ASG_NAME']
         env_var['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
+        env_var['fmcPerformanceLicenseTier'] = os.environ['FMC_PERFORMANCE_TIER']
         env_var['A_CRON_JOB_NAME'] = os.environ['A_CRON_JOB_NAME']
         env_var['AutoScaleManagerTopic'] = os.environ['AS_MANAGER_TOPIC']
         try:
