@@ -812,10 +812,16 @@ def fmc_cls_init():
     if fmc.reachable == 'AVAILABLE':
         l_seczone_name = [j_var['fmcInsideZone'], j_var['fmcOutsideZone']]
         l_network_obj_name = []
-        l_host_obj_name = [j_var['MetadataServerObjectName']]
+        
+        
         # Updates DerivedFMC object with appropriate user provided names
-        fmc.update_fmc_config_user_input(e_var['fmcDeviceGroupName'], j_var['fmcAccessPolicyName'],
-                                         j_var['fmcNatPolicyName'], l_seczone_name, l_network_obj_name, l_host_obj_name)
+        if e_var['GENEVE_SUPPORT'] == "disable":
+            l_host_obj_name = [j_var['MetadataServerObjectName']]
+            fmc.update_fmc_config_user_input(e_var['fmcDeviceGroupName'], j_var['fmcAccessPolicyName'],
+                                         l_seczone_name, l_network_obj_name, l_host_obj_name, j_var['fmcNatPolicyName'])
+        else:
+            fmc.update_fmc_config_user_input(e_var['fmcDeviceGroupName'], j_var['fmcAccessPolicyName'],
+                                         l_seczone_name, l_network_obj_name)
         # Updates DerivedFMC object with appropriate ids from FMC
         fmc.set_fmc_configuration()
     return fmc
@@ -837,12 +843,14 @@ def ftd_cls_init(instance_id, fmc):
     ftd.port = const.FTDV_SSH_PORT
     ftd.username = e_var['NgfwUserName']
     ftd.password = e_var['NgfwPassword']
+    ftd.performance_tier = e_var['fmcPerformanceLicenseTier']
     ftd.defaultPassword = const.DEFAULT_PASSWORD
     ftd.fmc_ip = j_var['fmcIpforDeviceReg']
     ftd.reg_id = j_var['RegistrationId']
     ftd.nat_id = j_var['NatId']
 
     ftd.l_caps = j_var['licenseCaps']
+ 
     ftd.traffic_routes = j_var['trafficRoutes']
     ftd.interface_config = j_var['interfaceConfig']
     ftd.in_nic = j_var['fmcInsideNic']
@@ -864,7 +872,7 @@ def fmc_configuration_validation(fmc, aws_grp):
     Raises:
     """
     # Check if all needed/user-provided inputs have entries in FMC
-    if fmc.check_fmc_configuration() == 'CONFIGURED':
+    if fmc.check_fmc_configuration(e_var['GENEVE_SUPPORT']) == 'CONFIGURED':
         aws_grp.create_or_update_tags('FmcAvailabilityStatus', 'AVAILABLE')
         aws_grp.create_or_update_tags('FmcConfigurationStatus', 'CONFIGURED')
         return 'PASS'
