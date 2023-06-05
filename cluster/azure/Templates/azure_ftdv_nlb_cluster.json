@@ -212,6 +212,20 @@
                 "description": "Comma separated License Capability list (Valid values : BASE, MALWARE, URLFilter, THREAT)"
             }
         },
+        "ftdvPerformanceTier": {
+          "type": "string",
+          "defaultValue": "FTDv30",
+          "allowedValues": [
+            "FTDv",
+            "FTDv20",
+            "FTDv30",
+            "FTDv50",
+            "FTDv100"
+          ],
+          "metadata": {
+            "description": "PerformanceTier Value to be used while registering the FTDv instances to the FMCv"
+          }
+        },
         "ftdvClusterNodeCount": {
             "type": "int",
             "minValue": 1,
@@ -228,8 +242,8 @@
         "ilbName":             "[concat(parameters('resourceNamePrefix'),'-ilb')]",
         "dataSecGrp":           "[concat(parameters('resourceNamePrefix'),'-dataIntfSecGrp')]",
         "mgmtSecGrp":           "[concat(parameters('resourceNamePrefix'),'-mgmtIntfSecGrp')]",
-    	"functionAppName":      "[concat(parameters('resourceNamePrefix'),'-function-app')]",
-    	"appInsightsName":      "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
+        "functionAppName":      "[concat(parameters('resourceNamePrefix'),'-function-app')]",
+        "appInsightsName":      "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
         "elbPublicIpName":      "[concat(variables('elbName'),'-public-ip')]",
         "elbId":                "[resourceId('Microsoft.Network/loadBalancers',variables('elbName'))]",
         "ilbId":                "[resourceId('Microsoft.Network/loadBalancers',variables('ilbName'))]",
@@ -544,6 +558,10 @@
                         {
                             "name": "REG_KEY",
                             "value": "1234"
+                        },
+                        {
+                          "name": "PERFORMANCE_TIER",
+                          "value": "[parameters('ftdvPerformanceTier')]"
                         },
                         {
                             "name": "RESOURCE_GROUP_NAME",
