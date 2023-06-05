@@ -89,6 +89,9 @@
     "licenseCapability": {
       "value": "BASE,MALWARE,THREAT"
     },
+    "ftdvPerformanceTier": {
+      "value": "FTDv30"
+    },
     "ftdvNodeCount": {
       "value": "4"
     }
