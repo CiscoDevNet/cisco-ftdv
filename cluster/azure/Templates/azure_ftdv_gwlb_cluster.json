@@ -132,11 +132,9 @@
         },
         "softwareVersion": {
             "type": "string",
-            "defaultValue": "730.44.0",
+            "defaultValue": "73069.0.0",
             "allowedValues": [
-                "730.44.0",
-                "730.33.0",
-                "730.8.0"
+                "73069.0.0"
             ],
             "metadata": {
                 "description": "FTD Software version to use."
@@ -221,9 +219,25 @@
                 "description": "Comma separated License Capability list (Valid values : BASE, MALWARE, URLFilter, THREAT)"
             }
         },
+        "ftdvPerformanceTier": {
+          "type": "string",
+          "defaultValue": "FTDv30",
+          "allowedValues": [
+            "FTDv",
+            "FTDv20",
+            "FTDv30",
+            "FTDv50",
+            "FTDv100"
+          ],
+          "metadata": {
+            "description": "PerformanceTier Value to be used while registering the FTDv instances to the FMCv"
+          }
+        },
         "ftdvNodeCount": {
-            "type": "string",
-            "defaultValue": "4",
+            "type": "int",
+            "minValue": 1,
+            "maxValue": 16,
+            "defaultValue": 4,
             "metadata": {
                 "description": "Cluster Node count"
             }
@@ -568,6 +582,10 @@
                         {
                             "name": "REG_KEY",
                             "value": "1234"
+                        },
+                        {
+                          "name": "PERFORMANCE_TIER",
+                          "value": "[parameters('ftdvPerformanceTier')]"
                         },
                         {
                             "name": "RESOURCE_GROUP_NAME",

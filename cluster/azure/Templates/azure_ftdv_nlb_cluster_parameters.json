@@ -1,20 +1,20 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
-  "contentVersion": "1.0.0.0",
-  "parameters": {
-    "resourceNamePrefix": {
-      "value": "sumisnlb"
-    },
-    "virtualNetworkRg": {
-      "value": "sumis-nlb-cluster"
-    },
-    "virtualNetworkName": {
-      "value": "sumis-nlb-cluster-vnet"
-    },
-    "virtualNetworkCidr": {
-      "value": "10.51.0.0/16"
-    },
-    "mgmtSubnet": {
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceNamePrefix": {
+            "value": "nlbcls"
+        },
+        "virtualNetworkRg": {
+            "value": "ftdv-nlb-cluster"
+        },
+        "virtualNetworkName": {
+            "value": "ftdv-nlb-cluster-vnet"
+        },
+        "virtualNetworkCidr": {
+            "value": "10.51.0.0/16"
+        },
+        "mgmtSubnet": {
             "value": "mgmt"
         },
         "diagSubnet": {
@@ -55,8 +55,8 @@
         },
         "softwareVersion": {
             "value": "73069.0.0"
-    },
-    "vmSize": {
+        },
+        "vmSize": {
             "value": "Standard_D4_v2"
         },
         "ftdLicensingSku": {
@@ -66,25 +66,28 @@
             "value": "cisco"
         },
         "ftdVmManagementUserPassword": {
-            "value": null
+            "value": ""
         },
         "ftdAdminUserPassword": {
-            "value": null
+            "value": ""
         },
         "fmcIpAddress": {
-            "value": "20.232.11.196"
+            "value": "1.2.3.4"
         },
         "fmcUserName": {
-            "value": "admin"
+            "value": "fmcUser"
         },
         "fmcPassword": {
-            "value": null
+            "value": ""
         },
         "policyName": {
             "value": "test-access-policy"
         },
         "licenseCapability": {
             "value": "BASE,MALWARE,THREAT"
+        },
+        "ftdvPerformanceTier": {
+            "value": "FTDv30"
         },
         "ftdvClusterNodeCount": {
             "value": "4"
