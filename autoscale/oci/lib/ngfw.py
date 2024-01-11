@@ -155,7 +155,7 @@ class NgfwInstance (OCIInstance):
             r, output, error = self.show_managers()
             logger.info("NGFW:check_ftdv_reg_status: status: %s output: %s error: %s" % (r, output, error))
     
-            if len(re.findall('pending', output)) == 1:
+            if len(re.findall('pending|Pending', output)) == 1:
                 logger.debug("NGFW:check_ftdv_reg_status: Instance " + self.vm_name + ", is pending to register with FMC")
                 return "PENDING"
             elif len(re.findall('Completed', output)) == 1:

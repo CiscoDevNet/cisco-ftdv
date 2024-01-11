@@ -248,6 +248,10 @@ class Stack_Deploy:
             if not outside_nsg_ocid.startswith("ocid1.networksecuritygroup."):
                 raise Exception("outside_nsg_ocid is incorrect, Please verify again")
 
+            function_subnet_ocid = str(parameters["function_subnet_ocid"])
+            if not function_subnet_ocid.startswith("ocid1.subnet."):
+                raise Exception("function_subnet_ocid is incorrect, Please verify again")
+            
             elb_listener_port = str(parameters["elb_listener_port"])
             port_list = elb_listener_port.split(',')
             if len(port_list) != len(set(port_list)):

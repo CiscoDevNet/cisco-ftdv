@@ -273,6 +273,8 @@ def handler(ctx, data: io.BytesIO = None):
         if int(time.time()-begin_time) > 200:
             logger.info("FTD CONFIGURE: Recalling as configure exceeded time limit")
             return ftd.publish_message(configure_ftdv_topic_id, body)
+        # Will wait for system deployment to finish.
+        time.sleep(60)
         #________________________________________________________________________________________________________________ 
         # FTDv DEPLOYMENT SECTION
         logger.info("FTDv CONFIGURE {}: --VM DEPLOY STARTED ({})-- TIME ELAPSED: {} SEC".format(identifier, current_counter, int(time.time()-begin_time)))
