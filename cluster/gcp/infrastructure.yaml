@@ -1,5 +1,5 @@
 ########################################################################################
-#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#Copyright (c) 2023 Cisco Systems Inc or its affiliates.                               #
 #All Rights Reserved.                                                                  #
 #Licensed under the Apache License, Version 2.0 (the "License");                       #
 #you may not use this file except in compliance with the License.                      #
@@ -15,7 +15,11 @@
 # Purpose: To provide Parameters to infrastructure.jinja for the FTDv cluster in GCP.  #
 ########################################################################################
 #                                                                                      #
-# USER need to create minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL).         #
+# withDiagnostic=True                                                                  #
+# Create minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL) for with Diagnostic.  #
+#                                                                                      #
+# withDiagnostic=False                                                                 #
+# Create minimum of 4 VPC Networks(OUTSIDE,INSIDE,MGMT,CCL) without Diagnostic.        #
 #                                                                                      #
 # Note: This is an example input parameter, user need to change required input         #
 # parameters with existing resources.                                                  #
@@ -33,6 +37,8 @@ resources:
     # resourceNamePrefix restricted to single word
     resourceNamePrefix: <> #ngfwvcls
     serviceAccountMailId: <> #<project-number>-compute@developer.gserviceaccount.com
+    withDiagnostic: <> #True, False
+
     # Mgmt VPC
     mgmtVpcRoutingMode: GLOBAL
     mgmtIpCidrRange: <> #10.10.51.0/24
@@ -40,8 +46,8 @@ resources:
     mgmtGatewayAddress: <> #10.10.51.1
     # Diag VPC
     diagVpcRoutingMode: GLOBAL
-    diagIpCidrRange: <> #10.10.52.0/24
-    diagGatewayAddress: <> #10.10.52.1
+    diagIpCidrRange: <> #10.10.52.0/24 #dummy for without diagnostic
+    diagGatewayAddress: <> #10.10.52.1 #dummy for without diagnostic
     # Inside VPC
     insideVpcRoutingMode: GLOBAL
     insideIpCidrRange: <> #10.10.53.0/24

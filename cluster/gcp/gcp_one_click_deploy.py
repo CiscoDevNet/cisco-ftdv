@@ -117,8 +117,10 @@ mail_id = ''
 infra_deployment_name = resource_prefix + '-infra'
 #name of the infrastructure deployment
 
-#VPC CIDR params
+with_Diagnostic = 'True' #default is FTDv with Diagnostic network interface
+# False: deploy FTDv without Diagnostic network interfcae
 
+#VPC CIDR params
 mgmt_cidr = '10.10.71.0/24'
 #CIDR block for management VPC
 mgmt_cidr28 = '10.10.0.0/28'
@@ -160,11 +162,11 @@ cluster_grp_name = resource_prefix + '-cluster'
 #for registration to FMC
 policy_id = 'ftdv-acl-policy'
 #for registration to FMC
-fmc_passwd = 'Cisco@123123'
+fmc_passwd = 'C!5c0@123'
 #password for FMC
 fmc_uname = 'testuser'
 #username for FMC
-ftdv_passwd = 'Cisco@123123'
+ftdv_passwd = 'C!5c0@123'
 #password for FTDv
 license_list = 'BASE,MALWARE,URLFilter,THREAT'
 #list of linceses for FTDv
@@ -178,7 +180,7 @@ cluster_deployment_name = resource_prefix + '-cluster'
 
 #day0 startup-script input params
 
-admin_passwd = 'Cisco@123123'
+admin_passwd = 'C!5c0@123'
 #ftdv admin password
 host_name = 'ciscoftdv'
 #ftdv hostname
@@ -189,14 +191,14 @@ ccl_range = '10.10.75.2 10.10.75.253'
 
 machine_type = 'e2-standard-8'
 #FTDv machine type
-src_img_url = 'projects/asavgcp-poc-4krn/global/images/cisco-secure-firewall-threat-defense-virtual-gcp-7-2-0-1553'
+src_img_url = 'projects/cisco-public/global/images/cisco-ftdv-7-4-1-172'
 #source image url for FTDv instance template
 
 #FTDv Autoscaled cluster params
 
 cpu_util = '0.8'
 #cpu utilization expressed in 0 to 1 range
-ftdv_count = '4'
+ftdv_count = '3'
 #number of ftdv replicas in cluster allowed range 1-16
 
 #ELB Service params
@@ -327,6 +329,7 @@ if deploy_only_function_and_cluster != '1' and deploy_only_cluster != '1':
 		[ 'mail_id', 'serviceAccountMailId', mail_id ],
 	    [ 'region', 'region', region ],
 	    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
+	    [ 'with_Diagnostic', 'withDiagnostic', with_Diagnostic ],
 	    [ 'mgmt_cidr', 'mgmtIpCidrRange', mgmt_cidr ],
 	    [ 'mgmt_cidr28', 'vpcConnectorIpCidrRange', mgmt_cidr28 ],
 	    [ 'diag_cidr', 'diagIpCidrRange', diag_cidr ],
@@ -474,7 +477,6 @@ silent_params = [
     [ 'ftdvHealthCheckProtocolName', 'TCP' ],
     [ 'ftdvUnhealthyThreshold', '10' ]
 ]
-
 if deploy_topology == 'NS':
 	cluster_params = [
 		[ 'mail_id', 'serviceAccountMailId', mail_id ],
@@ -482,6 +484,7 @@ if deploy_topology == 'NS':
 	    [ 'zonecode', 'zonecode', zonecode ],
 	    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
 	    [ 'admin_passwd', 'adminPassword', admin_passwd ],
+        [ 'with_Diagnostic', 'withDiagnostic', with_Diagnostic ],
 	    [ 'host_name', 'hostname', host_name ],
 	    [ 'ccl_range', 'cclSubnetRange', ccl_range ],
 	    [ 'cluster_grp_name', 'clusterGrpName', cluster_grp_name],
@@ -513,6 +516,7 @@ else:
 	    [ 'zonecode', 'zonecode', zonecode ],
 	    [ 'resource_prefix', 'resourceNamePrefix', resource_prefix ],
 	    [ 'admin_passwd', 'adminPassword', admin_passwd ],
+        [ 'with_Diagnostic', 'withDiagnostic', with_Diagnostic ],
 	    [ 'host_name', 'hostname', host_name ],
 	    [ 'ccl_range', 'cclSubnetRange', ccl_range ],
 	    [ 'cluster_grp_name', 'clusterGrpName', cluster_grp_name],

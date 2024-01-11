@@ -1,0 +1,93 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceNamePrefix": {
+            "value": "ftdvnlb"
+        },
+        "virtualNetworkRg": {
+            "value": "ftdv-nlb-cluster"
+        },
+        "virtualNetworkName": {
+            "value": "ftdv-nlb-cluster-vnet"
+        },
+        "virtualNetworkCidr": {
+            "value": "10.51.0.0/16"
+        },
+        "mgmtSubnet": {
+            "value": "mgmt"
+        },
+        "insideSubnet": {
+            "value": "inside"
+        },
+        "insideNetworkGatewayIp": {
+            "value": "10.51.3.1"
+        },
+        "internalLbIP": {
+            "value": "10.51.3.4"
+        },
+        "outsideSubnet": {
+            "value": "outside"
+        },
+        "outsideNetworkGatewayIp": {
+            "value": "10.51.4.1"
+        },
+        "insideZoneName": {
+            "value": "inside-sz"
+        },
+        "outsideZoneName": {
+            "value": "outside-sz"
+        },
+        "cclSubnet": {
+            "value": "ccl"
+        },
+        "cclSubnetStartAddr": {
+            "value": "10.51.5.4"
+        },
+        "cclSubnetEndAddr": {
+            "value": "10.51.5.253"
+        },
+        "clusterGroupName": {
+            "value": "nlb-cluster"
+        },
+        "softwareVersion": {
+            "value": "741172.0.0"
+        },
+        "vmSize": {
+            "value": "Standard_D4_v2"
+        },
+        "ftdLicensingSku": {
+            "value": "ftdv-azure-payg"
+        },
+        "ftdVmManagementUserName": {
+            "value": "cisco"
+        },
+        "ftdVmManagementUserPassword": {
+            "value": ""
+        },
+        "ftdAdminUserPassword": {
+            "value": ""
+        },
+        "fmcIpAddress": {
+            "value": "1.2.3.4"
+        },
+        "fmcUserName": {
+            "value": "fmcUser"
+        },
+        "fmcPassword": {
+            "value": ""
+        },
+        "policyName": {
+            "value": "test-access-policy"
+        },
+        "licenseCapability": {
+            "value": "BASE,MALWARE,THREAT"
+        },
+        "ftdvPerformanceTier": {
+            "value": "FTDv30"
+        },
+        "ftdvClusterNodeCount": {
+            "value": "4"
+        }
+    }
+}

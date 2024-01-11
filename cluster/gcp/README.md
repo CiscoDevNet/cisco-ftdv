@@ -2,8 +2,11 @@
 Clustering lets you group multiple threat defense virtuals together as a single logical device. A cluster provides
 all the convenience of a single device (management, integration into a network) while achieving the increased
 throughput and redundancy of multiple devices. You can deploy threat defense virtual clusters in a public
-cloud using Amazon Web Services (AWS) or Google Cloud Platform (GCP). Only routed firewall mode is
+cloud using Amazon Web Services (AWS) or Google Cloud Platform (GCP) or AZURE. Only routed firewall mode is
 supported. <br>
+<br>
+NOTE: From version 7.4.1 onwards, users can deploy FTDv-cluster without the Diagnostic interface (Outside, Inside, Management, CCL). <br>
+To do so, ensure that the "withDiagnostic" variable is set to False in both the infrastructure.yaml file and the respective deploy_ngfw_cluster.yaml files (either north-south/deploy_ngfw_cluster.yaml or east-west/deploy_ngfw_cluster.yaml). <br>
 
 # Cloud Formation Template Deployment
 ## Prerequisites:
@@ -30,7 +33,9 @@ c) Upload google function src archieve to bucket using below CLI on Google Cloud
 	Note: if src archieve name is different then edit cluster_function_infra.yaml in pre-deployment step.<br>
 
 ## Deployment Steps:
-Step-3: Deploy infrastructure for FTDv cluster using below CLI on Google Cloud Shell: <br>
+Step-3: <br>
+To deploy without the Diagnostic network interface, ensure that the "withDiagnostic" variable is set to False in the infrastructure.yaml file. <br>
+Deploy infrastructure for FTDv cluster using below CLI on Google Cloud Shell: <br>
 
 	'gcloud deployment-manager deployments create <name> --config infrastructure.yaml'
 <br>
@@ -43,12 +48,13 @@ b) Create vpcConnector for Cloud Functions with FTDv management vpc, use it in s
 	Note: vpcConnector Name will be  used in cluster_function_infra.yaml as an input for vpcConnectorName.<br>
 
 Step-5: <br>
- Make sure to set deployWithExternalIP as True in cluster_function_infra.yaml if FTDv require external IP. Deploy FTDv cluster google function using below CLI on Google Cloud Shell:<br>
+ Make sure to set "deployWithExternalIP" as True in cluster_function_infra.yaml if FTDv require external IP. Deploy FTDv cluster google function using below CLI on Google Cloud Shell:<br>
 
 	'gcloud deployment-manager deployments create <name> --config cluster_function_infra.yaml'
 <br>
 Step-6: <br>
-
+To deploy without the Diagnostic network interface, ensure that the "withDiagnostic" variable is set to False in the deploy_ngfw_cluster.yaml file. <br>
+Make sure to set variable "deployUsingExternalIP" as 1 in deploy_ngfw_cluster.yaml if FTDv require external IP. <br>
 Deploy FTDv cluster using below CLI on Google Cloud Shell:<br>
 a) For North-South topology deployment<br>
 
