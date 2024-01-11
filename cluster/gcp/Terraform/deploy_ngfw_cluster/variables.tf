@@ -147,3 +147,13 @@ variable "targetSize" {
   type = string
   default = "1"
 }
+
+variable "withDiagnostic" {
+  type = bool
+  default = true
+}
+
+variable "deployUsingExternalIP" {
+  type = bool
+  default = true
+}

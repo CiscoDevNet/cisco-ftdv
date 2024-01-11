@@ -10,7 +10,7 @@ supported. <br>
 Deployment can be run on any macOS/Linux/Windows machine with Google SDK and terraform installed.<br>
 
 ## Pre-deployment Steps:
-Step-1: Edit "ngfwv_infra/variables.tf", "cluster_function_infra/variables.tf" and "deploy_ngfw_cluster/variables.tf" for resourceNamePrefix and provide required user inputs.<br>
+Step-1: Edit "ngfwv_infra/variables.tf", "cluster_function_infra/variables.tf" and "deploy_ngfw_cluster/variables.tf" for resourceNamePrefix and provide required user inputs.Also depending on whether you want the Diagnostic interface or not, set the value of variable withDiagnostic accordingly in "ngfwv_infra/variables.tf" and "deploy_ngfw_cluster/variables.tf".<br>
 e.g: resourceNamePrefix = ngfwvcls <br>
 
 Step-2: Enable User Application Default Credentials (ADCs) to use terraform with your GCP project by running the following command: <br>
@@ -37,7 +37,8 @@ b) Upload google function src archieve to bucket using below CLI on Google Cloud
 	Note: if src archieve name is different then edit cluster_function_infra/variables.tf in pre-deployment step.<br>
 
 ## Deployment Steps:
-Step-4: Deploy infrastructure for FTDv cluster using below CLI on your terminal: <br>
+Step-4: <br>
+Deploy infrastructure for FTDv cluster using below CLI on your terminal: <br>
 
 	'cd ./ngfwv_infra/'
     'terraform init'
@@ -48,12 +49,13 @@ Step-5:<br>
 a) Launch and setup FMCv with FTDv management vpc if working with private IP<br>
 b) Create vpcConnector for Cloud Functions with FTDv management vpc, use it in step-5:<br>
 
-	'gcloud compute networks vpc-access connectors create <name> --region us-central1 --subnet ngfwvcls-ftdv-mgmt-subnet28'
+	'gcloud compute networks vpc-access connectors create <name> --region us-central1 --subnet ngfwvcls-ftdv-mgmt-vpcsubnt'
 <br>
 	Note: vpcConnector Name will be  used in cluster_function_infra/variables.tf as an input for vpcConnectorName.<br>
 
 Step-6: <br>
- Make sure to set deployWithExternalIP as True in cluster_function_infra/variables.tf if FTDv require external IP. Deploy FTDv cluster google function using below CLI on your terminal:<br>
+ Make sure to set deployWithExternalIP as True in cluster_function_infra/variables.tf and deploy_ngfw_cluster/variables.tf if FTDv require external IP. <br> 
+ Deploy FTDv cluster google function using below CLI on your terminal:<br>
 
 	'cd ../cluster_function_infra/'
     'terraform init'
@@ -61,12 +63,6 @@ Step-6: <br>
     'terraform apply'
 <br>
 Step-7: <br>
-Uncomment below lines [64-66] in cluster_function_infra/main.tf for deploying with public/external IP<br>
-          # access_config { <br>
-     # network_tier = "PREMIUM" <br>
-   # } <br>
-After uncommenting make sure EXTERNAL_IP_ENABLE set as True in cloud function environment variable if cloud function already deployed.<br>
-
 Deploy FTDv cluster using below CLI on your terminal:<br>
 
 	'cd ../deploy_ngfw_cluster'

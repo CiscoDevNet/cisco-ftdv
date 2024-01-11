@@ -49,7 +49,8 @@ Step-1: <br>
 Set deploy_topology = 'NS' for 'north-south' topology deployment <br>
 OR <br> 
 Set deploy_topology = 'EW' for 'east-west' topology deployment <br>
-If want to deploy with external/public IP make sure 'deploy_with_externalIP' set as True in gcp_one_click_deploy.py <br>
+To deploy with external/public IP, ensure that the 'deploy_with_externalIP' variable is set as True in gcp_one_click_deploy.py file <br>
+To deploy without the Diagnostic network interface, ensure that the "with_Diagnostic" variable is set to False in the gcp_one_click_deploy.py file. <br>
 
 Step-2: <br>
 After assigning values for parameters, move to the downloaded folder containing the gcp_one_click_deploy.py and run <br>

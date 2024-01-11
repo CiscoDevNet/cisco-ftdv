@@ -193,6 +193,12 @@ deploy_gwlbe = 'y'
 #set to any other non-empty string, otherwise
 #ignored if not using gateway load balancer
 
+targetfailover = 'no_rebalance'
+#With target failover, Gateway load balancer  handles existing traffic flows after a target becomes unhealthy or when the target is deregistered.
+#You can manage these flows by either rehashing them (rebalance) or leaving them at the default state (no_rebalance).
+#Enable Target Failover Support ("rebalance" or "no_rebalance").
+#This feature is only supported on version 7.4.1 onwards.
+
 gwlbe_vpc = 'Enter VPC ID for Gateway Load Balancer Endpoint.'
 #Vpc Id for deploying gateway load balancer endpoint
 #ignored if not using gateway load balancer or the endpoint
@@ -574,6 +580,7 @@ req_params = [
 	['cluster_number', cluster_number, 'ClusterNumber'],
 	['cluster_size', cluster_size, 'ClusterSize'],
 	['deploy_gwlbe', deploy_gwlbe, 'DeployGWLBE'],
+	['targetfailover', targetfailover, 'TargetFailover'],
 	['availability_zone', availability_zone, 'AZ'],
 	['ccl_first', ccl_first, 'CCLfirstIP'],
 	['ccl_last', ccl_last, 'CCLlastIP'],

@@ -109,6 +109,17 @@ Parameters:
      - "Yes"
      - "No"
     Default: "Yes"
+  TargetFailover:
+    Description: >-
+      With target failover, Gateway load balancer  handles existing traffic flows after a target becomes unhealthy or when the target is deregistered.
+      You can manage these flows by either rehashing them (rebalance) or leaving them at the default state (no_rebalance).
+      Enable Target Failover Support ("rebalance" or "no_rebalance").
+      This feature is only supported on version 7.4.1 onwards.
+    Type: String
+    AllowedValues:
+     - "rebalance"
+     - "no_rebalance"
+    Default: "no_rebalance"
   S3BktName:
     Description: The S3 Bucket name for lambda function
     Type: String
@@ -341,6 +352,7 @@ Metadata:
           - DeployGWLBE
           - VpcIdLBE
           - GWLBESubnetId
+          - TargetFailover
           - TgHealthPort
       - Label:
           default: Cisco NGFWv Instance Configuration
@@ -375,6 +387,8 @@ Metadata:
         default: Deploy Gateway Load Balancer Endpoint
       UseGWLB:
         default: Deploy Gateway Load Balancer
+      TargetFailover:
+        default: Target Failover
       LambdaSubnets:
         default: Subnets for Lambda Functions
       LambdaSG:
@@ -529,6 +543,11 @@ Resources:
       HealthCheckProtocol: TCP
       VpcId: !Ref VpcId
       TargetType: ip
+      TargetGroupAttributes:
+      - Key: target_failover.on_deregistration
+        Value: !Ref TargetFailover
+      - Key: target_failover.on_unhealthy
+        Value: !Ref TargetFailover
   listener:
     Condition: supportGWLB
     Type: AWS::ElasticLoadBalancingV2::Listener

@@ -1,5 +1,5 @@
 ###########################################################################################################
-#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                                                  #
+#Copyright (c) 2023 Cisco Systems Inc or its affiliates.                                                  #
 #All Rights Reserved.                                                                                     #
 #Licensed under the Apache License, Version 2.0 (the "License");                                          #
 #you may not use this file except in compliance with the License.                                         #
@@ -39,6 +39,7 @@ resources:
     network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-mgmt-vpc.selfLink)
     region: {{ properties["region"] }}
 # DIAG VPC and SUBNET
+{% if properties["withDiagnostic"] %}
 - name: {{ properties["resourceNamePrefix"] }}-ftdv-diag-vpc
   type: compute.v1.network
   properties:
@@ -52,6 +53,7 @@ resources:
     gatewayAddress: {{ properties["diagGatewayAddress"] }}
     network: $(ref.{{ properties["resourceNamePrefix"] }}-ftdv-diag-vpc.selfLink)
     region: {{ properties["region"] }}
+{% endif %}
 # INSIDE VPC and SUBNET
 - name: {{ properties["resourceNamePrefix"] }}-ftdv-inside-vpc
   type: compute.v1.network
@@ -108,6 +110,7 @@ resources:
         - '22'
         - '443'
         - '8305'
+{% if properties["withDiagnostic"] %}
 - name: {{ properties["resourceNamePrefix"] }}-ftdv-diag-firewall-rule
   type: compute.v1.firewall
   properties:
@@ -120,6 +123,7 @@ resources:
         ports:
         - '22'
         - '8305'
+{% endif %}
 - name: {{ properties["resourceNamePrefix"] }}-ftdv-in-firewall-rule
   type: compute.v1.firewall
   properties:

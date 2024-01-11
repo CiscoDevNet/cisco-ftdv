@@ -1,5 +1,5 @@
 ########################################################################################
-#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#Copyright (c) 2023 Cisco Systems Inc or its affiliates.                               #
 #All Rights Reserved.                                                                  #
 #Licensed under the Apache License, Version 2.0 (the "License");                       #
 #you may not use this file except in compliance with the License.                      #
@@ -11,12 +11,16 @@
 #See the License for the specific language governing permissions and                   #
 #limitations under the License.                                                        #
 ########################################################################################
-# File: deploy_ngfw_cluster.yaml                                                   #
-# Purpose: To provide Parameters to deploy_ngfw_cluster.jinja for the FTDv cluster #
+# File: deploy_ngfw_cluster.yaml                                                       #
+# Purpose: To provide Parameters to deploy_ngfw_cluster.jinja for the FTDv cluster     #
 # in GCP.                                                                              #
 ########################################################################################
 #                                                                                      #
-# USER should have a minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL).          #
+# withDiagnostic=True                                                                  #
+# Create minimum of 5 VPC Networks(OUTSIDE,INSIDE,MGMT,DIAG,CCL) for with Diagnostic.  #
+#                                                                                      #
+# withDiagnostic=False                                                                 #
+# Create minimum of 4 VPC Networks(OUTSIDE,INSIDE,MGMT,CCL) without Diagnostic.        #
 #                                                                                      #
 # Note: This is an example input parameter, user need to change required input         #
 # parameters with existing resources.                                                  #
@@ -39,26 +43,27 @@ resources:
     hostname: <> #ciscoftdv
     cclSubnetRange: <> #10.10.55.2 10.10.55.253 #only allowed range is x.x.x.2 x.x.x.253
     clusterGrpName: <> #ngfwvcls-cluster
+    withDiagnostic: <> #True, False
     # VPC and Firewall Parameters
     mgmtVpcName: <> #ngfwvcls-ftdv-mgmt-vpc
-    diagVpcName: <> #ngfwvcls-ftdv-diag-vpc
+    diagVpcName: <> #ngfwvcls-ftdv-diag-vpc #dummy for without diagnostic
     outsideVpcName: <> #ngfwvcls-ftdv-outside-vpc
     insideVpcName: <> #ngfwvcls-ftdv-inside-vpc
     cclVpcName: <> #ngfwvcls-ftdv-ccl-vpc
     mgmtSubnetworkName: <> #ngfwvcls-ftdv-mgmt-subnet
-    diagSubnetworkName: <> #ngfwvcls-ftdv-diag-subnet
+    diagSubnetworkName: <> #ngfwvcls-ftdv-diag-subnet #dummy for without diagnostic
     outsideSubnetworkName: <> #ngfwvcls-ftdv-outside-subnet
     insideSubnetworkName: <> #ngfwvcls-ftdv-inside-subnet
     cclSubnetworkName: <> #ngfwvcls-ftdv-ccl-subnet
     mgmtFirewallRule: <> #ngfwvcls-ftdv-mgmt-firewall-rule
-    diagFirewallRule: <> #ngfwvcls-ftdv-diag-firewall-rule
+    diagFirewallRule: <> #ngfwvcls-ftdv-diag-firewall-rule #dummy for without diagnostic
     outsideFirewallRule: <> #ngfwvcls-ftdv-out-firewall-rule
     insideFirewallRule: <> #ngfwvcls-ftdv-in-firewall-rule
     cclFirewallRule: <> #ngfwvcls-ftdv-ccl-firewall-rule
     healthCheckFirewallRule: <> #ngfwvcls-ftdv-hc-firewall-rule
     # Instance Template
     machineType: <> #e2-standard-8
-    sourceImageURL: <> #projects/asavgcp-poc-4krn/global/images/cisco-secure-firewall-threat-defense-virtual-gcp-7-2-0-1553
+    sourceImageURL: <> #projects/cisco-public/global/images/cisco-ftdv-7-4-1-172
     targetSize: 1
     deployUsingExternalIP: <> #1->YES, 0->NO
     # FTDv Health Check

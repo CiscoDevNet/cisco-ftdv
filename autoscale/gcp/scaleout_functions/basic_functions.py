@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 All Rights Reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -193,7 +193,7 @@ def check_ftdv_reg_status(channel):
      else:
           return "FAILED"
 
-def ftdv_reg_polling(fmc, channel, vm_name, minutes=2):
+def ftdv_reg_polling(fmc, channel, vm_name, minutes):
      """
      Purpose:    To poll both NGFW & FMCv for registration status
      Parameters: FirepowerManagementCenter class object, Minutes, channel, VM name
@@ -203,16 +203,15 @@ def ftdv_reg_polling(fmc, channel, vm_name, minutes=2):
      # Polling registration completion for specified 'minutes'
      status_in_ftdv = ''
      status_in_fmc = ''
-     for i in range(1, 6*minutes):
-          if i != ((2*minutes)-1):
-               status_in_ftdv = check_ftdv_reg_status(channel)
-               status_in_fmc = fmc.check_reg_status_from_fmc(vm_name)
-               if status_in_ftdv == "COMPLETED" and status_in_fmc == 'SUCCESS':
-                    return "SUCCESS"
-               else:
-                    print("Registration status in FTDv: " + status_in_ftdv + " in FMC: " + status_in_fmc)
-                    print("Sleeping for 10 seconds")
-                    time.sleep(10)
+     for i in range(0, 2*minutes):
+          status_in_ftdv = check_ftdv_reg_status(channel)
+          status_in_fmc = fmc.check_reg_status_from_fmc(vm_name)
+          if status_in_ftdv == "COMPLETED" and status_in_fmc == 'SUCCESS':
+               return "SUCCESS"
+          else:
+               print("Registration status in FTDv: " + status_in_ftdv + " in FMC: " + status_in_fmc)
+               print("Sleeping for 30 seconds")
+               time.sleep(30)
      if status_in_ftdv == "COMPLETED" or status_in_fmc == "SUCCESS":
           return "PARTIAL"
      return "FAILED"

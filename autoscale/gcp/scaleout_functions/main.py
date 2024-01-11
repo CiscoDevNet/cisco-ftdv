@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 All Rights Reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -82,7 +82,14 @@ def scale_out(event, context):
           info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone}
           first_run_flag = True
      except:
-          count = count + 1
+          prev_info = log_entry['textPayload']
+          # Extracting the Dict part from string
+          prev_info = prev_info[len("Second Attempt "):]
+          #making json acceptable format
+          prev_info = prev_info.replace("'", "\"")
+          prev_info = json.loads(prev_info)
+
+          count = prev_info["count"] + 1
           print("Function retriggered count: "+str(count))
 
      if count > MAX_RETRIES_COUNT:
@@ -122,10 +129,16 @@ def scale_out(event, context):
           r,channel,ssh = bf.establishingConnection(ssh_ip, user, password, minutes)
           print("Establishing Connection Response: "+ r)
      else:
-          print("Console not up")
+          print("ERROR: Console not up")
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
 
      if r == 'TIMEOUT':
@@ -136,8 +149,14 @@ def scale_out(event, context):
      if r != 'SUCCESS':
           print("ERROR: Establishing Connection")
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
 
      if first_run_flag:
@@ -151,10 +170,16 @@ def scale_out(event, context):
      print("Connection Status: "+ conn_status)
 
      if conn_status == 'FAIL':
-          print("Connection Failure")
+          print("ERROR: Connection Failure")
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
 
      ftd_version = bf.showVersion(channel)
@@ -197,10 +222,16 @@ def scale_out(event, context):
           r,channel,ssh = bf.establishingConnection(ssh_ip, user, password, minutes)
           print("Establishing Connection Response: "+ r)
      else:
-          print("Console not up")
+          print("ERROR: Console not up")
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
 
      if (time.time() - start_time) <= timeout_time:
@@ -217,8 +248,14 @@ def scale_out(event, context):
           print("ERROR: Registration Status: "+reg_status)
           print("Could not register FTDv:{} with FMCv".format(vm_name))
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
 
      print("Sleeping for a minute after FTD registration")
@@ -239,10 +276,16 @@ def scale_out(event, context):
           return
 
      if nic_id == None:
-          print("Could not fetch NIC ID for FTDv:{}".format(vm_name))
+          print("ERROR: Could not fetch NIC ID for FTDv:{}".format(vm_name))
           print("Deleting Instance {}".format(instanceName))
+          request_body = {
+                           "instances": [
+                             f"zones/{zone}/instances/{instanceName}"
+                           ],
+                           "skipInstancesOnValidationError": False
+                         }
           api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
+          response = api.regionInstanceGroupManagers().deleteInstances(project=project_id, region=zone[:-2], instanceGroupManager=instanceName[:-5], body=request_body).execute()
           return
      
      
