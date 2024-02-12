@@ -650,15 +650,14 @@ class ManagedDevice(NgfwInstance):
         Raises:
         """
         for static_route in self.traffic_routes:
-            if static_route['gateway'] == '':
-                if static_route['interface'] == self.in_nic_name:
-                    subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                    subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
-                    static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
-                elif static_route['interface'] == self.out_nic_name:
-                    subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-                    subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
-                    static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
+            if static_route['interface'] == self.in_nic_name:
+                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
+                static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
+            elif static_route['interface'] == self.out_nic_name:
+                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
+                static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
             logger.debug(json.dumps(static_route, separators=(',', ':')))
         return
 
