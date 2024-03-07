@@ -85,7 +85,7 @@
             "type": "string",
             "defaultValue": "ccl",
             "metadata": {
-                "description": "Outside subnet name"
+                "description": "CCL subnet name"
             }
         },
         "cclSubnetStartAddr": {
