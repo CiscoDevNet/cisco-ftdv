@@ -78,7 +78,7 @@
             "type": "string",
             "defaultValue": "ccl",
             "metadata": {
-                "description": "Outside subnet name"
+                "description": "CCL subnet name"
             }
         },
         "cclSubnetStartAddr": {
@@ -106,7 +106,7 @@
             "type": "string",
             "defaultValue": "741172.0.0",
             "allowedValues": [
-                "741172.0.0",
+                "741172.0.0"
             ],
             "metadata": {
                 "description": "FTD Software version to use."
