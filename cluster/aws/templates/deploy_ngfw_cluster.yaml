@@ -880,6 +880,7 @@ Resources:
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
+      - InstanceEvent
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]

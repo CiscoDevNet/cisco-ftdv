@@ -1081,6 +1081,7 @@ Resources:
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
+      - InstanceEvent
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber ] ]
