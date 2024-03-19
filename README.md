@@ -38,7 +38,7 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 
 ### FTDv Autoscale
 
-* On Azure for NGFWv6.7.0 & Above: [Code](autoscale/azure/)     |     [README](autoscale/azure/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/ftdv-azure-autoscale-v73.pdf)
+* On Azure for NGFWv6.7.0 & Above: [Code](autoscale/azure/)     |     [README](autoscale/azure/README.md)     |     [Deployment/Configuration Guide](autoscale/azure/ftdv-azure-autoscale.pdf)
 
 * On AWS for NGFWv6.7.0 & Above: [Code](autoscale/aws/)     |     [README](autoscale/aws/README.md)     |     [Deployment/Configuration Guide](autoscale/aws/deploy-ftdv-auto-scale-for-aws.pdf)
 
@@ -60,7 +60,7 @@ This conatains heat template files to deploy the Secure Firewall Threat Defense 
 
 
 ### Deployment Template
-* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.3.0/ftdv/README.md)  |   [FMCv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.3.0/fmcv/README.md)
+* Azure NGFWv Deployment Template: [README](deployment-templates/azure/README.md) | [NFWv/FTDv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.4.1/ftdv/README.md)  |   [FMCv](deployment-templates/azure/CiscoSecureFirewallVirtual-7.4.1/fmcv/README.md)
 * Openstack NGFWv Heat Deployment Template: [README](deployment-templates/openstack/README.md) | [NFWv/FTDv](deployment-templates/openstack/FTDv/README.md)  |   [FMCv](deployment-templates/openstack/FMCv/README.md)
 
 

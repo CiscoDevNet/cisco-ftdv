@@ -57,15 +57,21 @@ resource "google_compute_instance_template" "ftdv_template" {
     network = "${var.resourceNamePrefix}-ftdv-mgmt-vpc"
     subnetwork = "${var.resourceNamePrefix}-ftdv-mgmt-subnet"
     
-    # access_config {
-    #   network_tier = "PREMIUM"
-    # }
+    dynamic "access_config" {
+      for_each = var.deployUsingExternalIP ? [1] : []
+      content {
+        network_tier = "PREMIUM"
+      }
+    } 
     
   }
 
-  network_interface {
-    network = "${var.resourceNamePrefix}-ftdv-diag-vpc"
-    subnetwork = "${var.resourceNamePrefix}-ftdv-diag-subnet"
+  dynamic "network_interface" {
+    for_each = var.withDiagnostic ? [1] : []
+    content {
+      network = "${var.resourceNamePrefix}-ftdv-diag-vpc"
+      subnetwork = "${var.resourceNamePrefix}-ftdv-diag-subnet"
+    }
   }
 
   network_interface {
@@ -79,7 +85,7 @@ resource "google_compute_instance_template" "ftdv_template" {
 
 
   metadata = {
-    startup-script = "{ \"AdminPassword\": \"${var.adminPassword}\", \"Hostname\": \"${var.hostname}\", \"FirewallMode\": \"routed\", \"ManageLocally\": \"No\", \"Cluster\": { \"CclSubnetRange\": \"${var.cclSubnetRange}\", \"ClusterGroupName\": \"${local.cluster_name}\" } }"
+    startup-script = var.withDiagnostic ? local.startup_script_with_diagonistic : local.startup_script_without_diagonistic
   }
 
   service_account {
@@ -239,6 +245,3 @@ resource "google_compute_router" "cloud-nat-router" {
   region  = var.region
   network = "projects/${var.project_name}/global/networks/${local.outside_vpc_name}"
 }
-
-
-

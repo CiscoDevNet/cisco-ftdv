@@ -85,7 +85,7 @@
             "type": "string",
             "defaultValue": "ccl",
             "metadata": {
-                "description": "Outside subnet name"
+                "description": "CCL subnet name"
             }
         },
         "cclSubnetStartAddr": {
@@ -111,8 +111,9 @@
         },
         "softwareVersion": {
             "type": "string",
-            "defaultValue": "73069.0.0",
+            "defaultValue": "741172.0.0",
             "allowedValues": [
+                "741172.0.0",
                 "73069.0.0"
             ],
             "metadata": {

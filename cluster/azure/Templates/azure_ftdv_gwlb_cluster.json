@@ -48,16 +48,16 @@
         },
         "dataInterfaceSubnet": {
             "type": "string",
-            "defaultValue": "outside",
+            "defaultValue": "data",
             "metadata": {
-                "description": "Outside subnet name"
+                "description": "Data subnet name"
             }
         },
         "dataNetworkGatewayIp": {
             "type": "string",
             "defaultValue": "10.0.3.1",
             "metadata": {
-                "description": "Outside Subnet Gateway IP"
+                "description": "Data Subnet Gateway IP"
             }
         },
         "gatewayLoadBalancerIP": {
@@ -132,8 +132,9 @@
         },
         "softwareVersion": {
             "type": "string",
-            "defaultValue": "73069.0.0",
+            "defaultValue": "741172.0.0",
             "allowedValues": [
+                "741172.0.0",
                 "73069.0.0"
             ],
             "metadata": {

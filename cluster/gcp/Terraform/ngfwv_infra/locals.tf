@@ -1,5 +1,5 @@
 locals {
-  networks = [{
+  networks_default = [{
     name = "${var.resourceNamePrefix}-ftdv-inside-vpc",
     subnet = [{
       subnet_name = "${var.resourceNamePrefix}-ftdv-inside-subnet"
@@ -32,15 +32,6 @@ locals {
     protocol = "tcp"
     ports = ["22", "443", "8305"]
   },{
-    name = "${var.resourceNamePrefix}-ftdv-diag-vpc"
-    subnet = [{
-      subnet_name = "${var.resourceNamePrefix}-ftdv-diag-subnet"
-      subnet_ip = var.diagIpCidrRange
-      subnet_region = var.region
-    }]
-    protocol = "tcp"
-    ports = ["22", "8305"]
-  },{
     name = "${var.resourceNamePrefix}-ftdv-ccl-vpc"
     subnet = [{
       subnet_name = "${var.resourceNamePrefix}-ftdv-ccl-subnet"
@@ -50,6 +41,21 @@ locals {
     protocol = "all"
     ports = []
   }]
+
+  network_diagonistic = [{
+    name = "${var.resourceNamePrefix}-ftdv-diag-vpc"
+    subnet = [{
+      subnet_name = "${var.resourceNamePrefix}-ftdv-diag-subnet"
+      subnet_ip = var.diagIpCidrRange
+      subnet_region = var.region
+    }]
+    protocol = "tcp"
+    ports = ["22", "8305"]
+  }]
+}
+
+locals {
+  networks =  var.withDiagnostic ? concat(local.networks_default, local.network_diagonistic) : local.networks_default
 }
 
 locals {
