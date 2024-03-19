@@ -25,7 +25,9 @@ resources:
       tags:
         items:
           - {{ properties["mgmtFirewallRule"] }}
+          {% if properties["withDiagnostic"] %}
           - {{ properties["diagFirewallRule"] }}
+          {% endif %}
           - {{ properties["outsideFirewallRule"] }}
           - {{ properties["insideFirewallRule"] }}
           - {{ properties["healthCheckFirewallRule"] }}
@@ -58,15 +60,18 @@ resources:
            - name: External NAT
              type: ONE_TO_ONE_NAT
           {% endif %}
+        {% if properties["withDiagnostic"] %}
         - name: nic3
           network: projects/{{ env["project"] }}/global/networks/{{ properties["diagVpcName"] }}
           subnetwork: projects/{{ env["project"] }}/regions/{{ properties["region"] }}/subnetworks/{{ properties["diagSubnetworkName"] }}
           kind: compute#networkInterface
+        {% endif %}
       reservationAffinity:
         consumeReservationType: ANY_RESERVATION
       metadata:
         kind: compute#metadata
         items:
+          {% if properties["withDiagnostic"] %}
           - value: |-
                 {
                   "AdminPassword": "{{ properties["adminPassword"] }}",
@@ -76,6 +81,18 @@ resources:
                   "IPv4Mode": "dhcp",
                   "ManageLocally": "No"
                 }
+          {% else %}
+          - value: |-
+                {
+                  "AdminPassword": "{{ properties["adminPassword"] }}",
+                  "Hostname": "ftdv-gcp",
+                  "DNS1": "8.8.8.8",
+                  "FirewallMode": "routed",
+                  "IPv4Mode": "dhcp",
+                  "ManageLocally": "No",
+                  "Diagnostic": "OFF"
+                }
+          {% endif %}
             key: startup-script
           - value: {{ properties["publicKey"] }}
             key: ssh-keys

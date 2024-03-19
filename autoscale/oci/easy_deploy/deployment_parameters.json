@@ -18,6 +18,7 @@
     "inside_nsg_ocid": "ocid1.networksecuritygroup.oc1.phx.aaaaaaaasb6hpq5vng2i6awnhz5ifqkzggw2ai2jsxdsoqoxyoviq3gvy3yq",
     "outside_subnet_ocid": "ocid1.subnet.oc1.phx.aaaaaaaazu5isd7d44e6lompesumud2jljncmuezzvthgxdbwlu2nd7tuovq",
     "outside_nsg_ocid": "ocid1.networksecuritygroup.oc1.phx.aaaaaaaacuciei2qextx6eucobc52ntx5bzofsz63m2xbbz3qe32ucb2vvzq",
+    "function_subnet_ocid":"ocid1.subnet.oc1.phx.aaaaaaaa56xfaijllsh37vhx7yvpwldmtl5osvqfkzag3tmaeuqm6fsgt6kq",
     "fmc_ip": "3.95.61.43",
     "fmc_username": "parsahu",
     "fmc_password": "QcyFWzci3vvVAAZ7ZFjehBnK03ELOEFKMNrEMUWkzCHUpx+yKeAU3RQsD0XyBjfFvGYAAAAA",

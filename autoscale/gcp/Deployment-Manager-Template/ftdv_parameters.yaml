@@ -1,5 +1,5 @@
 #######################################################################################
-#Copyright (c) 2022 Cisco Systems Inc or its affiliates.                               #
+#Copyright (c) 2023 Cisco Systems Inc or its affiliates.                               #
 #All Rights Reserved.                                                                  #
 #Licensed under the Apache License, Version 2.0 (the "License");                       #
 #you may not use this file except in compliance with the License.                      #
@@ -32,19 +32,20 @@ resources:
     serviceAccountMailId: <>  #123456-compute@developer.gserviceaccount.com
     # VPC and Firewall Parameters
     mgmtVpcName: <>   #vpcname
-    diagVpcName: <>   #vpcname
+    diagVpcName: <>   #vpcname, #dummy for without diagnostic
     outsideVpcName: <>  #vpcname
     insideVpcName: <>   #vpcname
     mgmtSubnetworkName: <>  #subnetvpcname
-    diagSubnetworkName: <>  #subnetvpcname
+    diagSubnetworkName: <>  #subnetvpcname, #dummy for without diagnostic
     outsideSubnetworkName: <>   #subnetvpcname
     insideSubnetworkName: <>    #subnetvpcname
     mgmtFirewallRule: <>    #firewallname
-    diagFirewallRule: <>    #firewallname
+    diagFirewallRule: <>    #firewallname, #dummy for without diagnostic
     outsideFirewallRule: <>   #firewallname
     insideFirewallRule: <>    #firewallname
     healthCheckFirewallRule: <>   #firewallname
     deployUsingExternalIP: <> #True, False
+    withDiagnostic: <> #True, False
     adminPassword: <> #FTDv Admin Password
     publicKey: <>   #publickey
     # Instance Template

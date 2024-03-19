@@ -48,6 +48,7 @@ variable "project_id" {
   default = "asavgcp-poc-4krn"
 }
 
-
-
-
+variable "withDiagnostic" {
+  type = bool
+  default = true
+}

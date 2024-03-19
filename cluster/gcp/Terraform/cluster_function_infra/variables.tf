@@ -20,7 +20,7 @@ variable "function_archieve_object" {
 
 variable "deployWithExternalIP" {
     type = string
-    default = "False"
+    default = "True"
 }
 variable "retryCount" {
   type = string

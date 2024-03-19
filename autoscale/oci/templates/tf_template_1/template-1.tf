@@ -19,6 +19,7 @@ variable "compartment_id" {
         error_message = "The compartment OCID must start with <oocid1.compartment.....> and must be valid. Please check the value provided."
       }
 }
+
 variable "region" {
   description = "The unique identifier of the region in which you want the resources to be created. To get a list of all the regions and their unique identifiers in the OCI commercial realm refer to this link - https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm#About"
   validation {
@@ -29,15 +30,33 @@ variable "region" {
         error_message = "Please provide a valid region."
       }
 }
-variable "lb_size" {
-  description = "A template that determines the total pre-provisioned bandwidth (ingress plus egress) of the external and internal load balancer. The supported values are - 100Mbps, 10Mbps, 10Mbps-Micro, 400Mbps, 8000Mbps"
+
+variable "load_balancer_shape_details_maximum_bandwidth_in_mbps"{
+  description = "The maximum bandwidth (ingress plus egress) that the load balancer can achieve.The values must be between minimumBandwidthInMbps and 8000 (8Gbps)."
+  type = number
+  default = "400"
   validation {
         condition = (
-          contains(["100Mbps", "10Mbps", "10Mbps-Micro", "400Mbps", "8000Mbps"], var.lb_size)
+          var.load_balancer_shape_details_maximum_bandwidth_in_mbps >= 10 &&
+          var.load_balancer_shape_details_maximum_bandwidth_in_mbps <= 8000
         )
-        error_message = "Please provide a valid size."
-      }
+        error_message = "Please provide a valid value between 10 and 8000."
+  }
 }
+
+variable "load_balancer_shape_details_minimum_bandwidth_in_mbps"{
+  description = "The minimum bandwidth (ingress plus egress) that the load balancer can achieve.The values must be between 10 and the maximumBandwidthInMbps."
+  type = number
+  default = "100"
+  validation {
+        condition = (
+          var.load_balancer_shape_details_minimum_bandwidth_in_mbps >= 10 &&
+          var.load_balancer_shape_details_minimum_bandwidth_in_mbps <= 8000
+        )
+        error_message = "Please provide a valid value between 10 and 8000."
+  }
+}
+
 variable "availability_domain" {
   description = "The availability domain to place instances. To get the specific names of your tenancy's availability domains, use the ListAvailabilityDomains (https://docs.oracle.com/en-us/iaas/api/#/en/identity/20160918/AvailabilityDomain/ListAvailabilityDomains) operation, which is available in the IAM API. Example - Example - Tpeb:PHX-AD-1, Tpeb:PHX-AD-2"
 }
@@ -182,6 +201,17 @@ variable "outside_nsg_ocid" {
           can(regex("^ocid1.networksecuritygroup.", var.outside_nsg_ocid ))
         )
         error_message = "The NSG OCID must start with <ocid1.networksecuritygroup.....> and must be valid. Please check the value provided."
+      }
+}
+
+variable "function_subnet_ocid" {
+  description = "OCID of the subnet that is to be used for Oracle Functions, All traffic of this VCN/Subnet must be routed via NAT Gateway and public IP of this NAT GW must be allowed in security group of FTDv and FMCv management interface."
+  validation {
+        condition = (
+          length(var.function_subnet_ocid) > 13 &&
+          can(regex("^ocid1.subnet.", var.function_subnet_ocid ))
+        )
+        error_message = "The subnet OCID must start with <ocid1.subnet....> and must be valid. Please check the value provided."
       }
 }
 
@@ -391,24 +421,35 @@ resource "oci_load_balancer_load_balancer" "test_load_balancer_elb" {
     #Required
     compartment_id = var.compartment_id
     display_name = "${var.autoscale_group_prefix}_external_load_balancer"
-    shape = var.lb_size
+    shape = "flexible"
     subnet_ids = [var.outside_subnet_ocid]
+    network_security_group_ids = [var.outside_nsg_ocid]
 
     #Optional
     ip_mode = "IPV4"
     is_private = "false"
-
+    shape_details {
+      #Required
+      maximum_bandwidth_in_mbps = var.load_balancer_shape_details_maximum_bandwidth_in_mbps
+      minimum_bandwidth_in_mbps = var.load_balancer_shape_details_minimum_bandwidth_in_mbps
+  }
 }
 resource "oci_load_balancer_load_balancer" "test_load_balancer_ilb" {
     #Required
     compartment_id = var.compartment_id
     display_name = "${var.autoscale_group_prefix}_internal_load_balancer"
-    shape = var.lb_size
+    shape = "flexible"
     subnet_ids = [var.inside_subnet_ocid]
+    network_security_group_ids = [var.inside_nsg_ocid]
 
     #Optional
     ip_mode = "IPV4"
     is_private = "true"
+    shape_details {
+      #Required
+      maximum_bandwidth_in_mbps = var.load_balancer_shape_details_maximum_bandwidth_in_mbps
+      minimum_bandwidth_in_mbps = var.load_balancer_shape_details_minimum_bandwidth_in_mbps
+  }
 }
 resource "oci_load_balancer_backend_set" "test_backend_set_elb" {
     #Required
@@ -595,7 +636,7 @@ resource "oci_functions_application" "test_application" {
     #Required
     compartment_id = var.compartment_id
     display_name = "${var.autoscale_group_prefix}_application"
-    subnet_ids = [var.mgmt_subnet_ocid]
+    subnet_ids = [var.function_subnet_ocid]
 
     #Optional
     config = {
