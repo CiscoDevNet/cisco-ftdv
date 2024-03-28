@@ -369,7 +369,7 @@ def check_cluster_status(aws_grp,ftd):
             if data is (mins - 1):
                 break
             logger.info("Waiting for cluster to be formed..")
-            logger.info("Number of data node joined: {}".format(data))
+            logger.info("Number of data nodes joined: {}".format(data))
             time.sleep(30)
             count+=1
         control = status.count('in state '+const.CONTROL_NODE)
