@@ -32,6 +32,8 @@ jobs:
           cp -r ./layer/lib/python3.9/site-packages/* ./python/
           zip -r cluster_layer.zip ./python
           deactivate
+          cp cluster_layer.zip target/
+          python make.py
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -40,3 +42,5 @@ jobs:
           title: "Development Build"
           files: |
             cluster_layer.zip
+            cluster_manager.zip
+            cluster_lifecycle.zip
