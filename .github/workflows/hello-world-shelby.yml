@@ -45,6 +45,6 @@ jobs:
           prerelease: true
           title: "Development Build"
           files: |
-            cluster_layer.zip
-            cluster_manager.zip
-            cluster_lifecycle.zip
+            target/cluster_layer.zip
+            target/cluster_manager.zip
+            target/cluster_lifecycle.zip
