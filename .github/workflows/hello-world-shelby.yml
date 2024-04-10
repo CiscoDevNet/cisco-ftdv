@@ -22,6 +22,9 @@ jobs:
           python -m pip install virtualenv
       - name: "Build the cluster_layer.zip"
         run: |
+          pwd
+          cd cluster/aws
+          pwd
           python -V
           mkdir -p layer
           virtualenv ./layer/
