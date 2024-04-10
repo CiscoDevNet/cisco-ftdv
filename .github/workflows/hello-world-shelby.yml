@@ -1,15 +1,13 @@
 name: Python Package
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - "action_test"
 
 jobs:
   Run-Tox:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11"]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
@@ -18,4 +16,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Test with tox
-        run: echo "Hello Shelby"
+        run: date > some_file.txt
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            some_file.txt
