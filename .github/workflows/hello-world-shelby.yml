@@ -32,8 +32,9 @@ jobs:
           cp -r ./layer/lib/python3.9/site-packages/* ./python/
           zip -r cluster_layer.zip ./python
           deactivate
-          cp cluster_layer.zip target/
+          cp cluster_layer.zip lambda-python-files/
           python make.py
+
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
