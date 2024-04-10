@@ -14,9 +14,19 @@ jobs:
       - name: Setup python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.9"
       - name: Test with tox
-        run: date > some_file.txt
+        run: |
+        python -V
+        mkdir -p layer
+        virtualenv ./layer/
+        source ./layer/bin/activate
+        python -m pip install pycryptodome==3.17.0 paramiko==2.7.1 requests==2.23.0 scp==0.13.2 jsonschema==3.2.0 cffi==1.15.1 zipp==3.1.0 importlib-metadata==1.6.0
+        echo "Copy from ./layer directory to ./python\n"
+        mkdir -p ./python/
+        cp -r ./layer/lib/python3.9/site-packages/* ./python/
+        zip -r cluster_layer.zip ./python
+        deactivate      
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
@@ -24,4 +34,4 @@ jobs:
           prerelease: true
           title: "Development Build"
           files: |
-            some_file.txt
+            cluster_layer.zip
