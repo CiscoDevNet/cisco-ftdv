@@ -36,7 +36,7 @@ jobs:
           zip -r cluster_layer.zip ./python
           deactivate
           cp cluster_layer.zip lambda-python-files/
-          python make.py
+          python make.py build
 
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
