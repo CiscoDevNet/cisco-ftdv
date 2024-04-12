@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v2
-      - name: Setup python ${{ matrix.python-version }}
+      - name: Setup python 3.9
         uses: actions/setup-python@v2
         with:
           python-version: "3.9"
@@ -29,7 +29,7 @@ jobs:
           mkdir -p layer
           virtualenv ./layer/
           source ./layer/bin/activate
-          python -m pip install pycryptodomex paramiko==2.7.1 requests==2.23.0 scp==0.13.2 jsonschema==3.2.0 cffi==1.15.1 zipp==3.1.0 importlib-metadata==1.6.0
+          python -m pip install --platform manylinux2010_x86_64 pycryptodomex paramiko==2.7.1 requests==2.23.0 scp==0.13.2 jsonschema==3.2.0 cffi==1.15.1 zipp==3.1.0 importlib-metadata==1.6.0
           echo "Copy from ./layer directory to ./python\n"
           mkdir -p ./python/
           cp -r ./layer/lib/python3.9/site-packages/* ./python/
