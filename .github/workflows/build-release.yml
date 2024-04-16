@@ -36,7 +36,7 @@ jobs:
           cp cluster_layer.zip lambda-python-files/
           python make.py build
           cd target
-          zip cluster_aws.zip cluster_layer.zip cluster_manager.zip cluster_life_cycle.zip
+          zip cluster_aws.zip cluster_layer.zip cluster_manager.zip cluster_lifecycle.zip
 
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
