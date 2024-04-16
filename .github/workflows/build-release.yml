@@ -4,9 +4,10 @@ on:
   push:
     branches:
       - "action_test"
+      - "master"
 
 jobs:
-  Run-Tox:
+  Build-And-Release:
     runs-on: ubuntu-20.04
     steps:
       - name: Check out repository code
@@ -20,12 +21,9 @@ jobs:
           python -V
           python -m pip install --upgrade pip
           python -m pip install virtualenv
-      - name: "Build the cluster_layer.zip"
+      - name: "Build the cluster AWS artifacts"
         run: |
-          pwd
           cd cluster/aws
-          pwd
-          python -V
           mkdir -p layer
           virtualenv ./layer/
           source ./layer/bin/activate
@@ -37,14 +35,14 @@ jobs:
           deactivate
           cp cluster_layer.zip lambda-python-files/
           python make.py build
+          cd target
+          zip cluster_aws.zip cluster_layer.zip cluster_manager.zip cluster_life_cycle.zip
 
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
-          prerelease: true
-          title: "Development Build"
+          prerelease: false
+          title: "Release ${{ github.sha }}"
           files: |
-            cluster/aws/target/cluster_layer.zip
-            cluster/aws/target/cluster_manager.zip
-            cluster/aws/target/cluster_lifecycle.zip
+            cluster/aws/target/cluster_aws.zip
