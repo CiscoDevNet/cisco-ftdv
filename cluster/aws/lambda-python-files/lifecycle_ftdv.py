@@ -229,8 +229,6 @@ def create_tags_with_default_values(ec2_instance):
     Returns:    SUCCESS
     Raises:
     """
-    ec2_instance.create_instance_tags('NGFWvConfigDeployStatus', 'PENDING')
-    ec2_instance.create_instance_tags('NGFWvConfigurationStatus', 'PENDING')
     ec2_instance.create_instance_tags('NGFWvRegistrationStatus', 'PENDING')
     ec2_instance.create_instance_tags('NGFWvConnectionStatus', 'UN-AVAILABLE')
     ec2_instance.create_instance_tags('NGFWvFMCDeviceGrp', user_input['fmcDeviceGroupName'])
