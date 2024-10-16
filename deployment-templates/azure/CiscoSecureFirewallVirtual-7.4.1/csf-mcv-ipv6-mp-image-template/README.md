@@ -37,7 +37,7 @@ Please refer the CSF-TDv deployment procedure and this CSF-MCv deployment is ver
 e.g. cisco-mcv
 
 2. **softwareVersion**: The image version from the VM offer.<br>
-e.g. 7.4.1-172
+e.g. 7.6.0-113
 
 3. **adminUsername**: The username for logging into CSF-MCv. This cannot be the reserved name "admin".<br>
 e.g. jdoe
@@ -84,7 +84,7 @@ resourceGroup().location
 .blob.core.windows.net
 
 ## References
-* [Software Downloads Home - CSF-MCv](https://software.cisco.com/download/home/286259687/type/286271056/release/7.4.1)
+* [Software Downloads Home - CSF-MCv](https://software.cisco.com/download/home/286259687/type/286271056/release/7.6.0)
 * [CSF-TDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/consolidated_ftdv_gsg/threat-defense-virtual-74-gsg/m-ftdv-azure-gsg.html#id_82702)
 * [CSF-MCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 * [CSF-MCv deployment steps](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_82702)

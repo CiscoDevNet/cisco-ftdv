@@ -14,9 +14,9 @@ Use the instructions in the quick start guide for CSF-TDv deployment.<br>
 ## Deployment overview
 
 1. Download the CSF-TDv vhd image from Cisco Download Software download page.<br>
-e.g. 7.4.1-172 CSF-TDv image can be downloaded from:<br>
-URL  : https://software.cisco.com/download/home/286306503/type/286306337/release/7.4.1 <br>
-File : [ CSF-TDv v7.4.1 on Azure ] : Cisco_Firepower_Threat_Defense_Virtual-7.4.1-172.vhd.bz2<br>
+e.g. 7.6.0-113 CSF-TDv image can be downloaded from:<br>
+URL  : https://software.cisco.com/download/home/286306503/type/286306337/release/7.6.0 <br>
+File : [ CSF-TDv v7.6.0 on Azure ] : Cisco_Secure_Firewall_Threat_Defense_Virtual-7.6.0-113.vhd.bz2<br>
 
 2. Create a linux VM in Azure, un-compress the *.bz2 & upload the VHD image to container in Azure storage account.
 
@@ -168,7 +168,7 @@ resourceGroup().location
 .blob.core.windows.net
 
 ## References
-* [Software Downloads Home - CSF-TDv](https://software.cisco.com/download/home/286306503/type/286306337/release/7.4.1)
+* [Software Downloads Home - CSF-TDv](https://software.cisco.com/download/home/286306503/type/286306337/release/7.6.0)
 * [CSF-TDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/consolidated_ftdv_gsg/threat-defense-virtual-74-gsg/m-ftdv-azure-gsg.html#id_82702)
 * [CSF-MCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 

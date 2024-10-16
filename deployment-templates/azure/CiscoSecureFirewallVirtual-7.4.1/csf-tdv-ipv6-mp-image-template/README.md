@@ -44,7 +44,7 @@ Use the instructions in the quick start guide for CSF-TDv deployment.<br>
 e.g. cisco-tdv
 
 2. **softwareVersion**: The software version text, this is the image version from the VM offer.<br>
-e.g. 7.4.1-172
+e.g. 7.6.0-113
 
 3. **billingType**: Billing type to use BYOL or PAYG. PAYG is supported only for 6.5 and above versions.<br>
 e.g. BYOL
@@ -164,7 +164,7 @@ resourceGroup().location
 .blob.core.windows.net
 
 ## References
-* [Software Downloads Home - CSF-TDv](https://software.cisco.com/download/home/286306503/type/286306337/release/7.4.1)
+* [Software Downloads Home - CSF-TDv](https://software.cisco.com/download/home/286306503/type/286306337/release/7.6.0)
 * [CSF-TDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/consolidated_ftdv_gsg/threat-defense-virtual-74-gsg/m-ftdv-azure-gsg.html#id_82702)
 * [CSF-MCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 

@@ -15,9 +15,9 @@ Please refer the CSF-TDv deployment procedure and this CSF-MCv deployment is ver
 [Azure CSF-MCv quick start guide](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/consolidated_ftdv_gsg/threat-defense-virtual-74-gsg/m-ftdv-azure-gsg.html)
 
 1. Download the Firepower Management Center Virtual vhd image from Cisco Download Software download page. <br>
-e.g. 7.4.1-172 CSF-MCv image can be downloaded from:<br>
-URL  : https://software.cisco.com/download/home/286259687/type/286271056/release/7.4.1<br>
-File : [ CSF-MCv v7.4.1 on Azure ]  	Cisco_Secure_FW_Mgmt_Center_Virtual_Azure-7.4.1-172.vhd.bz2<br>
+e.g. 7.6.0-113 CSF-MCv image can be downloaded from:<br>
+URL  : https://software.cisco.com/download/home/286259687/type/286271056/release/7.6.0<br>
+File : [ CSF-MCv v7.6.0 on Azure ]  	Cisco_Secure_FW_Mgmt_Center_Virtual_Azure-7.6.0-113.vhd.bz2<br>
 
 2. Create a linux VM in Azure, un-compress the *.bz2 & upload the VHD image to container in Azure storage account.
 
@@ -91,7 +91,7 @@ resourceGroup().location
 .blob.core.windows.net
 
 ## References
-* [Software Downloads Home - CSF-MCv](https://software.cisco.com/download/home/286259687/type/286271056/release/7.4.1)
+* [Software Downloads Home - CSF-MCv](https://software.cisco.com/download/home/286259687/type/286271056/release/7.6.0)
 * [CSF-TDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/consolidated_ftdv_gsg/threat-defense-virtual-74-gsg/m-ftdv-azure-gsg.html#id_82702)
 * [CSF-MCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 * [CSF-MCv deployment steps](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_82702)
