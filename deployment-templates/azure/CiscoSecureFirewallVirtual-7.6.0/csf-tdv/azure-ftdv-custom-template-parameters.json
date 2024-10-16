@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "value": "cisco-tdv"
+    },
+    "vmImageId": {
+      "value": "/subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage"
+    },
+    "adminUsername": {
+      "value": "cisco"
+    },
+    "adminPassword": {
+      "value": "Password@2023"
+    },
+    "vmStorageAccount": {
+      "value": "ciscotdvstorage"
+    },
+    "availabilityZone": {
+      "value": 0
+    },
+    "customData": {
+      "value": "{\"AdminPassword\": \"Password@2023\",\"Hostname\": \"cisco-tdv\", \"ManageLocally\":\"No\"}"
+    },
+    "virtualNetworkResourceGroup": {
+      "value": "test-tdv-rg"
+    },
+    "virtualNetworkName": {
+      "value": "test-tdv-vnet"
+    },
+    "mgmtSubnetName": {
+      "value": "mgmt"
+    },
+    "mgmtSubnetIP": {
+      "value": "10.4.0.10"
+    },
+    "diagSubnetName": {
+      "value": "diag"
+    },
+    "diagSubnetIP": {
+      "value": "10.4.1.10"
+    },
+    "data1SubnetName": {
+      "value": "inside"
+    },
+    "data1SubnetIP": {
+      "value": "10.4.2.10"
+    },
+    "data2SubnetName": {
+      "value": "outside"
+    },
+    "data2SubnetIP": {
+      "value": "10.4.3.10"
+    },
+    "vmSize": {
+      "value": "Standard_D3_v2"
+    }
+  }
+}
