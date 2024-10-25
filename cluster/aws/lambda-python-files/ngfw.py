@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -105,12 +105,26 @@ class NgfwInstance (CiscoEc2Instance):
             raise Exception("SSH authentication failed")
         try:
             chan = connectmgr.invoke_shell()
-            resp = chan.recv(9999)
+            #Polling the initial output received on login for '>' prompt,
+            #so that 'show cluster info' is sent when Paramiko SSH session is stable 
+            #and correct output is received
+            resp1 = ''
+            seconds=0
+            while seconds<10:
+                resp1 += chan.recv(9999).decode('utf-8')
+                if resp1.endswith('> '):
+                    break
+                else:
+                    time.sleep(1)
+                    seconds+=1
+            if seconds == 10:
+                logger.error("ERROR forming stable session!")   
+                raise Exception("ERROR forming stable session!")   
             chan.send('show cluster info\n')
             time.sleep(3)
-            resp = chan.recv(9999)
+            resp2 = chan.recv(9999)
             connectmgr.close()
-            return resp.decode("utf-8")
+            return resp2.decode("utf-8")
         except:
             logger.error("ERROR: in connect cluster")
             raise Exception("Cluster connection failed")

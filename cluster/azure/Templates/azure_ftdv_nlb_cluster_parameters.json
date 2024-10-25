@@ -54,7 +54,7 @@
             "value": "nlb-cluster"
         },
         "softwareVersion": {
-            "value": "741172.0.0"
+            "value": "760113.0.0"
         },
         "vmSize": {
             "value": "Standard_D4_v2"

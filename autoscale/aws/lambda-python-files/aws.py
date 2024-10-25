@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -30,6 +30,8 @@ import constant as const
 import utility as utl
 
 logger = utl.setup_logging()
+# Get User input
+user_input = utl.get_user_input_lifecycle_ftdv()
 
 
 class SimpleNotificationService:
@@ -783,9 +785,20 @@ class EC2Instance:
                 network_interface = self.ec2.create_network_interface(SubnetId=subnet_id, Groups=[sec_grp_id])
                 network_interface_id = network_interface['NetworkInterface']['NetworkInterfaceId']
                 logger.info("Created network interface: {}".format(network_interface_id))
-
                 self.ec2.create_tags(Resources=[network_interface_id], Tags=[{'Key': 'Name', 'Value': eni_name}])
                 logger.info("Added tag {} to network interface".format(eni_name))
+                #FOR DUAL-ARM DEPLOYMENTS ONLY: Create and attach Elastic IP to outside interface
+                if user_input['PROXY_TYPE'] == 'DUAL_ARM' and const.ENI_NAME_OF_INTERFACE_3 in eni_name:
+                    logger.info('Creating and attaching Elastic IP to outside interface ..')
+                    elastic_ip_response = self.ec2.allocate_address(Domain='vpc')
+                    public_ip = elastic_ip_response['PublicIp']
+                    allocation_id = elastic_ip_response['AllocationId']
+                    # Associate the Elastic IP address with the network interface
+                    self.ec2.associate_address(
+                        AllocationId=allocation_id,
+                        NetworkInterfaceId=network_interface_id
+                    )
+                    logger.info ('Successfully attached Elastic IP {} to interface ..'.format(public_ip))
             except botocore.exceptions.ClientError as e:
                 logger.error("Error creating network interface: {}".format(e.response['Error']))
         return network_interface_id
@@ -829,17 +842,7 @@ class EC2Instance:
                             'AttachmentId': attachment,
                             'DeleteOnTermination': True
                         },
-                        # Description={
-                        # 	'Value': 'string'
-                        # },
-                        # DryRun=True|False,
-                        # Groups=[
-                        # 	'string',
-                        # ],
                         NetworkInterfaceId=network_interface_id,
-                        # SourceDestCheck={
-                        # 	'Value': True|False
-                        # }
                     )
                     logger.debug("Response of modify_network_interface_attribute: %s" % str(modify_attachment))
                     # both "Attachment" and "SourceDestCheck" doesn't go together in same function call
@@ -1161,3 +1164,34 @@ class CiscoEc2Instance(EC2Instance):
             return self.FAIL
         else:
             return self.SUCCESS
+        
+    def disassociate_from_instance_and_release_eip(self):
+        """
+        Purpose:    Dissociates and releases EIP associated with the device
+        Parameters:
+        Returns:    'SUCCESS' or 'FAIL'
+        Raises:
+        """
+        try:
+            response = self.ec2.describe_addresses(Filters=[{'Name': 'instance-id', 'Values': [self.instance_id]}])
+            allocation_id = response['Addresses'][0]['AllocationId']
+            eip_public_ip = response['Addresses'][0]['PublicIp']
+            response = self.ec2.disassociate_address(PublicIp=eip_public_ip)
+            if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+                logger.info("Elastic IP disassociated successfully.")
+                response = self.ec2.release_address(AllocationId=allocation_id)  
+                if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+                    logger.info("Elastic IP released successfully.")
+                    return self.SUCCESS
+                else:
+                    logger.error("Failed to release Elastic IP.")   
+                    return self.FAIL
+            else:
+                logger.error("Failed to disassociate Elastic IP.")
+                return self.FAIL
+        except botocore.exceptions.ClientError as e:
+            logger.error("Unable to dissociate / release Elastic IP from outside interface : {}".format(e.response['Error']))
+            logger.debug(str(e))
+            return self.FAIL 
+        else:
+            return self.SUCCESS        

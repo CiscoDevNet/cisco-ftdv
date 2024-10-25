@@ -1,45 +1,45 @@
 {
-  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
-  "fmcIpforDeviceReg": "DONTRESOLVE",
-  "RegistrationId": "cisco",
-  "NatId": "cisco",
-  "fmcAccessPolicyName": "aws-asg-policy",
-  "fmcNatPolicyName": "AWS-Cisco-NGFW-VMs",
-  "fmcInsideNicName": "inside",
-  "fmcOutsideNicName": "outside",
-  "fmcInsideNic": "GigabitEthernet0/0",
-  "fmcOutsideNic": "GigabitEthernet0/1",
-  "fmcOutsideZone": "Outside-sz",
-  "fmcInsideZone": "Inside-sz",
-  "MetadataServerObjectName": "aws-metadata-server",
-  "interfaceConfig": [
-    {
-      "managementOnly": "false",
-      "MTU": "1500",
-      "securityZone": {
-        "name": "Inside-sz"
+    "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+    "fmcIpforDeviceReg": "DONTRESOLVE",
+    "RegistrationId": "cisco",
+    "NatId": "cisco",
+    "fmcAccessPolicyName": "aws-access-policy",
+    "fmcPlatformPolicyName": "aws-healthcheck-plt-policy",
+    "fmcInsideNicName": "inside",
+    "fmcOutsideNicName": "outside",
+    "fmcInsideNic": "TenGigabitEthernet0/0",
+    "fmcOutsideNic": "TenGigabitEthernet0/1",
+    "fmcInsideZone": "Inside-sz",
+    "fmcOutsideZone": "Outside-sz",
+    "interfaceConfig": [
+      {
+        "ifname": "inside",
+        "name": "TenGigabitEthernet0/0",
+        "managementOnly": "false",
+        "MTU": "1500",
+        "mode": "NONE",
+        "securityZone": {
+          "name": "Inside-sz"
+        }
       },
-      "mode": "NONE",
-      "ifname": "inside",
-      "name": "GigabitEthernet0/0"
-    },
-    {
-      "managementOnly": "false",
-      "MTU": "1500",
-      "securityZone": {
-        "name": "Outside-sz"
-      },
-      "mode": "NONE",
-      "ifname": "outside",
-      "name": "GigabitEthernet0/1"
-    }
-  ],
-  "trafficRoutes": [
-    {
-      "interface": "inside",
-      "network": "aws-metadata-server",
-      "gateway": "",
-      "metric": "1"
-    }
-  ]
-}
+      {
+        "ifname": "outside",
+        "name": "TenGigabitEthernet0/1",
+        "managementOnly": "false",
+        "MTU": "1500",
+        "mode": "NONE", 
+        "securityZone": {
+          "name": "Outside-sz"
+        }
+      }
+    ],
+    "SingleArmTrafficRoutes": [
+      {
+        "interface": "inside",
+        "network": "any-ipv4",
+        "gateway": "",
+        "metric": "1"
+      }
+    ]
+  }
+  

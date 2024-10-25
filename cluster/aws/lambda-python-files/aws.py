@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -144,10 +144,10 @@ class AutoScaleGroup:
                 ],
             )
         except botocore.exceptions.ClientError as e:
-            logger.error("Botocore Error removing the instance: {}".format(e.response['Error']))
+            logger.error("Botocore Error in describing instance tags: {}".format(e.response['Error']))
             return None
         except Exception as e:
-            logger.error("General Error removing the instance" + str(e))
+            logger.error("General Error in describing instance tags" + str(e))
             return None
         return response
 
@@ -192,10 +192,10 @@ class AutoScaleGroup:
             logger.error("Botocore Error: {}".format(e.response['Error']))
             return None
         except Exception as e:
-            logger.error("General Error removing the instance" + str(e))
+            logger.error("General Error in getting instance details" + str(e))
             return None
         return instance_list
-        
+    
     def get_asgroup_size(self):
         """
         Purpose:        To get Desired, Min and Max AutoScale Group size.
@@ -220,7 +220,7 @@ class AutoScaleGroup:
             logger.error("General Error getting group size" + str(e))
             return None
         return DesiredCapacity, MinSize, MaxSize
-        
+
     def complete_lifecycle_action_success(self, hookname, instance_id):
         """
         Purpose:        To complete lifecycle hook successfully
@@ -543,14 +543,14 @@ class EC2Instance:
             r = response['Reservations'][0]['Instances'][0]['PublicIpAddress']
         except Exception as e:
             logger.debug(str(e))
-            return ''
+            return 'error retrieving public ip'
         return r
 
     def get_private_ip(self):
         """
         Purpose:        To get private ip of the instance
         Parameters:
-        Returns:        Public Ip or None
+        Returns:        Private Ip or None
         Raises:
         """
         response = self.__get_describe_instance()
@@ -558,7 +558,7 @@ class EC2Instance:
             r = response['Reservations'][0]['Instances'][0]['PrivateIpAddress']
         except Exception as e:
             logger.debug(str(e))
-            return ''
+            return 'error retrieving private ip'
         return r
 
     def get_instance_state(self):
@@ -689,6 +689,32 @@ class EC2Instance:
             logger.debug("{}".format(e))
             logger.error("Unable to split CIDR block to get subnet mask")
             return None
+
+    def get_cidr_describe_security_group(self, group_id):
+        """
+        Purpose:    To get cidr from describe security group
+        Parameters: security group id
+        Returns:    cidr
+        Raises:
+        """
+        cidr = None
+        try:
+            response = self.ec2.describe_security_groups(
+                GroupIds=[
+                    group_id,
+                ]
+            )
+        except ClientError as e:
+            logger.info("Unable find describe-security group for subnet with filter sec_grp_id-id: " + group_id)
+            logger.debug(str(e))
+            return None
+        else:
+            security_group = response['SecurityGroups'][0]
+            for permission in security_group.get('IpPermissions', []):
+                if permission['IpProtocol'] == 'tcp':
+                    for ip_range in permission.get('IpRanges', []):
+                        cidr = ip_range['CidrIp']
+            return cidr
 
     def get_instance_az(self):
         """

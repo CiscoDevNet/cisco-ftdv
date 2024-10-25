@@ -1,4 +1,4 @@
-#  Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+#  Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 #
 #  All Rights Reserved.
 #
@@ -59,8 +59,8 @@ Parameters:
       - 1
       - 2
       - 3
-    Default: 2
-  ListOfAzs:
+    Default: 3
+  ListOfAZs:
     Type: CommaDelimitedList
     Description: >-
       Enter the list of Availability Zones (Based on Number of Availability Zones above).
@@ -71,15 +71,14 @@ Parameters:
     ConstraintDescription: must be a valid S3 bucket name
   TgHealthPort:
     Description: >-
-      Note By default this port shouldn't be used for traffic, because
-      any request coming to NGFWv having destination port as this will be routed to AWS Metadata server.
-      If you want your application itself to reply for health probes then accordingly NAT rules can be changed for NGFWv.
+      Provide Health Probe Port for Gateway Load Balancer.
       In such case if application doesn't respond then FTDv will be marked as
       unhealthy and gets deleted due to Unhealthy instance threshold alarm.
+      Note: By default this port shouldn't be used for traffic.
     Type: String
     AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
     ConstraintDescription: must be a valid TCP port
-    Default: 22
+    Default: 7575
   AssignPublicIP:
     Description: >-
       Please select true if  needs to have public IP address. In case NGFWv needs to have public IP then management
@@ -100,12 +99,12 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
   InsideInterfaceSG:
     Description: >-
-      Please select security group ID for NGFWv instances inside interface
+      Please select security group ID for NGFWv instances' Inside interface
     Type: AWS::EC2::SecurityGroup::Id
   InsideSubnetId:
     Description: >-
-      Select only one subnet per AZ. If multiple subnet from same AZ are chosen,
-      wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
+      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
   OutsideInterfaceSG:
@@ -114,20 +113,35 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
   OutsideSubnetId:
     Description: >-
-      Select only one subnet per AZ. If multiple subnet from same AZ are chosen, Creation of LB will fail.
-      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen,
+      wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
   InstanceType:
     Description: Cisco NGFWv EC2 instance type
     Type: String
     AllowedValues:
-      - c3.xlarge
-      - c4.xlarge
       - c5.xlarge
       - c5.2xlarge
       - c5.4xlarge
-    Default: c4.xlarge
+      - c5d.xlarge
+      - c5d.2xlarge
+      - c5d.4xlarge
+      - c5a.xlarge
+      - c5a.2xlarge
+      - c5a.4xlarge
+      - c5ad.xlarge
+      - c5ad.2xlarge
+      - c5ad.4xlarge
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - m5n.xlarge
+      - m5n.2xlarge
+      - m5n.4xlarge
+      - m5zn.xlarge
+      - m5zn.2xlarge
+    Default: c5.xlarge
   LicenseType:
     Description: >-
       Choose Cisco NGFWv EC2 instance license type, make sure AMI ID which will be entered below is of same licensing type.
@@ -212,6 +226,13 @@ Parameters:
       If KMS ARN is specified above, please provide encrypted password.
     NoEcho: true
     Type: String
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V1 and V2 (token optional)"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
   CpuThresholds:
     Description: >-
       [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
@@ -350,6 +371,16 @@ Parameters:
       - 80,0
       - 90,95
       - 90,0
+  DeploymentType:
+    Description: >-
+      Specify whether single-arm or dual-arm deployment required. Choose "SINGLE_ARM" or "DUAL_ARM" from drop-down
+      NOTE : Dual-arm supported for versions 7.6.0 and above ONLY
+    Type: String
+    Default: "SINGLE_ARM"
+    AllowedValues:
+      - "SINGLE_ARM"
+      - "DUAL_ARM"
+
 Conditions:
   support1zone: !Equals
     - !Ref NoOfAZs
@@ -391,6 +422,10 @@ Conditions:
       - !Equals
         - 0
         - !Select ['0', !Ref MemoryThresholds ]
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -408,7 +443,7 @@ Metadata:
           - LambdaSubnets
           - LambdaSG
           - NoOfAZs
-          - ListOfAzs
+          - ListOfAZs
           - MgmtSubnetId
           - InsideSubnetId
           - OutsideSubnetId
@@ -428,6 +463,7 @@ Metadata:
           - AmiID
           - KmsArn
           - ngfwPassword
+          - InstanceMetadataServiceVersion
       - Label:
           default: FMC Automation Configuration
         Parameters:
@@ -462,7 +498,7 @@ Metadata:
         default: Security Groups for Lambda Functions
       NoOfAZs:
         default: Number of Availibility Zones
-      ListOfAzs:
+      ListOfAZs:
         default: Availability Zones
       S3BktName:
         default: S3 Bucket Name
@@ -512,13 +548,15 @@ Metadata:
         default: Lower,Upper CPU Thresholds
       MemoryThresholds:
         default: Lower,Upper Memory Thresholds
+      InstanceMetadataServiceVersion:
+        default: Instance Metadata Service Version
 Resources:
 # Lambda Layer ---------------------------------------------------------
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
-        - python3.9
+        - python3.11
       Content:
         S3Bucket: !Ref S3BktName
         S3Key: autoscale_layer.zip
@@ -588,7 +626,7 @@ Resources:
 # ------------------------------------------------------------------------
 # Load Balancer & Target groups
 # ------------------------------------------------------------------------
-  lbOutside:
+  lbInside:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'gwlb' ] ]
@@ -600,19 +638,19 @@ Resources:
         - support1zone
         - !Split
           - ':'
-          - !Select ['0', !Ref OutsideSubnetId ]
+          - !Select ['0', !Ref InsideSubnetId ]
         - !If
           - support2zone
           - !Split
             - ':'
-            - !Join [':', [ !Select ['0', !Ref OutsideSubnetId ], !Select ['1', !Ref OutsideSubnetId ] ] ]
+            - !Join [':', [ !Select ['0', !Ref InsideSubnetId ], !Select ['1', !Ref InsideSubnetId ] ] ]
           - !Split
             - ':'
-            - !Join [':',[ !Select ['0', !Ref OutsideSubnetId ], !Select ['1', !Ref OutsideSubnetId ], !Select ['2', !Ref OutsideSubnetId ] ] ]
+            - !Join [':',[ !Select ['0', !Ref InsideSubnetId ], !Select ['1', !Ref InsideSubnetId ], !Select ['2', !Ref InsideSubnetId ] ] ]
   UnSectg0:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     DependsOn:
-      - lbOutside
+      - lbInside
     Properties:
       Name: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'lb-UnSec-tg0' ] ]
       Port: 6081
@@ -629,7 +667,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref UnSectg0
-      LoadBalancerArn: !Ref lbOutside
+      LoadBalancerArn: !Ref lbInside
 
 # ------------------------------------------------------------------------
 # AutoScale Manager Lambda
@@ -640,7 +678,7 @@ Resources:
    Properties:
      FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'manager-lambda'] ]
      Handler: manager.lambda_handler
-     Runtime: python3.9
+     Runtime: python3.11
      ReservedConcurrentExecutions: 1
      CodeUri:
        Bucket: !Ref S3BktName
@@ -668,8 +706,9 @@ Resources:
          FMC_PASSWORD: !Ref fmcOperationsPassword
          NO_OF_AZs: !Ref NoOfAZs
          FTD_LICENSE_TYPE: !Ref LicenseType
-         LB_ARN_OUTSIDE: !Ref lbOutside
+         LB_ARN: !Ref lbInside
          FTD_PASSWORD: !Ref ngfwPassword
+         PROXY_TYPE: !Ref DeploymentType
          TG_HEALTH_PORT: !Ref TgHealthPort
          AS_MANAGER_TOPIC: !Ref ASmanagerTopic
          USER_NOTIFY_TOPIC_ARN: !If
@@ -753,7 +792,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'lifecycle-lambda'] ]
       Handler: lifecycle_ftdv.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.11
       CodeUri:
         Bucket: !Ref S3BktName
         Key: lifecycle_ftdv.zip
@@ -775,6 +814,7 @@ Resources:
           FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
           FMC_PERFORMANCE_TIER: !Ref fmcPerformanceLicenseTier
           NO_OF_AZs: !Ref NoOfAZs
+          PROXY_TYPE: !Ref DeploymentType
           FTD_LICENSE_TYPE: !Ref LicenseType
           INSIDE_SUBNET: !If
             - support1zone
@@ -792,7 +832,7 @@ Resources:
               - !Join ['::', [ !Select ['0', !Ref OutsideSubnetId ], !Select ['1', !Ref OutsideSubnetId ] ] ]
               - !Join ['::', [ !Select ['0', !Ref OutsideSubnetId ], !Select ['1', !Ref OutsideSubnetId ], !Select ['2', !Ref OutsideSubnetId ] ] ]
           SECURITY_GRP_3: !Ref OutsideInterfaceSG
-          LB_ARN_OUTSIDE: !Ref lbOutside
+          LB_ARN: !Ref lbInside
           LB_DEREGISTRATION_DELAY: 180
           CONFIGURE_ASAV_TOPIC_ARN: !Ref ASmanagerTopic
           USER_NOTIFY_TOPIC_ARN: !If
@@ -842,7 +882,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'publish-custom-metrics'] ]
       Handler: custom_metric_fmc.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.11
       CodeUri:
         Bucket: !Ref S3BktName
         Key: custom_metric_fmc.zip
@@ -860,7 +900,6 @@ Resources:
       Environment:
         Variables:
          DEBUG_LOGS: 'enable'
-         GENEVE_SUPPORT: 'enable'
          KMS_ENC: !If
            - ShouldEncrypt
            - !Ref KmsArn
@@ -1081,6 +1120,7 @@ Resources:
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
+      - InstanceEvent
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber ] ]
@@ -1122,7 +1162,7 @@ Resources:
           LifecycleHookName: Launch_LifecycleHook
           LifecycleTransition: 'autoscaling:EC2_INSTANCE_LAUNCHING'
         - DefaultResult: CONTINUE
-          HeartbeatTimeout: 120
+          HeartbeatTimeout: 400
           LifecycleHookName: Terminate_LifecycleHook
           LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
   FTDvLaunchTemplate:
@@ -1130,6 +1170,16 @@ Resources:
     Properties:
       LaunchTemplateName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'ftd-launch-template' ] ]
       LaunchTemplateData:
+        MetadataOptions:
+          Fn::If:
+            - EnableIMDSv2
+            -
+              HttpEndpoint: "enabled"  # Use Amazon DNS for metadata service
+              HttpProtocolIpv6: "disabled"  # Disable IPv6 for metadata service
+              HttpPutResponseHopLimit: 1  # Set hop limit to 1
+              HttpTokens: "required"  # Require IMDSv2 for metadata requests
+              # InstanceMetadataTags: "enabled"  # Include custom instance metadata tags
+            - !Ref "AWS::NoValue"
         EbsOptimized: false
         ImageId: !Ref AmiID
         InstanceType: !Ref InstanceType
@@ -1148,12 +1198,3 @@ Resources:
           Fn::Base64: !Sub |
             { "AdminPassword": "FtDv_AuT0Scale"}
 
-  OutsideInterfaceSGIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      CidrIp: 0.0.0.0/0
-      Description: Ingress Rule to Allow Health Check traffic
-      FromPort: !Ref TgHealthPort
-      ToPort: !Ref TgHealthPort
-      GroupId: !Ref OutsideInterfaceSG
-      IpProtocol: tcp

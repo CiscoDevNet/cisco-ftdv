@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -117,6 +117,7 @@ class NgfwInstance (CiscoEc2Instance):
             if status == 'SUCCESS':
                 cnt_ngfw.close()  # As below function triggers interactive shell
                 if self.change_ngfw_password(cnt_ngfw, self.defaultPassword, self.password) == 'SUCCESS':
+                    logger.info('FTD Default password changed, user-provided password set')
                     return 'SUCCESS'
             else:
                 logger.error("Unable to authenticate to NGFW instance, please check password!")
@@ -267,15 +268,21 @@ class ManagedDevice(NgfwInstance):
     """
     def __init__(self, instance_id, fmc):
         super().__init__(instance_id)
-        # Will be available from json
+        # Will be available from json / environment variables
         self.l_caps = ''
         self.performance_tier = ''
+        self.health_check_port = ''
+        self.platform_policy_name = ''
+        self.dual_arm_nat_policy_name = ''
         self.traffic_routes = []
         self.interface_config = []
+        self.proxy_type = ''
         self.in_nic = ''
         self.out_nic = ''
         self.in_nic_name = ''
         self.out_nic_name = ''
+        self.vni_nic_name = ''
+        self.vni_nic_zone = ''
 
         # Will be instantiated during run-time
         self.fmc = fmc
@@ -289,6 +296,9 @@ class ManagedDevice(NgfwInstance):
         self.out_nic_zone = ''
         self.in_nic_zone_id = ''
         self.out_nic_zone_id = ''
+        self.vni_nic_zone_id = ''
+        self.platform_policy_id = ''
+        self.dual_arm_nat_policy_id = ''
         # Only if STATIC
         self.in_nic_ip = ''
         self.in_nic_subnet_id = ''
@@ -348,6 +358,8 @@ class ManagedDevice(NgfwInstance):
                     if interface['ifname'] == self.out_nic_name:
                         self.out_nic_zone = interface['securityZone']['name']
                         self.out_nic_zone_id = self.fmc.get_security_objectid_by_name(self.out_nic_zone)
+                if self.proxy_type == 'DUAL_ARM':
+                    self.vni_nic_zone_id = self.fmc.get_security_objectid_by_name(self.vni_nic_zone)         
             except Exception as e:
                 logger.exception(e)
         else:
@@ -398,14 +410,82 @@ class ManagedDevice(NgfwInstance):
                 return 'FAIL'
         return 'SUCCESS'
 
-    def check_and_configure_routes(self):
+    def check_and_configure_platform_policy(self):
         """
-        Purpose:    Checks for Static Route if present, if not then creates the Static Route.
+        Purpose:    Checks for Platform Policy if present, if not then creates the Platform Policy.
+                    This is required to set up listener on FTDs to register to Target Group
         Parameters: fmc object from caller function
         Returns:    Success or Fail
         Raises:
         """
         try:
+            logger.info('Checking and creating Platform Policy if it does not exist in FMC')
+            self.platform_policy_id = self.fmc.check_and_create_platform_policy(self.platform_policy_name)
+            if self.platform_policy_id == '':
+                raise Exception("Error fetching Platform Policy UUID from FMC")
+            
+            logger.info('Checking and associating Platform Policy to FTD Device Group ')
+            if self.fmc.check_and_associate_policy_to_device_group('FTDPlatformSettingsPolicy', self.platform_policy_name, self.platform_policy_id) == 'SUCCESS':
+                r = self.fmc.check_http_access_settings(self.platform_policy_id,self.health_check_port,self.in_nic_zone,self.in_nic_zone_id)
+                if r == 'CONFIGURED':
+                    return 'SUCCESS'
+                elif r == 'UN-CONFIGURED':
+                    r = self.fmc.create_http_access_settings(self.platform_policy_id,self.health_check_port,self.in_nic_zone,self.in_nic_zone_id) 
+                    logger.info(r)
+                    return 'SUCCESS'
+                else:
+                    raise Exception("Error checking / creating HTTP Access settings in Platform Policy")
+            else:
+                raise Exception("Error associating Platform Policy to FTD Device Group")
+        except Exception as e:
+            logger.critical(e)
+            return 'FAIL'    
+
+    def check_and_configure_dualarm_nat_policy(self):
+        """
+        Purpose:    [DUAL-ARM ONLY !!] 
+                    Checks for NAT Policy if present, if not then creates the NAT Policy.
+        Parameters: fmc object from caller function
+        Returns:    Success or Fail
+        Raises:
+        """
+        try:
+            logger.info('Checking and creating DualArm NAT Policy if it does not exist in FMC')
+            self.dual_arm_nat_policy_id = self.fmc.check_and_create_nat_policy(self.dual_arm_nat_policy_name)
+            if self.dual_arm_nat_policy_id == '':
+                raise Exception("Error fetching NAT Policy UUID from FMC")
+            
+            logger.info('Checking and associating NAT Policy to FTD Device Group ')
+            if self.fmc.check_and_associate_policy_to_device_group('FTDNatPolicy', self.dual_arm_nat_policy_name, self.dual_arm_nat_policy_id) == 'SUCCESS':
+                #Check if NAT rule within NAT policy is configured as expected : else create and configure
+                r = self.fmc.check_nat_rule_within_nat_policy(self.dual_arm_nat_policy_id, self.vni_nic_zone_id, self.out_nic_zone_id)
+                if r == 'CONFIGURED':
+                    return 'SUCCESS'
+                elif r == 'UN-CONFIGURED':
+                    r = self.fmc.create_nat_rule_within_nat_policy(self.dual_arm_nat_policy_id, self.vni_nic_zone, self.vni_nic_zone_id, self.out_nic_zone, self.out_nic_zone_id)
+                    logger.info(r)
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("NAT Rule creation failed!!")
+                    return 'SUCCESS'
+                else:
+                    raise Exception("Error checking / creating NAT Rule within NAT Policy")
+            else:
+                raise Exception("Error associating NAT Policy to FTD Device Group")
+        except Exception as e:
+            logger.critical(e)
+            return 'FAIL'   
+
+    def check_and_configure_static_routes(self): 
+        """
+        Purpose:    Checks for Static Route(s) if present, if not then creates the Static Routes.
+                    [SINGLE-ARM : Creates routes for inside interface]
+                    [DUAL-ARM : Creates routes for inside, outside and VNI interfaces]    
+        Parameters: fmc object from caller function
+        Returns:    Success or Fail
+        Raises:
+        """
+        try:
+            #Update required gateway for device as per AZ
             self.update_gw_stat_route()
             for static_route in self.traffic_routes:
                 check_s_route_ = self.fmc.check_static_route(self.device_id, static_route['interface'],
@@ -434,7 +514,7 @@ class ManagedDevice(NgfwInstance):
                         logger.info("Static Host route configuration REST response {}".format(r.status_code))
         except KeyError as e:
             logger.exception(e)
-            logger.error("Looks like Configuration.json file Key")
+            logger.error("Looks like Configuration.json file Key error")
             return 'FAIL'
         except Exception as e:
             logger.critical(e)
@@ -453,7 +533,7 @@ class ManagedDevice(NgfwInstance):
                           },
                           "mode": "NONE",
                           "ifname": "outside",
-                          "name": "GigabitEthernet0/1"
+                          "name": "TenGigabitEthernet0/1"
                         }
         Returns:        SUCCESS, FAIL
         Raises:
@@ -515,6 +595,12 @@ class ManagedDevice(NgfwInstance):
         Raises:
         """
         for interface in self.interface_config:
+
+            #Skip out_nic's interface configuration in single-arm mode : as out_nic NOT NEEDED
+            if interface['name'] == self.out_nic and self.proxy_type == 'SINGLE_ARM':
+                logger.info('Outside interface configuration not needed in single-arm mode , SKIPPING ...')
+                continue
+            
             if self.check_interface_config(interface) == 'FAIL':
                 try:
                     logger.info("Configuring Nic %s ..." % (interface['name']))
@@ -527,9 +613,9 @@ class ManagedDevice(NgfwInstance):
                                                               interface['MTU'], self.in_nic_ip, self.in_nic_netmask)
                         elif interface['name'] == self.out_nic:
                             r = self.fmc.configure_nic_static(self.device_id, self.out_nic_id, self.out_nic,
-                                                              self.out_nic_name, interface['managementOnly'],
-                                                              interface['mode'], self.out_nic_zone_id,
-                                                              interface['MTU'], self.out_nic_ip, self.out_nic_netmask)
+                                                                self.out_nic_name, interface['managementOnly'],
+                                                                interface['mode'], self.out_nic_zone_id,
+                                                                interface['MTU'], self.out_nic_ip, self.out_nic_netmask)
                     elif const.NIC_CONFIGURE == "DHCP":
                         if interface['name'] == self.in_nic:
                             r = self.fmc.configure_nic_dhcp(self.device_id, self.in_nic_id, self.in_nic,
@@ -537,9 +623,9 @@ class ManagedDevice(NgfwInstance):
                                                             interface['mode'], self.in_nic_zone_id, interface['MTU'])
                         elif interface['name'] == self.out_nic:
                             r = self.fmc.configure_nic_dhcp(self.device_id, self.out_nic_id, self.out_nic,
-                                                            self.out_nic_name, interface['managementOnly'],
-                                                            interface['mode'], self.out_nic_zone_id, interface['MTU'])
-                    logger.info("Response: ")
+                                                                self.out_nic_name, interface['managementOnly'],
+                                                                interface['mode'], self.out_nic_zone_id, interface['MTU'])
+                        logger.info("Response: ")
                     logger.info(r)
                 except Exception as e:
                     logger.exception(e)
@@ -547,6 +633,9 @@ class ManagedDevice(NgfwInstance):
 
         status = 'SUCCESS'
         for interface in self.interface_config:
+            #Skip check_interface_config for out_nic in single-arm mode
+            if interface['name'] == self.out_nic and self.proxy_type == 'SINGLE_ARM':
+                continue
             status = self.check_interface_config(interface)
             if status == 'FAIL':
                 return status
@@ -562,19 +651,29 @@ class ManagedDevice(NgfwInstance):
         for interface in self.interface_config:
             try:                
                 r = None
-                if interface['name'] == self.out_nic:
+                #Configure VTEP and VNI on inside interface
+                if interface['name'] == self.in_nic:
                     logger.info("Configuring vtep for %s ..." % (interface['name']))				
-                    r = self.fmc.enable_vtep(self.device_id, self.out_nic_id, self.out_nic, self.out_nic_name)
+                    r = self.fmc.enable_vtep(self.device_id, self.in_nic_name, self.in_nic_id)
                     logger.info("Response: ")
                     logger.info(r)
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("Configuring VTEP failed!!")
                     logger.info("Adding VNI")
-                    r = self.fmc.add_vni(self.device_id, self.out_nic_zone_id)
+                    if self.proxy_type == 'DUAL_ARM':
+                        vni_nic_name = self.vni_nic_name
+                        vni_seczone_id = self.vni_nic_zone_id
+                    elif self.proxy_type == 'SINGLE_ARM':
+                        vni_nic_name = 'vni1'
+                        vni_seczone_id = self.in_nic_zone_id
+                    r = self.fmc.add_vni(self.device_id, self.proxy_type, vni_nic_name, vni_seczone_id) 
                     logger.info("Response: ")
-                    logger.info(r)					
+                    logger.info(r)	
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("Configuring VTEP failed!!")				
             except Exception as e:
                 logger.exception(e)
-                logger.error("Configuring VTEP failed!")
-        #TODO: check status and return  
+                logger.error("Configuring VNI / VTEP failed!") 
         status = 'SUCCESS'
         return status
 		
@@ -642,23 +741,31 @@ class ManagedDevice(NgfwInstance):
         else:
             return "SUCCESS"
 
-    def update_gw_stat_route(self):
+    def update_gw_stat_route(self): 
         """
         Purpose:    To update Gateway in static route
         Parameters:
         Returns:
         Raises:
         """
+        #Gateway needs to be configured for every device individually as per AZ
         for static_route in self.traffic_routes:
-            if static_route['gateway'] == '':
-                if static_route['interface'] == self.in_nic_name:
-                    subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                    subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
-                    static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
-                elif static_route['interface'] == self.out_nic_name:
-                    subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-                    subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
-                    static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
+            ## Inside Route : Single-arm,Dual-arm both.Needed for cross-zone routing 
+			## Needed for NLB as well
+            if static_route['interface'] == self.in_nic_name:
+                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
+                static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)   
+            ## Outside Route : Dual-Arm only,N-S traffic
+            elif static_route['interface'] == self.out_nic_name:
+                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
+                static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
+            ## VNI Route : Dual-Arm only,E-W traffic     
+            elif static_route['interface'] == self.vni_nic_name:
+                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
+                static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)  
             logger.debug(json.dumps(static_route, separators=(',', ':')))
         return
 
@@ -791,7 +898,6 @@ class ParamikoSSH:
         Raises:
             ValueError based on the error
         """
-        # try:
         if self.connect(username, password) != self.SUCCESS:
             raise ValueError("Unable to connect to server")
         status, shell = self.invoke_interactive_shell()

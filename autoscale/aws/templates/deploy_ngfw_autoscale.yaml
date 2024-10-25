@@ -1,4 +1,4 @@
-#  Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+#  Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 #
 #  All Rights Reserved.
 #
@@ -239,6 +239,13 @@ Parameters:
       If KMS ARN is specified above, please provide encrypted password.
     NoEcho: true
     Type: String
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V1 and V2 (token optional)"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
   CpuThresholds:
     Description: >-
       [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
@@ -431,6 +438,10 @@ Conditions:
       - !Equals
         - 0
         - !Select ['0', !Ref MemoryThresholds ]
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -472,6 +483,7 @@ Metadata:
           - AmiID
           - KmsArn
           - ngfwPassword
+          - InstanceMetadataServiceVersion
       - Label:
           default: FMC Automation Configuration
         Parameters:
@@ -564,6 +576,8 @@ Metadata:
         default: Lower,Upper CPU Thresholds
       MemoryThresholds:
         default: Lower,Upper Memory Thresholds
+      InstanceMetadataServiceVersion:
+        default: Instance Metadata Service Version
 Resources:
 # Lambda Layer ---------------------------------------------------------
   LambdaLayer:
@@ -1181,6 +1195,7 @@ Resources:
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
+      - InstanceEvent
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber ] ]
@@ -1230,6 +1245,16 @@ Resources:
     Properties:
       LaunchTemplateName: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'ftd-launch-template' ] ]
       LaunchTemplateData:
+        MetadataOptions:
+          Fn::If:
+            - EnableIMDSv2
+            -
+              HttpEndpoint: "enabled"  # Use Amazon DNS for metadata service
+              HttpProtocolIpv6: "disabled"  # Disable IPv6 for metadata service
+              HttpPutResponseHopLimit: 1  # Set hop limit to 1
+              HttpTokens: "required"  # Require IMDSv2 for metadata requests
+              # InstanceMetadataTags: "enabled"  # Include custom instance metadata tags
+            - !Ref "AWS::NoValue"
         EbsOptimized: false
         ImageId: !Ref AmiID
         InstanceType: !Ref InstanceType
