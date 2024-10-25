@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -58,7 +58,7 @@ DISABLE_REGISTER_TARGET = False
 # Disables or Enables execution of  business logic in ConfigureASAv Lambda
 DISABLE_CLUSTER_MANAGER_LAMBDA = False
 
-DECREMENT_CAP_IF_CLUSTER_DELETED = False
+DECREMENT_CAP_IF_CLUSTER_DELETED = True
 FTD_POLL_TIME_IN_MIN_CLUSTER_READY = 10
 
 DISABLE_CLUSTER_READY_FUNC = False
@@ -73,3 +73,19 @@ TO_FUN_RETRY_COUNT = [3, 5, 5, 3]
 REG_TASK_ID = ""
 # Configuration File Name
 JSON_LOCAL_FILENAME = 'Configuration.json'
+
+# Custom Metric Publisher Constants
+# ------------------------------------------------------------------------------
+DISABLE_CUSTOM_METRIC_PUBLISH_LAMBDA = False
+# These below values are used in CloudFormation Stack..
+# also do change it on AWS resources or CloudFormation
+METRIC_NAME_SPACE = 'Cisco-NGFWv-Cluster-Group'
+NO_DEV_IN_FMC_NOT_IN_AWS = 'DevicesOnlyInFmc'
+NO_DEV_IN_AWS_NOT_IN_FMC = 'DevicesOnlyInAws'
+NO_DEV_IN_BOTH_FMC_AWS = 'DevicesInBothFmcAndAws'
+DEVICE_NO_UNIT = 'Count'
+FMC_METRICS = ['memory']
+MEMORY_UNIT = 'Percent'
+GROUP_AVG_MEMORY = 'GroupAvgMem'
+GROUP_MAX_MEMORY = 'GroupMaxMem'
+GROUP_MIN_MEMORY = 'GroupMinMem'

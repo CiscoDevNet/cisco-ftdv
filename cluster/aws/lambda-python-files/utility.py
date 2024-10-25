@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -99,15 +99,12 @@ def get_user_input_lifecycle_ftdv():
     user_input = {
         "ClusterGrpName": "",
         "fmcDeviceGroupName": "",
-        "max_number_of_interfaces": "5",
+        "max_number_of_interfaces": "4",
         "NO_OF_AZs": "",
         "SUBNET_ID_LIST_2": [],
         "SUBNET_ID_LIST_3": [],
-        "SUBNET_ID_LIST_4": [],
-        "GWLBSUPPORT": "",
         "SECURITY_GRP_2": "",
         "SECURITY_GRP_3": "",
-        "SECURITY_GRP_4": "",
         "GWLB_ARN": "",
         "LB_DEREGISTRATION_DELAY": "",
         "USER_NOTIFY_TOPIC_ARN": "",
@@ -119,28 +116,14 @@ def get_user_input_lifecycle_ftdv():
         user_input['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
         if re.match(r'..*', user_input['fmcDeviceGroupName']) is None:
             raise ValueError("Unable to find valid FMC Device Group Name")
-        user_input['max_number_of_interfaces'] = '5'
+        user_input['max_number_of_interfaces'] = '4'
         user_input['NO_OF_AZs'] = os.environ['NO_OF_AZs']
         user_input['FTD_LICENSE_TYPE'] = os.environ['FTD_LICENSE_TYPE']
         user_input['SUBNET_ID_LIST_2'] = os.environ['INSIDE_SUBNET'].split('::')
         user_input['SECURITY_GRP_2'] = os.environ['SECURITY_GRP_2']
-        try:
-            user_input['SUBNET_ID_LIST_3'] = os.environ['OUTSIDE_SUBNET'].split('::')
-        except KeyError as e:
-            logger.debug("Exception occurred: {}".format(repr(e)))
-            user_input['SUBNET_ID_LIST_3'] = None
-        try:
-            user_input['SECURITY_GRP_3'] = os.environ['SECURITY_GRP_3']
-        except KeyError as e:
-            logger.debug("Exception occurred: {}".format(repr(e))) 
-            user_input['SECURITY_GRP_3'] = None
-        user_input['SUBNET_ID_LIST_4'] = os.environ['CCL_SUBNET'].split('::')
-        user_input['SECURITY_GRP_4'] = os.environ['SECURITY_GRP_4']
-        user_input['GWLBSUPPORT'] = os.environ['GWLBSUPPORT']
-        if user_input['GWLBSUPPORT'] == "Yes":
-            user_input['GWLB_ARN'] = os.environ['GWLB_ARN']
-        else:
-            user_input['GWLB_ARN'] = None
+        user_input['SUBNET_ID_LIST_3'] = os.environ['CCL_SUBNET'].split('::')
+        user_input['SECURITY_GRP_3'] = os.environ['SECURITY_GRP_3']
+        user_input['GWLB_ARN'] = os.environ['GWLB_ARN']
         user_input['LB_DEREGISTRATION_DELAY'] = os.environ['LB_DEREGISTRATION_DELAY']
         try:
             user_input['USER_NOTIFY_TOPIC_ARN'] = os.environ['USER_NOTIFY_TOPIC_ARN']
@@ -154,6 +137,55 @@ def get_user_input_lifecycle_ftdv():
     logger.debug("Environment Variables: " + json.dumps(user_input, separators=(',', ':')))
     return user_input
 
+def get_user_input_custom_metric():
+    """
+    Purpose:    To get user input for custom metric publisher
+    Parameters:
+    Returns:
+    Raises:
+    """
+    user_input = {
+        "ClusterGrpName": "",
+        "fmcDeviceGroupName": "",
+        "FmcServer": "",
+        "FmcMetUserName": "",
+        "FmcMetPassword": "",
+        "cron_event_name": ""
+    }
+    try:
+        user_input['ClusterGrpName'] = os.environ['ASG_NAME']
+        if re.match(r'..*', user_input['ClusterGrpName']) is None:
+            raise ValueError("Unable to find ASG_NAME in os.env")
+        user_input['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
+        if re.match(r'..*', user_input['fmcDeviceGroupName']) is None:
+            raise ValueError("Unable to find FMC_DEVICE_GRP in os.env")
+        user_input['FmcServer'] = os.environ['FMC_SERVER']
+        if re.match(r'^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$',
+                    user_input['FmcServer']) is None:
+            raise ValueError("Unable to find valid FMC_SERVER in os.env, should be a valid IP")
+        user_input['FmcMetUserName'] = os.environ['FMC_MET_USERNAME']
+        if re.match(r'..*', user_input['FmcMetUserName']) is None:
+            raise ValueError("Unable to find FMC_MET_USERNAME in os.env")
+        user_input['cron_event_name'] = os.environ['CRON_JOB_NAME']
+        if re.match(r'..*', user_input['cron_event_name']) is None:
+            raise ValueError("Unable to find CRON_JOB_NAME in os.env")
+        # Print collected values, later add Password to user_input JSON
+        logger.debug("Environment Variables: " + json.dumps(user_input, separators=(',', ':')))
+        user_input['FmcMetPassword'] = os.environ['FMC_MET_PASSWORD']
+        if re.match(r'..*', user_input['FmcMetPassword']) is None:
+            raise ValueError("Unable to find FMC_MET_PASSWORD in os.env")
+        try:
+            if os.environ['KMS_ENC'] is not None:
+                user_input['FmcMetPassword'] = get_decrypted_key(user_input['FmcMetPassword'])
+            else:
+                logger.critical("Issue with KMS ARN in os.env")
+                pass
+        except KeyError:
+            logger.debug("Looks like passwords may not be encrypted with KMS")
+    except Exception as e:
+        logger.error("Exception: {}".format(e))
+        logger.error("Unable to find OS environment variables")
+    return user_input
 
 def get_user_input_manager():
     """
@@ -167,7 +199,6 @@ def get_user_input_manager():
         "fmcDeviceGroupName": "",
         "ClusterManagerTopic": "",
         "USER_NOTIFY_TOPIC_ARN": "",
-        "GWLBSUPPORT" : "",
         "GWLB_ARN": "",
         "FmcIp": "",
         "FmcUserName": "",
@@ -193,10 +224,6 @@ def get_user_input_manager():
                 "pattern": "^arn:aws:sns:.*:.*:.*$"
             },
             "USER_NOTIFY_TOPIC_ARN": {
-                "type": "string",
-                "pattern": "^...*$"
-            },
-            "GWLBSUPPORT": {
                 "type": "string",
                 "pattern": "^...*$"
             },
@@ -234,7 +261,6 @@ def get_user_input_manager():
             "fmcDeviceGroupName",
             "ClusterManagerTopic",
             "USER_NOTIFY_TOPIC_ARN",
-            "GWLBSUPPORT",
             "GWLB_ARN",
             "FmcIp",
             "FmcUserName",
@@ -289,7 +315,6 @@ def get_user_input_manager():
     try:
         env_var['ClusterGrpName'] = os.environ['ASG_NAME']
         env_var['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
-
         env_var['ClusterManagerTopic'] = os.environ['CLS_MANAGER_TOPIC']
         try:
             if os.environ['USER_NOTIFY_TOPIC_ARN'] and os.environ['USER_NOTIFY_TOPIC_ARN'] != '':
@@ -297,12 +322,7 @@ def get_user_input_manager():
         except Exception as e:
             logger.debug(e)
             env_var['USER_NOTIFY_TOPIC_ARN'] = 'NA'
-
-        env_var['GWLBSUPPORT'] = os.environ['GWLBSUPPORT']
-        if env_var['GWLBSUPPORT'] == "Yes":
-            env_var['GWLB_ARN'] = os.environ['GWLB_ARN']
-        else:
-            env_var['GWLB_ARN'] = 'NA'
+        env_var['GWLB_ARN'] = os.environ['GWLB_ARN']
         env_var['FmcIp'] = os.environ['FMC_SERVER']
         env_var['FmcUserName'] = os.environ['FMC_USERNAME']
         env_var['FmcPassword'] = os.environ['FMC_PASSWORD']

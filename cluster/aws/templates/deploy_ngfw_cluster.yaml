@@ -1,4 +1,4 @@
-#  Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+#  Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 #
 #  All Rights Reserved.
 #
@@ -17,14 +17,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: 'AWS::Serverless-2016-10-31'
 Description: >-
-  Deploys Cluster solution for Cisco NGFWv instances
+  Deploys MultiAZ, Autoscaling-enabled Cluster solution for Cisco NGFWv instances
 Parameters:
   ClusterGrpNamePrefix:
     Description: >-
       This will be Cluster Group Name prefix with suffix as Cluster Number
     Type: String
     MaxLength: 18
-    Default: NGFWv-Cluster
+    Default: Multi-AzCluster
   ClusterNumber:
     Description: >-
       This will be suffixed to Cluster Group Name(NGFWv-Cluster), if this value is 1 then, group name will be
@@ -54,7 +54,7 @@ Parameters:
       - 14
       - 15
       - 16
-    Default: 4
+    Default: 3
   NotifyEmailID:
     Description: >-
       Email address to which Cluster Events Email needs to be sent.
@@ -79,28 +79,23 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
   LambdaSG:
     Description: >-
-      Provide Security Groups for Lambda functions, Keep outbound connections to ANYWHERE.
+      Provide Security Group for Lambda functions, Keep outbound connections to ANYWHERE.
     Type: List<AWS::EC2::SecurityGroup::Id>
   NoOfAZs:
     Description: >-
-      Only 1 AZ is supported.
+      Total Number of Availability Zones into which NGFWv will be deployed (Min 1 and Max 3 depends on Region).
+      PLEASE SELECT NoOfAZs = 2 OR 3 ONLY FOR RELEASES 7.6.0 AND ABOVE. FOR LOWER RELEASES, SELECT 1.
     Type: Number
     AllowedValues:
       - 1
-    Default: 1
+      - 2
+      - 3
+    Default: 3
   AZ:
     Type: CommaDelimitedList
     Description: >-
-      Enter 1 Availability Zone
-    Default: us-east-1a
-  UseGWLB:
-    Description: >-
-      Please select "Yes", if you like to use Gateway Load Balancer.
-    Type: String
-    AllowedValues:
-     - "Yes"
-     - "No"
-    Default: "Yes"
+      Enter the list of Availability Zones to launch NGFWvs(Based on Number of Availability Zones above).
+    Default: us-east-1a,us-east-1b,us-east-1c
   DeployGWLBE:
     Description: >-
       Please select "Yes", if you like to deploy Gateway Load Balancer Endpoint.
@@ -108,23 +103,23 @@ Parameters:
     AllowedValues:
      - "Yes"
      - "No"
-    Default: "Yes"
+    Default: "No"
   TargetFailover:
     Description: >-
-      With target failover, Gateway load balancer  handles existing traffic flows after a target becomes unhealthy or when the target is deregistered.
-      You can manage these flows by either rehashing them (rebalance) or leaving them at the default state (no_rebalance).
       Enable Target Failover Support ("rebalance" or "no_rebalance").
-      This feature is only supported on version 7.4.1 onwards.
+      'no_rebalance' - Directs existing flows to failed targets and new flows to healthy targets, ensuring backward compatibility.
+      'rebalance' - GWLB redistributes existing flows while ensuring new flows go to healthy targets.
     Type: String
     AllowedValues:
      - "rebalance"
      - "no_rebalance"
     Default: "no_rebalance"
   S3BktName:
-    Description: The S3 Bucket name for lambda function
+    Description: The S3 Bucket which contains uploaded Lambda zip files. Please specify correct bucket name
     Type: String
     AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
     ConstraintDescription: must be a valid S3 bucket name
+    Default: multi-azinfra-s3bucketcluster-rsx6170089ez
   TgHealthPort:
     Description: >-
       *SKIP this field, if you are NOT using Gateway Load Balancer.
@@ -132,10 +127,10 @@ Parameters:
     Type: String
     AllowedPattern: '^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[1-5])$'
     ConstraintDescription: must be a valid TCP port
-    Default: 80
+    Default: 8080
   AssignPublicIP:
     Description: >-
-      Please select true if  needs to have public IP address. In case NGFWv needs to have public IP then management
+      Please select true if NGFWvs need to have public IP address. In case NGFWv needs to have public IP then management
       subnet should have AWS IGW as route to internet.
     Type: String
     AllowedValues:
@@ -147,83 +142,58 @@ Parameters:
       Enter only one subnet ID.
       - *SKIP this field, if you are NOT deploying Gateway Load Balancer Endpoint.
       Wrong Subnet selection will cause problems.
-      Make sure that Subnet belongs to correct VPC and Subnet should be in same AZ.
+      Make sure that Subnet belongs to correct VPC and belongs to the AZs specified above.
     Type: String
     Default: "SKIP, if you are NOT deploying Gateway Load Balancer Endpoint."
   MgmtInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances
     Type: List<AWS::EC2::SecurityGroup::Id>
-  MgmtSubnetId:
+  MgmtSubnetIds:
     Description: >-
-      Select only one subnet. Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Select only one subnet per AZ. If multiple subnets from same AZ are chosen, wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
   InsideInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances inside interface
     Type: AWS::EC2::SecurityGroup::Id
-  InsideSubnetId:
+  InsideSubnetIds:
     Description: >-
-      Select only one subnet.
-      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Select only one subnet per AZ. If multiple subnets from same AZ are chosen,
+      wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
-  OutsideInterfaceSG:
-    Description: >-
-      Enter Security group ID for NGFWv instances outside interface.
-      - *SKIP this field, if you are using Gateway Load Balancer.
-    Type: String
-    Default: SKIP, if you are using Gateway Load Balancer.
-  OutsideSubnetId:
-    Description: >-
-      Enter Subnet ID of outside subnet.
-      - *SKIP this field, if you are using Gateway Load Balancer.
-      Wrong Subnet ID will cause problems while deploying the NGFWv instances.
-      Make sure of adding Subnet from AZ provided.
-    Type: String
-    Default: SKIP, if you are using Gateway Load Balancer.
   CCLInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances CCL interface
     Type: AWS::EC2::SecurityGroup::Id
-  CCLSubnetId:
+  CCLSubnetIds:
     Description: >-
-      Select only one subnet.
-      Wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Select only one subnet per AZ. If multiple subnet from same AZ are chosen,
+      wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
-  CCLfirstIP:
+  CCLSubnetRanges:
     Description: >-
-      Enter first IP of CCL subnet.
+      Enter IP ranges of CCL subnets for different AZs.
       Exclude first 4 reserved IPs.
       IP pool for Cluster Control Link (CCL).
-      IP will be allocated to CCL interface from CCL IP Pool.
-    Type: String
-    MinLength: 7
-    MaxLength: 15
-    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+      IP will be allocated to NGFWVs' CCL interfaces from CCL IP Pool.
+    Type: CommaDelimitedList
     ConstraintDescription: must be a valid IP address
-    Default: 10.1.90.4
-  CCLlastIP:
-    Description: >-
-      Enter last IP of CCL subnet.
-      Exclude last broadcast IP.
-      IP pool for Cluster Control Link (CCL).
-      IP will be allocated to CCL interface from CCL IP Pool.
-    Type: String
-    MinLength: 7
-    MaxLength: 15
-    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
-    ConstraintDescription: must be a valid IP address
-    Default: 10.1.90.254
+    Default: 10.5.90.4 10.5.90.30,10.5.91.4 10.5.91.30,10.5.92.4 10.5.92.30
   InstanceType:
     Description: >-
       Cisco NGFWv EC2 instance type.
-      Select _.4xlarge (Which supports 5 interfaces), if you are NOT using Gateway Load Balancer.
       Make sure that AWS Region supports selected instance type.
     Type: String
     AllowedValues:
+      - m5n.xlarge
+      - m5n.2xlarge
+      - m5n.4xlarge
+      - m5zn.xlarge
+      - m5zn.2xlarge
       - c5.xlarge
       - c5.2xlarge
       - c5.4xlarge
@@ -239,12 +209,7 @@ Parameters:
       - c5n.xlarge
       - c5n.2xlarge
       - c5n.4xlarge
-      - m5n.xlarge
-      - m5n.2xlarge
-      - m5n.4xlarge
-      - m5zn.xlarge
-      - m5zn.2xlarge
-    Default: c5.4xlarge
+    Default: c5.xlarge
   LicenseType:
     Description: >-
       Choose Cisco NGFWv EC2 instance license type, make sure AMI ID which will be entered below is of same licensing type.
@@ -256,9 +221,16 @@ Parameters:
   AmiID:
     Description: >-
       Please choose correct AMI ID as per the region, desired version and license type(BYOL/PAYG).
-      NGFWv version 7.2 onwards releases are supported.
+      NGFWv version 7.2 onwards support clustering, version 7.6 onwards supports the multi-AZ enhancements 
     Type: AWS::EC2::Image::Id
-    Default: ami-0265b4bbf47bd0171
+    Default: ami-09963e452646cef87
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V1 and V2 (token optional)"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
   KmsArn:
     Description: >-
       [Conditional] ARN of an existing KMS (AWS KMS key to encrypt at rest), If specified, NGFWv 'admin' Password below should be encrypted
@@ -274,6 +246,7 @@ Parameters:
     MinLength: 8
     Type: String
     ConstraintDescription: password must be of minimum 8 characters
+    Default: c0mpleX@1209
   fmcServer:
     Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
     Type: String
@@ -281,33 +254,202 @@ Parameters:
     MaxLength: 15
     AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
     ConstraintDescription: must be a valid IP address
+    Default: 44.195.48.182
   fmcOperationsUsername:
     Description: >-
       Unique Internal user for Cluster Manager automation tasks on FMC,
         User should have 'Administrator' Role.
         Refer 'Firepower Management Center Configuration Guide'
     Type: String
+    Default: fmcapi
   fmcOperationsPassword:
     Description: >-
       Please make sure you type correct password (Wrong password will result in failure in automation).
       If KMS ARN is specified above, please provide encrypted password.
     NoEcho: true
     Type: String
+    Default: c0mpleX@1209
   fmcDeviceGrpName:
     Description: >-
       Enter unique name for Cluster Group in FMC
     Type: String
     Default: ftdv-cluster
+  fmcPublishMetrics:
+    Description: >-
+      Please select true if you would like to create a Lambda Function to poll FMC,
+      and publish a specific Device Group Metrics to AWS CloudWatch.
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: true
+  fmcMetricsUsername:
+    Description: >-
+      Unique Internal user for Polling Memory Metrics from FMC,
+        User should have roles system provided 'Network Admin' and 'Maintenance User' or more.
+        Refer 'Firepower Management Center Configuration Guide'
+    Type: String
+    Default: fmcmetricuser
+  fmcMetricsPassword:
+    Description: >-
+      Please make sure you type correct password (Wrong password will result in failure of Metrics collection).
+      If KMS ARN is specified above, please provide encrypted password.
+    NoEcho: true
+    Type: String
+    Default: c0mpleX@1209
+  CpuThresholds:
+    Description: >-
+      [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
+      If 0,0 is selected, no cpu scaling alarm or policies will be created.
+      Evaluation points & Data points are kept default/recommended values
+    Type: CommaDelimitedList
+    Default: 10,70
+    AllowedValues:
+      - 0,0
+      - 0,90
+      - 0,80
+      - 0,70
+      - 0,60
+      - 0,50
+      - 0,40
+      - 0,30
+      - 0,20
+      - 0,10
+      - 5,90
+      - 5,70
+      - 5,50
+      - 5,30
+      - 5,15
+      - 10,90
+      - 10,80
+      - 10,70
+      - 10,60
+      - 10,50
+      - 10,40
+      - 10,30
+      - 10,20
+      - 10,0
+      - 20,90
+      - 20,80
+      - 20,70
+      - 20,60
+      - 20,50
+      - 20,30
+      - 20,0
+      - 30,90
+      - 30,80
+      - 30,70
+      - 30,60
+      - 30,50
+      - 30,40
+      - 30,0
+      - 40,90
+      - 40,80
+      - 40,70
+      - 40,60
+      - 40,50
+      - 40,0
+      - 50,90
+      - 50,80
+      - 50,70
+      - 50,60
+      - 50,0
+      - 60,90
+      - 60,80
+      - 60,70
+      - 60,0
+      - 70,90
+      - 70,80
+      - 70,0
+      - 80,95
+      - 80,90
+      - 80,0
+      - 90,95
+      - 90,0
+  MemoryThresholds:
+    Description: >-
+      [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
+      If 0,0 is selected, no memory scaling alarm or policies will be created. Note, if Metric publish Lambda is not
+      created then this input will be ignored irrespective of chosen values.
+    Type: CommaDelimitedList
+    Default: 40,70
+    AllowedValues:
+      - 0,0
+      - 0,90
+      - 0,80
+      - 0,70
+      - 0,60
+      - 0,50
+      - 0,40
+      - 0,30
+      - 0,20
+      - 0,10
+      - 5,90
+      - 5,70
+      - 5,50
+      - 5,30
+      - 5,15
+      - 10,90
+      - 10,80
+      - 10,70
+      - 10,60
+      - 10,50
+      - 10,40
+      - 10,30
+      - 10,20
+      - 10,0
+      - 20,90
+      - 20,80
+      - 20,70
+      - 20,60
+      - 20,50
+      - 20,30
+      - 20,0
+      - 30,90
+      - 30,80
+      - 30,70
+      - 30,60
+      - 30,50
+      - 30,40
+      - 30,0
+      - 40,90
+      - 40,80
+      - 40,70
+      - 40,60
+      - 40,50
+      - 40,0
+      - 50,90
+      - 50,80
+      - 50,70
+      - 50,60
+      - 50,0
+      - 60,90
+      - 60,80
+      - 60,70
+      - 60,0
+      - 70,90
+      - 70,80
+      - 70,0
+      - 80,95
+      - 80,90
+      - 80,0
+      - 90,95
+      - 90,0
 
 Conditions:
+  support1zone: !Equals
+    - !Ref NoOfAZs
+    - 1
+  support2zone: !Equals
+    - !Ref NoOfAZs
+    - 2
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
   UserNotifyEmail: !Not
     - !Equals
       - ''
       - !Ref NotifyEmailID
-  supportGWLB: !Not
-    - !Equals
-      - "No"
-      - !Ref UseGWLB
   ShouldEncrypt: !Not
     - !Equals
       - ''
@@ -316,6 +458,34 @@ Conditions:
     - !Equals
       - "No"
       - !Ref DeployGWLBE
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
+  PublishMetrics: !Equals
+    - !Ref fmcPublishMetrics
+    - true
+  DoCpuUpPolcy: !Not
+    - !Equals
+      - 0
+      - !Select ['1', !Ref CpuThresholds ]
+  DoCpuLowPolcy: !Not
+    - !Equals
+      - 0
+      - !Select ['0', !Ref CpuThresholds ]
+  DoMemUpPolcy: !And
+    - !Condition PublishMetrics
+    - !Not
+      - !Equals
+        - 0
+        - !Select ['1', !Ref MemoryThresholds ]
+  DoMemLowPolcy: !And
+    - !Condition PublishMetrics
+    - !Not
+      - !Equals
+        - 0
+        - !Select ['0', !Ref MemoryThresholds ]
+
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -332,18 +502,14 @@ Metadata:
           - AZ
           - NotifyEmailID
           - S3BktName
-          - UseGWLB
           - VpcId
-          - MgmtSubnetId
-          - InsideSubnetId
-          - OutsideSubnetId
+          - MgmtSubnetIds
+          - InsideSubnetIds
           - LambdaSubnets
-          - CCLSubnetId
-          - CCLfirstIP
-          - CCLlastIP
+          - CCLSubnetIds
+          - CCLSubnetRanges
           - MgmtInterfaceSG
           - InsideInterfaceSG
-          - OutsideInterfaceSG
           - LambdaSG
           - CCLInterfaceSG
       - Label:
@@ -363,6 +529,7 @@ Metadata:
           - AmiID
           - KmsArn
           - ngfwPassword
+          - InstanceMetadataServiceVersion
       - Label:
           default: FMC Automation Configuration
         Parameters:
@@ -370,6 +537,17 @@ Metadata:
           - fmcOperationsUsername
           - fmcOperationsPassword
           - fmcDeviceGrpName
+      - Label:
+          default: FMC Device Group Metrics Publish Configuration
+        Parameters:
+          - fmcPublishMetrics
+          - fmcMetricsUsername
+          - fmcMetricsPassword
+      - Label:
+          default: Scaling Configuration
+        Parameters:
+          - CpuThresholds
+          - MemoryThresholds
     ParameterLabels:
       ClusterGrpNamePrefix:
         default: Cluster Group Name Prefix
@@ -385,8 +563,6 @@ Metadata:
         default: VPC ID for Gateway Load Balancer Endpoint
       DeployGWLBE:
         default: Deploy Gateway Load Balancer Endpoint
-      UseGWLB:
-        default: Deploy Gateway Load Balancer
       TargetFailover:
         default: Target Failover
       LambdaSubnets:
@@ -396,7 +572,7 @@ Metadata:
       NoOfAZs:
         default: Number of Availibility Zones
       AZ:
-        default: Enter Valid Availability Zone
+        default: Enter Valid Availability Zones for launching NGFWvs
       S3BktName:
         default: S3 Bucket Name
       TgHealthPort:
@@ -412,25 +588,19 @@ Metadata:
       GWLBESubnetId:
         default: Subnet ID for Gateway Load Balancer Endpoint
       MgmtInterfaceSG:
-        default: Security Groups for NGFWv Instance
-      MgmtSubnetId:
-        default: Subnet for NGFWv Management Interface
+        default: Security Group for NGFWv Instance
+      MgmtSubnetIds:
+        default: Subnet for NGFWv Management Interfaces of different AZs
       InsideInterfaceSG:
         default: Security Group for NGFWv Instance inside
-      InsideSubnetId:
-        default: Subnet for NGFWv Inside Interface
-      OutsideInterfaceSG:
-        default: Security Group for NGFWv Instance outside
-      OutsideSubnetId:
-        default: Subnet for NGFWv Outside Interface
+      InsideSubnetIds:
+        default: Subnet for NGFWv Inside Interface of different AZs
       CCLInterfaceSG:
         default: Security Group for NGFWv CCL
-      CCLSubnetId:
-        default: Subnet for NGFWv CCL Interface
-      CCLfirstIP:
-        default: First IP of CCL Subnet (CCL IP Pool)
-      CCLlastIP:
-        default: Last IP of CCL Subnet (CCL IP Pool)
+      CCLSubnetIds:
+        default: Subnet for NGFWv CCL Interface of different AZs
+      CCLSubnetRanges:
+        default: Ranges for CCL Subnets of different AZs (CCL IP Pools)
       KmsArn:
         default: KMS Master Key ARN
       ngfwPassword:
@@ -443,6 +613,18 @@ Metadata:
         default: FMC Password for Cluster Automation
       fmcDeviceGrpName:
         default: FMC Device Group Name
+      fmcPublishMetrics:
+        default: Publish Custom Metrics from FMC
+      fmcMetricsUsername:
+        default: FMC Username for Publishing Metrics to CloudWatch
+      fmcMetricsPassword:
+        default: FMC Password for Publishing Metrics to CloudWatch
+      CpuThresholds:
+        default: Lower,Upper CPU Thresholds
+      MemoryThresholds:
+        default: Lower,Upper Memory Thresholds
+      InstanceMetadataServiceVersion:
+        default: Instance Metadata Service Version  
 Resources:
 # Lambda Layer ---------------------------------------------------------
   LambdaLayer:
@@ -520,14 +702,15 @@ Resources:
 # GW Load Balancer & Target groups
 # ------------------------------------------------------------------------
   gwlb:
-    Condition: supportGWLB
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'GWLB' ] ]
       Type: gateway
-      Subnets: !Ref InsideSubnetId
+      Subnets: !Ref InsideSubnetIds
+      LoadBalancerAttributes: 
+        - Key: load_balancing.cross_zone.enabled
+          Value: true
   tg:
-    Condition: supportGWLB
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     DependsOn:
       - gwlb
@@ -549,7 +732,6 @@ Resources:
       - Key: target_failover.on_unhealthy
         Value: !Ref TargetFailover
   listener:
-    Condition: supportGWLB
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
@@ -676,7 +858,7 @@ Resources:
     Condition: addGWLBE
     Type: AWS::EC2::VPCEndpointService
     Properties:
-      GatewayLoadBalancerArns:
+      GatewayLoadBalancerArns: 
         - !Ref gwlb
       AcceptanceRequired: false
 
@@ -731,11 +913,7 @@ Resources:
          FMC_PASSWORD: !Ref fmcOperationsPassword
          NO_OF_AZs: !Ref NoOfAZs
          FTD_LICENSE_TYPE: !Ref LicenseType
-         GWLBSUPPORT: !Ref UseGWLB
-         GWLB_ARN: !If
-           - supportGWLB
-           - !Ref gwlb
-           - !Ref 'AWS::NoValue'
+         GWLB_ARN: !Ref gwlb
          FTD_PASSWORD: !Ref ngfwPassword
          TG_HEALTH_PORT: !Ref TgHealthPort
          CLS_MANAGER_TOPIC: !Ref CLSmanagerTopic
@@ -821,23 +999,23 @@ Resources:
           FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
           NO_OF_AZs: !Ref NoOfAZs
           FTD_LICENSE_TYPE: !Ref LicenseType
-          GWLBSUPPORT: !Ref UseGWLB
-          INSIDE_SUBNET: !Select ['0', !Ref InsideSubnetId ]
+          INSIDE_SUBNET: !If
+              - support2zone
+              - !Join ['::', [ !Select ['0', !Ref InsideSubnetIds ], !Select ['1', !Ref InsideSubnetIds ] ] ]
+              - !If
+                - support3zone
+                - !Join ['::', [ !Select ['0', !Ref InsideSubnetIds ], !Select ['1', !Ref InsideSubnetIds ], !Select ['2', !Ref InsideSubnetIds ] ] ]
+                - !Select ['0', !Ref InsideSubnetIds ]
           SECURITY_GRP_2: !Ref InsideInterfaceSG
-          OUTSIDE_SUBNET: !If
-            - supportGWLB
-            - !Ref 'AWS::NoValue'
-            - !Ref OutsideSubnetId
-          SECURITY_GRP_3: !If
-            - supportGWLB
-            - !Ref 'AWS::NoValue'
-            - !Ref OutsideInterfaceSG
-          CCL_SUBNET: !Select ['0', !Ref CCLSubnetId ]
-          SECURITY_GRP_4: !Ref CCLInterfaceSG
-          GWLB_ARN: !If
-            - supportGWLB
-            - !Ref gwlb
-            - !Ref 'AWS::NoValue'
+          CCL_SUBNET: !If
+              - support2zone
+              - !Join ['::', [ !Select ['0', !Ref CCLSubnetIds ], !Select ['1', !Ref CCLSubnetIds ] ] ]
+              - !If
+                - support3zone
+                - !Join ['::', [ !Select ['0', !Ref CCLSubnetIds ], !Select ['1', !Ref CCLSubnetIds ], !Select ['2', !Ref CCLSubnetIds ] ] ]
+                - !Select ['0', !Ref CCLSubnetIds ]
+          SECURITY_GRP_3: !Ref CCLInterfaceSG      
+          GWLB_ARN: !Ref gwlb
           LB_DEREGISTRATION_DELAY: 180
           USER_NOTIFY_TOPIC_ARN: !If
             - UserNotifyEmail
@@ -875,21 +1053,279 @@ Resources:
       SourceArn: !GetAtt LifeCycleEvent.Arn
 
 # ------------------------------------------------------------------------
+# Custom Metric Publishing
+# ------------------------------------------------------------------------
+  CustomMetricsPublisher:
+    Type: AWS::Serverless::Function
+    Condition: PublishMetrics
+    DependsOn:
+      - LambdaRole
+      - LambdaPolicy
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'custom-metrics-publisher-lambda'] ]
+      Handler: custom_metrics_publisher.lambda_handler
+      Runtime: python3.9
+      CodeUri:
+        Bucket: !Ref S3BktName
+        Key: custom_metrics_publisher.zip
+      Description: 'Custom Metric Publisher Lambda is responsible to periodically publish metrics (CPU/Memory) to CloudWatch'
+      MemorySize: 128
+      ReservedConcurrentExecutions: 10
+      Timeout: 300
+      Role: !GetAtt LambdaRole.Arn
+      VpcConfig:
+        SecurityGroupIds: !Ref LambdaSG
+        SubnetIds: !Ref LambdaSubnets
+      KmsKeyArn: !Ref KmsArn
+      Layers:
+        - !Ref LambdaLayer
+      Environment:
+        Variables:
+         DEBUG_LOGS: 'enable'
+         KMS_ENC: !If
+           - ShouldEncrypt
+           - !Ref KmsArn
+           - !Ref 'AWS::NoValue'
+         ASG_NAME: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+         FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
+         FMC_SERVER: !Ref fmcServer
+         FMC_MET_USERNAME: !Ref fmcMetricsUsername
+         FMC_MET_PASSWORD: !Ref fmcMetricsPassword
+         CRON_JOB_NAME: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'metric-pub-cron' ] ]
+  CustomMetricsPublisherLogGrp:
+    Condition: PublishMetrics
+    DependsOn: CustomMetricsPublisher
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Join ['/', ['/aws/lambda', !Ref CustomMetricsPublisher]]
+  CloudWatchCron1:
+    Condition: PublishMetrics
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'metric-pub-cron' ] ]
+      #ScheduleExpression: !Join ['rate','(',[!Ref Rate],' minutes)'  ]    ]
+      #ScheduleExpression: !Ref Rate
+      ScheduleExpression: !Sub
+        - rate(${Time} minutes)
+        - Time: 2
+      Targets:
+        - Id: CloudWatchEventTarget
+          Arn: !GetAtt CustomMetricsPublisher.Arn
+      State: ENABLED
+  CloudWatchCron1InvokeLambdaPermission:
+    Condition: PublishMetrics
+    Type: AWS::Lambda::Permission
+    DependsOn: CloudWatchCron1
+    Properties:
+      FunctionName: !Ref CustomMetricsPublisher
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt CloudWatchCron1.Arn
+  InstanceLaunchEvent:
+    Condition: PublishMetrics
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'notify-vmlaunch-publisher'] ]
+      EventPattern:
+        source:
+         - aws.autoscaling
+        detail-type:
+         - EC2 Instance Launch Successful
+        detail:
+         AutoScalingGroupName:
+           - !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
+      Targets:
+       - Id: CloudWatchEventTarget
+         Arn: !GetAtt CustomMetricsPublisher.Arn
+      State: ENABLED
+  InstanceLaunchEventInvkPerm:
+    Condition: PublishMetrics
+    Type: AWS::Lambda::Permission
+    DependsOn: InstanceLaunchEvent
+    Properties:
+      FunctionName: !Ref CustomMetricsPublisher
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt InstanceLaunchEvent.Arn
+# ------------------------------------------------------------------------
+# AWS provided Dynamic Scaling
+# ------------------------------------------------------------------------
+  ScaleOutCPUpolicy:
+    Condition: DoCpuUpPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+  ScaleInCPUpolicy:
+    Condition: DoCpuLowPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
+  ScaleOutMempolicy:
+    Condition: DoMemUpPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+  ScaleInMempolicy:
+    Condition: DoMemLowPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref FTDvGroup
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
+# ------------------------------------------------------------------------
+# Scaling Alarm & Notification
+# ------------------------------------------------------------------------
+  CPUUpperboundAlarm1:
+    Condition: DoCpuUpPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join ['', [!Ref ClusterGrpNamePrefix, '-',!Ref ClusterNumber, 'Cpu-up-threshold' ] ]
+      ActionsEnabled: true
+      Namespace: AWS/EC2
+      AlarmActions:
+        - !Ref ScaleOutCPUpolicy
+      AlarmDescription: Alarm when CPU usage hits upper threshold
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 5
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup
+      EvaluationPeriods: 5
+      MetricName: CPUUtilization
+      Threshold: !Select ['1', !Ref CpuThresholds ]
+      Period: 60
+      Statistic: Average
+      Unit: Percent
+      TreatMissingData: notBreaching
+  CPULowerboundAlarm1:
+    Condition: DoCpuLowPolcy
+    DependsOn:
+      - FTDvGroup
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join ['', [!Ref ClusterGrpNamePrefix, '-',!Ref ClusterNumber, 'Cpu-low-threshold' ] ]
+      ActionsEnabled: true
+      Namespace: AWS/EC2
+      AlarmActions:
+        - !Ref ScaleInCPUpolicy
+      AlarmDescription: Alarm when CPU usage hits lower threshold
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: 10
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup
+      EvaluationPeriods: 10
+      MetricName: CPUUtilization
+      Threshold: !Select ['0', !Ref CpuThresholds ]
+      Period: 60
+      Statistic: Average
+      Unit: Percent
+      TreatMissingData: notBreaching
+  MemoryUpperboundAlarm1:
+    Condition: DoMemUpPolcy
+    DependsOn:
+      - FTDvGroup
+      - CustomMetricsPublisher
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join ['', [!Ref ClusterGrpNamePrefix, '-',!Ref ClusterNumber, 'Memory-up-threshold' ] ]
+      ActionsEnabled: true
+      Namespace: Cisco-NGFWv-Cluster-Group
+      AlarmActions:
+        - !Ref ScaleOutMempolicy
+      AlarmDescription: Alarm when Memory usage hits upper threshold
+      ComparisonOperator: GreaterThanThreshold
+      DatapointsToAlarm: 4
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup 
+        - Name: fmcDeviceGroupName
+          Value: !Ref fmcDeviceGrpName
+      EvaluationPeriods: 4
+      MetricName: GroupAvgMem
+      Threshold: !Select ['1', !Ref MemoryThresholds ]
+      Period: 120
+      Statistic: Average
+      Unit: Percent
+      TreatMissingData: notBreaching
+  MemoryLowerboundAlarm1:
+    Condition: DoMemLowPolcy
+    DependsOn:
+      - FTDvGroup
+      - CustomMetricsPublisher
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Join ['', [!Ref ClusterGrpNamePrefix, '-',!Ref ClusterNumber, 'Memory-low-threshold' ] ]
+      ActionsEnabled: true
+      Namespace: Cisco-NGFWv-Cluster-Group
+      AlarmActions:
+        - !Ref ScaleInMempolicy
+      AlarmDescription: Alarm when Memory usage hits lower threshold
+      ComparisonOperator: LessThanThreshold
+      DatapointsToAlarm: 5
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref FTDvGroup
+        - Name: fmcDeviceGroupName
+          Value: !Ref fmcDeviceGrpName
+      EvaluationPeriods: 5
+      MetricName: GroupAvgMem
+      Threshold: !Select ['0', !Ref MemoryThresholds ]
+      Period: 120
+      Statistic: Average
+      Unit: Percent
+      TreatMissingData: notBreaching
+# ------------------------------------------------------------------------
 # Cluster Group & Launch Template
 # ------------------------------------------------------------------------
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
+      - InstanceEvent
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       AutoScalingGroupName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber ] ]
-      VPCZoneIdentifier: !Ref MgmtSubnetId
+      VPCZoneIdentifier: !If
+        - support1zone
+        - !Split
+          - ':'
+          - !Select ['0', !Ref MgmtSubnetIds ]
+        - !If
+          - support2zone
+          - !Split
+            - ':'
+            - !Join [':', [ !Select ['0', !Ref MgmtSubnetIds ], !Select ['1', !Ref MgmtSubnetIds ] ] ]
+          - !Split
+            - ':'
+            - !Join [':', [ !Select ['0', !Ref MgmtSubnetIds ], !Select ['1', !Ref MgmtSubnetIds ], !Select ['2', !Ref MgmtSubnetIds ] ] ]
       LaunchTemplate:
         LaunchTemplateId: !Ref FTDvLaunchTemplate
         Version: 1
       MinSize: !Ref ClusterSize
       DesiredCapacity: !Ref ClusterSize
-      MaxSize: !Ref ClusterSize
+      MaxSize: 16
       MetricsCollection:
         - Granularity: 1Minute
           Metrics:
@@ -898,8 +1334,8 @@ Resources:
             - GroupTerminatingInstances
             - GroupTotalInstances
             - GroupStandbyInstances
-      HealthCheckGracePeriod: 2000
-      Cooldown: 2000
+      HealthCheckGracePeriod: 900
+      Cooldown: 900
       TerminationPolicies:
         - OldestLaunchConfiguration
         - OldestLaunchTemplate
@@ -910,20 +1346,27 @@ Resources:
           LifecycleHookName: Launch_LifecycleHook
           LifecycleTransition: 'autoscaling:EC2_INSTANCE_LAUNCHING'
         - DefaultResult: CONTINUE
-          HeartbeatTimeout: 120
+          HeartbeatTimeout: 400
           LifecycleHookName: Terminate_LifecycleHook
           LifecycleTransition: 'autoscaling:EC2_INSTANCE_TERMINATING'
   FTDvLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
-      LaunchTemplateName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'ftd-launch-template' ] ]
+      LaunchTemplateName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'NGFWv-launch-template' ] ]
       LaunchTemplateData:
+        MetadataOptions:
+          Fn::If:
+            - EnableIMDSv2
+            -
+              HttpEndpoint: "enabled"  # Use Amazon DNS for metadata service
+              HttpProtocolIpv6: "disabled"  # Disable IPv6 for metadata service
+              HttpPutResponseHopLimit: 1  # Set hop limit to 1
+              HttpTokens: "required"  # Require IMDSv2 for metadata requests
+              # InstanceMetadataTags: "enabled"  # Include custom instance metadata tags
+            - !Ref "AWS::NoValue"
         EbsOptimized: false
         ImageId: !Ref AmiID
-        InstanceType: !If
-          - supportGWLB
-          - !Ref InstanceType
-          - c5.4xlarge
+        InstanceType: !Ref InstanceType
         NetworkInterfaces:
           - AssociatePublicIpAddress: !Ref AssignPublicIP
             DeleteOnTermination: true
@@ -936,5 +1379,20 @@ Resources:
         Monitoring:
           Enabled: true
         UserData:
-          Fn::Base64: !Sub |
-            { "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": "${CCLfirstIP} ${CCLlastIP}", "Geneve": "${UseGWLB}","HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}
+          Fn::Base64: !If
+                        - support2zone
+                        - !Sub
+                          - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}"], "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
+                          - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
+                            CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges ]
+                        - !If
+                          - support3zone
+                          - !Sub
+                            - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}","${CCLSubnet2}"], "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
+                            - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
+                              CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges ]
+                              CCLSubnet2: !Select ['2', !Ref CCLSubnetRanges ]
+                          - !Sub
+                            - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": "${CCLSubnet0}", "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
+                            - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
+                            

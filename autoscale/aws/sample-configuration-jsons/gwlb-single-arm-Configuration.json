@@ -1,0 +1,44 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "aws-access-policy",
+  "fmcPlatformPolicyName": "aws-healthcheck-plt-policy",
+  "fmcInsideNicName": "inside",
+  "fmcOutsideNicName": "outside",
+  "fmcInsideNic": "TenGigabitEthernet0/0",
+  "fmcOutsideNic": "TenGigabitEthernet0/1",
+  "fmcInsideZone": "Inside-sz",
+  "fmcOutsideZone": "Outside-sz",
+  "interfaceConfig": [
+    {
+      "ifname": "inside",
+      "name": "TenGigabitEthernet0/0",
+      "managementOnly": "false",
+      "MTU": "1500",
+      "mode": "NONE",
+      "securityZone": {
+        "name": "Inside-sz"
+      }
+    },
+    {
+      "ifname": "outside",
+      "name": "TenGigabitEthernet0/1",
+      "managementOnly": "false",
+      "MTU": "1500",
+      "mode": "NONE", 
+      "securityZone": {
+        "name": "Outside-sz"
+      }
+    }
+  ],
+  "SingleArmTrafficRoutes": [
+    {
+      "interface": "inside",
+      "network": "any-ipv4",
+      "gateway": "",
+      "metric": "1"
+    }
+  ]
+}

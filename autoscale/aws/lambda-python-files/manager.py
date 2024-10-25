@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -42,7 +42,7 @@ import constant as const
 
 
 logger = utl.setup_logging()
-# Get User input
+# Get User input and Configuration.json input
 e_var, j_var = utl.get_user_input_manager()
 
 
@@ -80,7 +80,7 @@ def lambda_handler(event, context):
 
     logger.info("Received an event but not a SNS notification event")
 
-    # EC2 CloudWatch Event
+    # EC2 CloudWatch Event : Scheduled Cron Event / EC2 Instance Launch Successful / EC2 Instance Terminate Successful
 
     try:
         if event["detail-type"] == "Scheduled Event":
@@ -316,7 +316,7 @@ def handle_sns_event(sns_data):
 
     elif _m_attr['to_function'] == 'vm_configure':
         if _m_attr['category'] == 'FIRST':
-            if execute_vm_configure_first(ftd) == 'SUCCESS':
+            if execute_vm_configure_first(ftd, fmc) == 'SUCCESS':
                 ftd.create_instance_tags('NGFWvConfigurationStatus', 'DONE')
                 logger.info("Instance is configured in FMC, Next action: Deployment")
                 if not const.DISABLE_VM_DEPLOY_FUNC:
@@ -499,9 +499,22 @@ def handle_cron_event(event):
     if const.DISABLE_HEALTH_DOCTOR is True:
         logger.info("Health Doctor running is disabled, check constant.py")
         return
-
+    
     try:
-        l_kill_ftd, l_unhealthy_ip = execute_instance_tg_health_doctor()
+        #Initialise DerivedFMC and AutoScaleGroup class
+        fmc = fmc_cls_init()
+        aws_grp = aws_asg_cls_init()
+        status = fmc_configuration_validation(fmc, aws_grp)
+        logger.info("Fmc validation status: " + status)
+        if status == 'FAIL':
+            inform_user = True
+    except Exception as e:
+        logger.exception(e)
+    else:
+        data.update({"fmc_config_validation": fmc.configuration})
+    
+    try:
+        l_kill_ftd, l_unhealthy_ip = execute_instance_tg_health_doctor(fmc)
         if l_kill_ftd != []:
             logger.debug("Not empty l_kill_ftd")
             inform_user = True
@@ -515,20 +528,6 @@ def handle_cron_event(event):
         logger.exception(e)
     else:
         data.update(item)
-
-    try:
-        # AutoScaleGroup
-        aws_grp = aws_asg_cls_init()
-        # Initialize DerivedFMC & AutoScaleGroup
-        fmc = fmc_cls_init()
-        status = fmc_configuration_validation(fmc, aws_grp)
-        logger.info("Fmc validation status: " + status)
-        if status == 'FAIL':
-            inform_user = True
-    except Exception as e:
-        logger.exception(e)
-    else:
-        data.update({"fmc_config_validation": fmc.configuration})
 
     if inform_user:
         # SNS class initialization
@@ -569,11 +568,6 @@ def execute_vm_register_first(ftd):
     """
     ftd.create_instance_tags('NGFWvRegistrationStatus', 'ONGOING')
     try:
-        # device_grp_id = fmc.get_device_grp_id_by_name(e_var['fmcDeviceGroupName'])
-        # if device_grp_id is None:
-        #     raise ValueError("Unable to find Device Group in FMC: %s " % e_var['fmcDeviceGroupName'])
-        # else:
-        #     logger.debug("Device Group: %s " % device_grp_id)
         reg_status = ftd.check_ftdv_reg_status()  # Check Device Registration state
         if reg_status == "COMPLETED":
             logger.info("Device is in registration successful ")
@@ -581,7 +575,7 @@ def execute_vm_register_first(ftd):
         elif reg_status == "PENDING":
             logger.info("Device is in registration pending status ")
             task_status = ftd.send_registration_request()  # Can return FAIL or SUCCESS
-            time.sleep(1 * 60)  # Related to CSCvs17405
+            time.sleep(1 * 60) 
             if task_status == 'SUCCESS':
                 return 'SUCCESS'
         elif reg_status == 'NO_MANAGER':
@@ -592,14 +586,14 @@ def execute_vm_register_first(ftd):
                 if reg_status == 'PENDING':
                     logger.info("Device is in registration pending status ")
                     task_status = ftd.send_registration_request()  # Can return FAIL or SUCCESS
-                    time.sleep(1 * 60)  # Related to CSCvs17405
+                    time.sleep(1 * 60)
                     if task_status == 'SUCCESS':
                         return 'SUCCESS'
         elif reg_status == 'TROUBLESHOOT':
             logger.info("Device has manager configuration related problem, sending: 'configure manager delete'")
             request_response = ftd.configure_manager_delete()
             if request_response != 'COMMAND_RAN':
-                ftd.configure_manager_delete()  # Next iteration should fix it!
+                ftd.configure_manager_delete() 
     except ValueError as e:
         logger.warn("Exception occurred {}".format(repr(e)))
     except Exception as e:
@@ -608,9 +602,9 @@ def execute_vm_register_first(ftd):
     return 'FAIL'
 
 
-def execute_vm_configure_first(ftd):
+def execute_vm_configure_first(ftd, fmc):
     """
-    Purpose:    This configures Interfaces & Static Routes on the NGFW instance
+    Purpose:    This configures Interfaces, Platform Policy, NAT Policy (Dual-arm only) and Static Routes on the NGFW instance
     Parameters: ManagedDevice object
     Returns:    SUCCESS, FAIL
     Raises:
@@ -620,21 +614,61 @@ def execute_vm_configure_first(ftd):
         ftd.update_device_configuration()
     if ftd.device_id != '':
         try:
+            # Poll for system-initiated deployment to finish first, before doing initial deploy [DUAL_ARM]
+            ## Add polling for [SINGLE_ARM] as well, observing vm_deploy failing due to system deployment not finished
+            if ftd.proxy_type == 'DUAL_ARM' or 'SINGLE_ARM':
+                logger.info('Checking that system deployment after registration is done.')
+                deploy_status = fmc.check_deploy_status(ftd.vm_name)
+                if deploy_status != 'DEPLOYED':
+                    deploy_status = ftd.ftdv_deploy_polling(5)
+                    if deploy_status != "SUCCESS":
+                        raise ValueError("System Configuration deployment failed")
+                    logger.info("System deployment finished, proceeding to configure device ....")
+            # Configure interfaces from FMC
             nic_status = ftd.check_and_configure_interface()
             if nic_status != 'SUCCESS':
                 raise ValueError("Interface configuration failed")
-			# Check env flag for geneve then add geneve support
+            # Create and associate Platform Policy in FMC for FTDs' health check configuration
             if e_var['GENEVE_SUPPORT'] == 'enable':
-                logger.info("Geneve support enabled, Adding Geneve configuration")			
+                plt_policy_status = ftd.check_and_configure_platform_policy()
+                if plt_policy_status != 'SUCCESS':
+                    raise ValueError("Platform Policy configuration failed!!")
+                # Add Geneve support : VTEP and VNI interface creation
+                logger.info("Adding Geneve configuration")			
                 geneve_status = ftd.configure_geneve()
                 if geneve_status != 'SUCCESS':
-                    raise ValueError("Geneve configuration failed")				
-            routes_status = ftd.check_and_configure_routes()
-            if routes_status != 'SUCCESS':
-                raise ValueError("Route configuration failed")
+                    raise ValueError("Geneve configuration failed")
+            if ftd.proxy_type == 'SINGLE_ARM' or '': 
+                logger.info("Adding static route for cross-zone traffic")
+                routes_status = ftd.check_and_configure_static_routes()
+                if routes_status != 'SUCCESS':
+                        raise ValueError("Static Route configuration failed!!") 
+            if ftd.proxy_type == 'DUAL_ARM': 
+                ## FOR DUAL_ARM ONLY : Initial deployment of platform policy, interface and geneve configuration
+                ## Separate deployment for Dual-arm NAT and Dual-arm outside interface static route
+                ## Required to avoid flooding of health-checks seen on outside interface
+                logger.info('Initial configuration deployment as part of vm_configure ...')
+                init_deploy_status = fmc.check_deploy_status(ftd.vm_name)
+                if init_deploy_status != 'DEPLOYED':
+                    if fmc.start_deployment(ftd.vm_name) is None:
+                        raise ValueError("Initial Configuration Deployment REST post failing!!!")
+                init_deploy_status = ftd.ftdv_deploy_polling(5)
+                if init_deploy_status != "SUCCESS":
+                    raise ValueError("Initial Configuration deployment failed")
+                logger.info("Initial Configuration is deployed, proceeding to dual-arm specific Configuration")
+
+                #Configure NAT Policy, required routes for DualArm deployments
+                nat_status = ftd.check_and_configure_dualarm_nat_policy() 
+                if nat_status != 'SUCCESS':
+                    raise ValueError("Dual-arm NAT Policy configuration failed!!")			
+                routes_status = ftd.check_and_configure_static_routes()
+                if routes_status != 'SUCCESS':
+                    raise ValueError("Dual-arm Route configuration failed!!")
             return 'SUCCESS'
         except ValueError as e:
             logger.info("Exception occurred {}".format(repr(e)))
+            ftd.create_instance_tags('NGFWvConfigurationStatus', 'FAIL')
+            return 'FAIL'
         except Exception as e:
             logger.exception(e)
     ftd.create_instance_tags('NGFWvConfigurationStatus', 'FAIL')
@@ -699,7 +733,7 @@ def execute_vm_delete_first(ftd, fmc):
     return result
 
 
-def execute_instance_tg_health_doctor():
+def execute_instance_tg_health_doctor(fmc):
     """
     Purpose:    To remove un-healthy instances from TG if satisfies conditions
     Parameters:
@@ -717,7 +751,7 @@ def execute_instance_tg_health_doctor():
     killable_ftd_instance = []
     unhealthy_ip_targets = []
     try:
-        _ip_targets = elb_client.get_unhealthy_ip_targets(e_var['LB_ARN_OUTSIDE'])
+        _ip_targets = elb_client.get_unhealthy_ip_targets(e_var['LB_ARN'])
         for i in _ip_targets:
             unhealthy_ip_targets.append(i)
     except Exception as e:
@@ -737,7 +771,7 @@ def execute_instance_tg_health_doctor():
                 except IndexError as e:
                     logger.debug("{}".format(repr(e)))
                     logger.info("Removing IP: " + str(unhealthy_ip_targets[i]) + " as no associated Instance found!")
-                    elb_client.deregister_ip_target_from_lb(e_var['LB_ARN_OUTSIDE'], unhealthy_ip_targets[i])
+                    elb_client.deregister_ip_target_from_lb(e_var['LB_ARN'], unhealthy_ip_targets[i])
                     utl.put_line_in_log('Instance Doctor finished', 'dot')
                     return killable_ftd_instance, unhealthy_ip_targets
                 for val in instance['Tags']:
@@ -754,7 +788,7 @@ def execute_instance_tg_health_doctor():
                 else:
                     logger.info(unhealthy_instance_id + " is not part of " + str(e_var['AutoScaleGrpName']))
                     logger.info("Removing IP: " + str(unhealthy_ip_targets[i]) + " as it is not of an NGFWv VM!")
-                    elb_client.deregister_ip_target_from_lb(e_var['LB_ARN_OUTSIDE'], unhealthy_ip_targets[i])
+                    elb_client.deregister_ip_target_from_lb(e_var['LB_ARN'], unhealthy_ip_targets[i])
                     utl.put_line_in_log('Instance Doctor finished', 'dot')
                     return killable_ftd_instance, unhealthy_ip_targets
     except Exception as e:
@@ -764,17 +798,25 @@ def execute_instance_tg_health_doctor():
         return killable_ftd_instance, unhealthy_ip_targets
 
     try:
-        logger.info("NGFWv instances: " + str(killable_ftd_instance) + " found unhealthy for more than threshold!")
+        logger.info("NGFWv instances: " + str(killable_ftd_instance) + " found unhealthy for more than threshold!")   
         list_len = len(killable_ftd_instance)
         if list_len > 0:
+            unhealthy_instance_name = asg_name + '-' + unhealthy_instance_id 
             ec2_group = AutoScaleGroup(e_var['AutoScaleGrpName'])
             for i in range(0, list_len):
+                # Delete instance from Autoscale Group
                 response = ec2_group.remove_instance(killable_ftd_instance[i],
                                                      const.DECREMENT_CAP_IF_VM_REMOVED_BY_DOCTOR)
                 if response is not None:
                     logger.info("Removing instance response: " + str(response))
                 else:
                     logger.info("Unable to kill instance: " + str(killable_ftd_instance[i]))
+
+                # Deregister instance from FMC    
+                logger.info('Deregistering device %s from FMC' % unhealthy_instance_id)
+                r = fmc.deregister_device(unhealthy_instance_name)
+                logger.info(r)
+                      
     except Exception as e:
         logger.exception(e)
         logger.info("Unable to terminate unhealthy Instances")
@@ -810,22 +852,26 @@ def fmc_cls_init():
     # Gets Auth token & updates self.reachable variable
     fmc.reach_fmc_()
     if fmc.reachable == 'AVAILABLE':
+        d_grp_name = e_var['fmcDeviceGroupName']
+        a_policy_name = j_var['fmcAccessPolicyName']
         l_seczone_name = [j_var['fmcInsideZone'], j_var['fmcOutsideZone']]
         l_network_obj_name = []
-        
-        
-        # Updates DerivedFMC object with appropriate user provided names
+    
+        # Updates DerivedFMC object with appropriate user provided name
         if e_var['GENEVE_SUPPORT'] == "disable":
             l_host_obj_name = [j_var['MetadataServerObjectName']]
-            fmc.update_fmc_config_user_input(e_var['fmcDeviceGroupName'], j_var['fmcAccessPolicyName'],
-                                         l_seczone_name, l_network_obj_name, l_host_obj_name, j_var['fmcNatPolicyName'])
+            nat_policy_name = j_var['fmcNatPolicyName']
+            fmc.update_fmc_config_user_input(d_grp_name = d_grp_name, a_policy_name = a_policy_name,
+                                        l_seczone_name = l_seczone_name, l_network_obj_name = l_network_obj_name, l_host_obj_name = l_host_obj_name, 
+                                        nat_policy_name = nat_policy_name)
         else:
-            fmc.update_fmc_config_user_input(e_var['fmcDeviceGroupName'], j_var['fmcAccessPolicyName'],
-                                         l_seczone_name, l_network_obj_name)
+            vni_seczone_name =  j_var['fmcVNIZone'] if e_var['PROXY_TYPE'] == 'DUAL_ARM' else None
+            fmc.update_fmc_config_user_input(d_grp_name =  d_grp_name, a_policy_name = a_policy_name, 
+			                            l_seczone_name = l_seczone_name, l_network_obj_name = l_network_obj_name, l_host_obj_name = [], 
+                                        nat_policy_name = '', vni_seczone_name = vni_seczone_name)
         # Updates DerivedFMC object with appropriate ids from FMC
-        fmc.set_fmc_configuration()
+        fmc.set_fmc_configuration(e_var['GENEVE_SUPPORT'], e_var['PROXY_TYPE'])
     return fmc
-
 
 def ftd_cls_init(instance_id, fmc):
     """
@@ -850,14 +896,28 @@ def ftd_cls_init(instance_id, fmc):
     ftd.nat_id = j_var['NatId']
 
     ftd.l_caps = j_var['licenseCaps']
- 
-    ftd.traffic_routes = j_var['trafficRoutes']
     ftd.interface_config = j_var['interfaceConfig']
     ftd.in_nic = j_var['fmcInsideNic']
     ftd.out_nic = j_var['fmcOutsideNic']
     ftd.in_nic_name = j_var['fmcInsideNicName']
     ftd.out_nic_name = j_var['fmcOutsideNicName']
 
+    if e_var['GENEVE_SUPPORT'] == 'enable':
+        ftd.health_check_port = e_var['TargetGrpHealthPort']
+        ftd.platform_policy_name = j_var['fmcPlatformPolicyName']
+        ftd.proxy_type=e_var['PROXY_TYPE']	
+        if ftd.proxy_type == 'DUAL_ARM':
+            ftd.vni_nic_name = j_var['fmcVNINicName']
+            ftd.vni_nic_zone = j_var['fmcVNIZone']
+            ftd.dual_arm_nat_policy_name = j_var['fmcNatPolicyName']
+            ftd.traffic_routes = j_var['DualArmTrafficRoutes']
+        elif ftd.proxy_type == 'SINGLE_ARM':
+            ftd.traffic_routes = j_var['SingleArmTrafficRoutes'] 
+    ##NLB Case        
+    else:
+        ftd.proxy_type = '' 
+        ftd.traffic_routes = j_var['NLBTrafficRoutes']    
+           
     # Updating device configuration
     ftd.update_device_configuration()
 
@@ -872,7 +932,7 @@ def fmc_configuration_validation(fmc, aws_grp):
     Raises:
     """
     # Check if all needed/user-provided inputs have entries in FMC
-    if fmc.check_fmc_configuration(e_var['GENEVE_SUPPORT']) == 'CONFIGURED':
+    if fmc.check_fmc_configuration(e_var['GENEVE_SUPPORT'], e_var['PROXY_TYPE']) == 'CONFIGURED':
         aws_grp.create_or_update_tags('FmcAvailabilityStatus', 'AVAILABLE')
         aws_grp.create_or_update_tags('FmcConfigurationStatus', 'CONFIGURED')
         return 'PASS'

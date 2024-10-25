@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -21,6 +21,7 @@ Purpose:    This python file has Lambda handler for function LifeCycleLambda
 """
 
 import time
+import os
 from aws import *
 import constant as const
 
@@ -41,7 +42,7 @@ def lambda_handler(event, context):
     logger.info("Received event: " + json.dumps(event, separators=(',', ':')))
 
     if const.DISABLE_LIFECYCLE_LAMBDA is True:
-        logger.info("LifeCycleASAvLambda running is disabled! Check constant.py")
+        logger.info("LifeCycleFTDvLambda running is disabled! Check constant.py")
         utl.put_line_in_log('LifeCycle Lambda Handler finished', 'thick')
         return
 
@@ -74,7 +75,7 @@ def lambda_handler(event, context):
                     if const.DISABLE_REGISTER_TARGET is False:
                         if register_instance(ec2_instance) == 'SUCCESS':
                             ec2_instance.lb.modify_target_groups_deregistration_delay(
-                                user_input['LB_ARN_OUTSIDE'], user_input['LB_DEREGISTRATION_DELAY'])
+                                user_input['LB_ARN'], user_input['LB_DEREGISTRATION_DELAY'])
                             life_cycle_action = 'SUCCESS'
                     else:
                         logger.info("register_instance function is disabled! Check constant.py")
@@ -86,6 +87,9 @@ def lambda_handler(event, context):
             if state != 'terminated' or state is not None:
                 if deregister_instance(ec2_instance) == 'SUCCESS':
                     time.sleep(int(user_input['LB_DEREGISTRATION_DELAY']))
+                    if user_input['PROXY_TYPE'] == 'DUAL_ARM':
+                        if disassociate_and_release_eip(ec2_instance) != 'SUCCESS':
+                            life_cycle_action = 'FAIL'
                     life_cycle_action = 'SUCCESS'
                 else:
                     life_cycle_action = 'FAIL'
@@ -94,7 +98,7 @@ def lambda_handler(event, context):
                 life_cycle_action = 'SUCCESS'
 
         else:
-            logger.error("Not a EC2 Instance Lifecycle Action")
+            logger.error("Not an EC2 Instance Lifecycle Action")
 
         if life_cycle_action == 'SUCCESS':
             ec2_instance.asg.complete_lifecycle_action_success(lifecycle_hookname, instance_id)
@@ -116,14 +120,14 @@ def create_interface_and_attach(ec2_instance):
     instance_az = ec2_instance.get_instance_az()
     logger.info("EC2 instance has been launched in AZ: " + instance_az)
     subnets_list_in_az = ec2_instance.get_subnet_list_in_az(instance_az)
-    logger.info("List of subnet in %s is: %s" % (instance_az, subnets_list_in_az))
+    logger.debug("List of subnets in %s is: %s" % (instance_az, subnets_list_in_az))
 
     # Get the security group ID of this instance
     sec_grp_id = ec2_instance.get_security_group_id()
-    logger.info("Security group id found for instance: " + sec_grp_id)
+    logger.info("Security group id found for instance management interface: " + sec_grp_id)
 
     # Create and Attach interfaces from respective subnet
-    utl.put_line_in_log('Attaching Interface', 'dot')
+    utl.put_line_in_log('Attaching Diagnostic and Data Interfaces', 'dot')
 
     # Attach Diag interface
     eni_name = ec2_instance.instance_id + const.ENI_NAME_OF_DIAG_INTERFACE + str(1)
@@ -136,15 +140,16 @@ def create_interface_and_attach(ec2_instance):
             if len(re.findall('already has an interface attached at', str(err))) >= 1:
                 logger.warn("Already has an attached network interface at device index: %s" % str(1))
                 pass
-            utl.put_line_in_log('Attaching Interface: FAILED', 'dot')
+            utl.put_line_in_log('Attaching Diagnostic Interface: FAILED', 'dot')
             return 'FAIL'
     else:
-        utl.put_line_in_log('Attaching Interface: FAILED', 'dot')
+        utl.put_line_in_log('Attaching Diagnostic Interface: FAILED', 'dot')
         return 'FAIL'
 
-    # Attach Data interface
+    # Attach Data interfaces
     for dev_index in range(2, int(user_input['max_number_of_interfaces'])):
         eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(dev_index)
+        # Get security group for respective data interface (inside / outside) 
         sec_grp_id = user_input[const.SECURITY_GROUP_PREFIX + str(dev_index)]
         subnet_id_list = const.SUBNET_ID_LIST_PREFIX + str(dev_index)
         # User should have given only one subnet id from this availability zone
@@ -158,7 +163,8 @@ def create_interface_and_attach(ec2_instance):
             logger.error(subnet_id)
             return 'FAIL'
 
-        # Create interface in the subnet with security group
+        # Create interface in the subnet with its respective security group
+        logger.info("sec_grp_id is: %s" % (sec_grp_id))
         interface_id = ec2_instance.create_interface(str(subnet_id[0]), sec_grp_id, eni_name)
 
         if interface_id:
@@ -169,45 +175,79 @@ def create_interface_and_attach(ec2_instance):
                 if len(re.findall('already has an interface attached at', str(err))) >= 1:
                     logger.warn("Already has an attached network interface at device index: %s" % str(dev_index))
                     pass
-                utl.put_line_in_log('Attaching Interface: FAILED', 'dot')
+                utl.put_line_in_log('Attaching Data Interface: FAILED', 'dot')
                 return 'FAIL'
         else:
-            utl.put_line_in_log('Attaching Interface: FAILED', 'dot')
+            utl.put_line_in_log('Attaching Data Interface: FAILED', 'dot')
             return 'FAIL'
     return 'SUCCESS'
 
 
 def register_instance(ec2_instance):
     """
-    Purpose:    To register Gig0/1 IP to Load Balancer
+    Purpose:    To register Gig0/0 IP to Load Balancer's Target Group 
+                [Gig0/1 IP for NLB case]
     Parameters: Object
     Returns:    SUCCESS, FAIL
     Raises:
     """
-    utl.put_line_in_log('Registering eth2(outside) to Target Groups', 'dot')
-    eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(3)
 
-    if ec2_instance.register_instance_to_lb(user_input['LB_ARN_OUTSIDE'], eni_name) == 'FAIL':
-        utl.put_line_in_log('Registering to Target Groups: FAILED', 'dot')
+    ## If GENEVE_SUPPORT is enabled (GWLB case), register inside interface to Target Group
+    ## Else (NLB case) register outside interface to Target Group
+    interface_data = {
+    'enable': ('inside', 2),
+    'disable': ('outside', 3) 
+    }
+    interface_name, interface_index = interface_data.get(user_input['GENEVE_SUPPORT'], ('inside', 2))
+    
+    utl.put_line_in_log('Registering %s interface to Target Group' %interface_name, 'dot')
+    eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(interface_index)
+    if ec2_instance.register_instance_to_lb(user_input['LB_ARN'], eni_name) == 'FAIL':
+        utl.put_line_in_log('Registering %s interface to Target Group: FAILED' %interface_name, 'dot')
         return 'FAIL'
-    utl.put_line_in_log('Registering to Target Groups: SUCCESS', 'dot')
+    utl.put_line_in_log('Registering %s interface to Target Group: SUCCESS' %interface_name, 'dot')
     return 'SUCCESS'
 
 
 def deregister_instance(ec2_instance):
     """
-    Purpose:    To de-register interface from LB
+    Purpose:    To de-register Gig0/0 IP from Target Group 
+                [Gig0/1 IP for NLB case]
     Parameters: Instance Id
     Returns:    SUCCESS, FAIL
     Raises:
     """
-    utl.put_line_in_log('De-registering eth2(outside) from Target Groups', 'dot')
-    eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(3)
 
-    if ec2_instance.deregister_instance_from_lb(user_input['LB_ARN_OUTSIDE'], eni_name) == 'FAIL':
-        utl.put_line_in_log('De-registering from Target Groups finished: FAIL', 'dot')
+    ## If GENEVE_SUPPORT is enabled (GWLB case), deregister inside interface from Target Group
+    ## Else (NLB case) deregister outside interface form Target Group
+    interface_data = {
+    'enable': ('inside', 2),
+    'disable': ('outside', 3) 
+    }
+    interface_name, interface_index = interface_data.get(user_input['GENEVE_SUPPORT'], ('inside', 2))
+    
+    utl.put_line_in_log('De-registering FTDv %s interface from Target Group' %interface_name, 'dot')
+    eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(interface_index)
+
+    if ec2_instance.deregister_instance_from_lb(user_input['LB_ARN'], eni_name) == 'FAIL':
+        utl.put_line_in_log('De-registering %s interface from Target Group finished: FAIL' %interface_name, 'dot')
         return 'FAIL'
-    utl.put_line_in_log('De-registering from Target Groups finished: SUCCESS', 'dot')
+    utl.put_line_in_log('De-registering %s interface from Target Group finished: SUCCESS' %interface_name, 'dot')
+    return 'SUCCESS'
+
+
+def disassociate_and_release_eip(ec2_instance):
+    """
+    Purpose:    [GWLB DUAL-ARM case] To disassociate and release EIP associated with Gig0/1 interface 
+    Parameters: Object
+    Returns:    SUCCESS, FAIL
+    Raises:
+    """
+    utl.put_line_in_log('Disassociating and Releasing Elastic IP for outside interface', 'dot')
+    if ec2_instance.disassociate_from_instance_and_release_eip() == 'FAIL':
+        utl.put_line_in_log('Disassociating and Releasing Elastic IP for outside interface: FAIL', 'dot')
+        return 'FAIL'
+    utl.put_line_in_log('Disassociating and Releasing Elastic IP for outside interface: SUCCESS', 'dot')
     return 'SUCCESS'
 
 
