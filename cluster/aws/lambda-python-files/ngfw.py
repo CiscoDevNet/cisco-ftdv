@@ -112,6 +112,7 @@ class NgfwInstance (CiscoEc2Instance):
             seconds=0
             while seconds<10:
                 resp1 += chan.recv(9999).decode('utf-8')
+                logger.debug('Initial response on login : {}'.format(resp1))
                 if resp1.endswith('> '):
                     break
                 else:
