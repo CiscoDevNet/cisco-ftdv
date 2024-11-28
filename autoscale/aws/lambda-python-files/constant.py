@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -24,13 +24,10 @@ Purpose:    This is python file for Constant variables
 # Encoding constant for password decryption function
 ENCODING = "utf-8"
 
-# Load Balancer Health probe configuration
-AWS_METADATA_SERVER = '169.254.169.254'
 
 # NIC Configuration method, DHCP/STATIC
 # NIC_CONFIGURE = "STATIC"  # Related to CSCvs17405
 NIC_CONFIGURE = "DHCP"
-
 
 
 # Lifecycle hook constants
@@ -52,7 +49,7 @@ USE_PUBLIC_IP_FOR_FMC_CONN = True
 
 # LifeCycleLambda Constants
 # ------------------------------------------------------------------------------
-# Disables or Enables execution of  business logic in LifeCycle Lambda
+# Disables or Enables execution of business logic in LifeCycle Lambda
 DISABLE_LIFECYCLE_LAMBDA = False
 DISABLE_CREATE_ATTACH_INT = False
 DISABLE_REGISTER_TARGET = False
@@ -60,10 +57,10 @@ DISABLE_REGISTER_TARGET = False
 
 # Autoscale Manager Constants
 # ------------------------------------------------------------------------------
-# Disables or Enables execution of  business logic in ConfigureASAv Lambda
+# Disables or Enables execution of business logic in ConfigureASAv Lambda
 DISABLE_AUTOSCALE_MANAGER_LAMBDA = False
 
-DECREMENT_CAP_IF_VM_DELETED = True
+DECREMENT_CAP_IF_VM_DELETED = False
 FTD_POLL_TIME_IN_MIN_VM_READY = 10
 
 DISABLE_VM_READY_FUNC = False
@@ -72,13 +69,14 @@ DISABLE_VM_CONFIGURE_FUNC = False
 DISABLE_VM_DEPLOY_FUNC = False
 DISABLE_VM_DELETE_FUNC = False
 
+#Retries counts for to_function : [vm_ready,vm_register,vm_configure,vm_deploy,vm_delete]
 TO_FUN_RETRY_COUNT = [3, 5, 10, 5, 5]
 
-# Configuration File Name
+# Configuration File Name Constants
 JSON_LOCAL_FILENAME = 'Configuration.json'
+JSON_SCHEMA_LOCAL_FILENAME = 'Configuration-schema.json'
 
 # Constants for Health Doctor
-
 DISABLE_HEALTH_DOCTOR = False
 UNHEALTHY_DAYS_THRESHOLD = 0
 UNHEALTHY_HOURS_THRESHOLD = 1

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -287,10 +287,10 @@ def handle_sns_event(sns_data):
                 cls_mem = None
                 cls_id = fmc.get_cluster_id_by_name(e_var["fmcDeviceGroupName"])
                 if cls_id:
-                    cls_mem = fmc.get_cluster_members(cls_id)
+                    cls_name, cls_mem = fmc.get_cluster_members(cls_id)
                 des, mins, maxs = aws_grp.get_asgroup_size()
                 if cls_mem:
-                    if mins is len(cls_mem):
+                    if des is len(cls_mem):
                         logger.info("Cluster Members: {}".format(cls_mem))
                         if e_var['USER_NOTIFY_TOPIC_ARN'] != 'NA':
                             details_of_the_device = "Cluster Members "+str(cls_mem)
@@ -334,7 +334,6 @@ def handle_sns_event(sns_data):
                                                                  str(int(_m_attr['counter']) - 1),
                                                                  const.REG_TASK_ID)
                 sns.publish_to_topic(e_var['ClusterManagerTopic'], message_subject, msg_body)
-
     elif _m_attr['to_function'] == 'cluster_delete':
         if _m_attr['category'] == 'FIRST':
             if execute_cluster_delete_first(ftd, fmc) == 'SUCCESS':
@@ -359,14 +358,14 @@ def check_cluster_status(aws_grp,ftd):
     Raises:
     """
     des, mins, maxs = aws_grp.get_asgroup_size()
-    logger.info("Cluster Group Size: {}".format(mins))
+    logger.info("Cluster Group Size: {}".format(des))
 
-    if mins != 1:
+    if des != 1:
         count=0
         while count<20:
             status = ftd.connect_cluster()
             data = status.count('in state '+const.DATA_NODE+'\r\n')
-            if data is (mins - 1):
+            if data is (des - 1):
                 break
             logger.info("Waiting for cluster to be formed..")
             logger.info("Number of data nodes joined: {}".format(data))
@@ -374,7 +373,7 @@ def check_cluster_status(aws_grp,ftd):
             count+=1
         control = status.count('in state '+const.CONTROL_NODE)
         data = status.count('in state '+const.DATA_NODE)
-        if (control != 1 or data != (mins - 1)):
+        if (control != 1 and data != (des - 1)) or count == 10:
             logger.info('Cluster is not properly formed..!!')
             return 'FAILURE'
         logger.info("Control: {}".format(control))

@@ -3,6 +3,7 @@
 ## System requirements
 
 The one-click deploy/delete scripts can be run in any Windows/Linux/MacOS machine that has python3 installed
+NOTE: The one-click script supports version 7.2.0 only
 
 ## Prerequisites
 

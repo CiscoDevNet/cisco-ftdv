@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -245,6 +245,27 @@ class FirepowerManagementCenter:
                     return str(item['id'])
         return None
 
+    def get_cluster_id_by_name(self, grp_name):
+        """
+        Purpose:    To get cluster id
+        Parameters:
+        Returns:    Cluster Id or None
+        Raises:
+        """
+        count = 1
+        while count<=3:
+            logger.info("Get Cluster ID - Attempt Number: " + str(count))
+            api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/deviceclusters/ftddevicecluster'
+            url = self.server + api_path + '?offset=0&limit=9000'
+            r = self.rest_get(url)
+            if 'items' in r.json():
+                for item in r.json()['items']:
+                    if item['name'] == grp_name:
+                        return str(item['id'])
+            time.sleep(10)
+            count += 1
+        return None
+
     def get_member_list_in_device_grp(self, grp_id):
         """
         Purpose:    To get devices name list from grp id
@@ -263,7 +284,7 @@ class FirepowerManagementCenter:
                 member_id_list.append(item['id'])
 
         return member_name_list, member_id_list
-
+ 
     def get_security_objectid_by_name(self, name):
         """
         Purpose:    Get Zone ID from it's name
@@ -328,7 +349,7 @@ class FirepowerManagementCenter:
                 return str(item['id'])
         # raise Exception('host object with name ' + name + ' was not found')
         return ''
-
+        
     def get_device_id_by_name(self, name):
         """
         Purpose:    Get Device Id by its name
@@ -368,25 +389,18 @@ class FirepowerManagementCenter:
             count += 1
         return ""
 
-    def get_cluster_id_by_name(self, grp_name):
+    def get_hostname_by_id(self, device_id):
         """
-        Purpose:    To get cluster id
-        Parameters:
-        Returns:    Cluster Id or None
+        Purpose:    Get Hostname by Device Id
+        Parameters: Device Id
+        Returns:    Hostname
         Raises:
         """
-        count = 1
-        while count<=3:
-            logger.info("Get Cluster ID - Attempt Number: " + str(count))
-            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/deviceclusters/ftddevicecluster"
-            url = self.server + api_path + '?offset=0&limit=9000'
-            r = self.rest_get(url)
-            if 'items' in r.json():
-                for item in r.json()['items']:
-                    if item['name'] == grp_name:
-                        return str(item['id'])
-            time.sleep(10)
-            count += 1
+        api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/devices/devicerecords/' + device_id
+        url = self.server + api_path
+        r = self.rest_get(url)
+        if (r.json()['hostName']):
+            return (r.json()['hostName'])
         return None
 
     def get_cluster_members(self, cls_id):
@@ -399,16 +413,19 @@ class FirepowerManagementCenter:
         count = 1
         while count<=3:
             member_name_list = []
+            member_id_list= []
             logger.info("Get Cluster Members - Attempt Number: " + str(count))
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/deviceclusters/ftddevicecluster/"
             url = self.server + api_path + cls_id
             r = self.rest_get(url)
             if 'controlDevice' in r.json():
                 # Add Control Node
+                member_id_list.append(r.json()['controlDevice']['deviceDetails']['id'])
                 member_name_list.append(r.json()['controlDevice']['deviceDetails']['name'])
                 try:
                     # Add Data Nodes
                     for item in r.json()['dataDevices']:
+                        member_id_list.append(item['deviceDetails']['id'])
                         member_name_list.append(item['deviceDetails']['name'])
                 except:
                     pass
@@ -416,10 +433,10 @@ class FirepowerManagementCenter:
             time.sleep(10)
             count += 1
         if member_name_list:
-            return member_name_list
+            return member_name_list,member_id_list
         else:
             return None
- 
+            
     def get_nic_id_by_name(self, device_id, nic_name):
         """
         Purpose:    Get Nic Id by device & nic name
@@ -683,6 +700,19 @@ class FirepowerManagementCenter:
         r = self.rest_delete(url)
         return r
 
+    def delete_device(self, ftd_id):
+        """
+        Purpose:    deleting the device from FMC
+        Parameters: Device ID
+        Returns:    REST delete response
+        Raises:
+        """
+        logger.info("Deleting: " + ftd_id)
+        api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/devices/devicerecords/'
+        url = self.server + api_path + ftd_id
+        r = self.rest_delete(url)
+        return r
+        
     def start_deployment(self, device_name):
         """
         Purpose:    Deploys policy changes on device
@@ -787,9 +817,19 @@ class FirepowerManagementCenter:
         Raises:
         """
         try:
-            api_path = '/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/'
-            api_suffix = '/operational/metrics?filter=metric%3Amemory&offset=0&limit=1&expanded=true'
-            url = self.server + api_path + device_id + api_suffix
+            # New Health Monitoring API
+            api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/health/metrics'
+            # Values are fetched from last one minute at interval of 10 sec (step).
+            end_time = int(time.time())
+            start_time = end_time - 60
+            step_size = 10
+            regex_filter = "used_percentage_system_and_swap"
+            api_suffix = \
+                f'?offset=0&limit=100&filter=deviceUUIDs%3A{device_id}%3Bmetric%3Amem%3B' + \
+                f"startTime%3A{start_time}%3BendTime%3A{end_time}%3Bstep%3A{step_size}%3B" + \
+                f"regexFilter%3A{regex_filter}&expanded=true"
+            url = self.server + api_path + api_suffix
+
             r = self.rest_get(url)
             resp = r.text
             return json.loads(resp)
@@ -976,4 +1016,3 @@ class DerivedFMC(FirepowerManagementCenter):
         except Exception as e:
             logger.exception(e)
             return None
-

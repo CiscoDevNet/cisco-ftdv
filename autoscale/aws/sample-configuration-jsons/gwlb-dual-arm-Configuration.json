@@ -1,0 +1,59 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "aws-access-policy",
+  "fmcNatPolicyName": "aws-dualarm-nat-policy", 
+  "fmcPlatformPolicyName": "aws-healthcheck-plt-policy",
+  "fmcInsideNicName": "inside",
+  "fmcOutsideNicName": "outside",
+  "fmcVNINicName": "vni-in", 
+  "fmcInsideNic": "TenGigabitEthernet0/0",
+  "fmcOutsideNic": "TenGigabitEthernet0/1",
+  "fmcInsideZone": "Inside-sz",
+  "fmcOutsideZone": "Outside-sz",
+  "fmcVNIZone": "VNI-sz",
+  "interfaceConfig": [
+    {
+      "ifname": "inside",
+      "name": "TenGigabitEthernet0/0",
+      "managementOnly": "false",
+      "MTU": "1500",
+      "mode": "NONE",
+      "securityZone": {
+        "name": "Inside-sz"
+      }
+    },
+    {
+      "ifname": "outside",
+      "name": "TenGigabitEthernet0/1",
+      "managementOnly": "false",
+      "MTU": "1500",
+      "mode": "NONE",
+      "securityZone": {
+        "name": "Outside-sz"
+      }
+    }
+  ],
+  "DualArmTrafficRoutes": [
+    {
+      "interface": "inside",
+      "network": "any-ipv4",
+      "gateway": "",
+      "metric": "2"
+    },
+    {
+      "interface": "outside",
+      "network": "any-ipv4",
+      "gateway": "",
+      "metric": "1"
+    },
+    {
+      "interface": "vni-in",
+      "network": "IPv4-Private-All-RFC1918",
+      "gateway": "",
+      "metric": "1"
+    }
+  ]
+}

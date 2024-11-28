@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -222,7 +222,6 @@ class FirepowerManagementCenter:
             # logging.debug("domain_uuid: " + domain_uuid)
             if auth_token is None:
                 logging.debug("auth_token not found. Exiting...")
-                # raise Exception("Error occurred in get auth token ")
         except Exception as err:
             logger.error("Error in generating auth token --> " + str(err))
         return
@@ -333,7 +332,6 @@ class FirepowerManagementCenter:
                 return str(item['id'])
         return ''
 
-
     # Get network objects (all network and host objects)
     def get_network_objectid_by_name(self, name):
         """
@@ -348,9 +346,7 @@ class FirepowerManagementCenter:
         for item in r.json()['items']:
             if item['type'] == 'Network' and item['name'] == name:
                 return str(item['id'])
-        # raise Exception('network object with name ' + name + ' was not found')
         return ''
-
     def get_port_objectid_by_name(self, name):
         """
         Purpose:    Get Port object Id by its name
@@ -364,10 +360,8 @@ class FirepowerManagementCenter:
         for item in r.json()['items']:
             if item['type'] == 'ProtocolPortObject' and item['name'] == name:
                 return str(item['id'])
-        # raise Exception('network port with name ' + name + ' was not found')
         return ''
-
-    def get_host_objectid_by_name(self, name):
+    def get_host_objectid_by_name(self, name): 
         """
         Purpose:    Get Host object Id by Name
         Parameters: Object Name
@@ -380,7 +374,6 @@ class FirepowerManagementCenter:
         for item in r.json()['items']:
             if item['type'] == 'Host' and item['name'] == name:
                 return str(item['id'])
-        # raise Exception('host object with name ' + name + ' was not found')
         return ''
 
     def get_device_id_by_name(self, name):
@@ -416,7 +409,147 @@ class FirepowerManagementCenter:
                 if item['name'] == name:
                     return str(item['id'])
         return None
+    
+    def get_platform_policy_id_by_name(self, name):
+        """
+        Purpose:    Get Platform Policy Id by its name
+        Parameters: Platform policy name
+        Returns:    Platform Policy Id, None
+        Raises:
+        """
+        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies"
+        url = self.server + api_path + '?offset=0&limit=10000'
+        r = self.rest_get(url)
+        # Search for policy by name
+        if 'items' in r.json():
+            for item in r.json()['items']:
+                if item['name'] == name:
+                    return str(item['id'])
+        return None
+    
+    def check_nat_rule_within_nat_policy(self, nat_policy_id, vni_seczone_id, outside_seczone_id):
+        """
+        Purpose:    Checks if NAT Rule is configured correctly within NAT Policy
+        Parameters: NAT policy Id
+        Returns: "CONFIGURED" or "UN-CONFIGURED"
+        Raises:
+        """
+        try:
+            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" 
+            url = self.server + api_path + nat_policy_id + '/manualnatrules?offset=0&limit=25&expanded=true'
+            r = self.rest_get(url)
+            any_obj_id = self.get_group_objectid_by_name('any')
+            if 'items' in r.json():
+                for item in r.json()['items']:
+                    if item['originalSource']['id'] == any_obj_id and item['sourceInterface']['id'] == vni_seczone_id:
+                        if item['destinationInterface']['id'] == outside_seczone_id:
+                            if item['natType'] == 'DYNAMIC' and item['enabled'] is True and item['metadata']['section'] == 'BEFORE_AUTO':
+                                return "CONFIGURED"
+            return "UN-CONFIGURED"
+        except Exception as e:
+            logger.exception(e)
+        
+    def create_nat_rule_within_nat_policy(self, nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id):
+        """
+        Purpose:    Creates Dual-arm NAT Rule within NAT Policy
+        Parameters: NAT policy Id
+        Returns:    Rest response
+        Raises:
+        """
+        try:
+            any_obj_id = self.get_group_objectid_by_name('any')
+            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" + nat_policy_id + "/manualnatrules"
+            url = self.server + api_path
+            post_data = {
+                "originalSource": {
+                    "type": "NetworkGroup",
+                    "overridable": "false",
+                    "id": any_obj_id,
+                    "name": "any"
+                },
+                "interfaceInOriginalDestination": "false",
+                "interfaceInTranslatedSource": "true",
+                "unidirectional": "true",
+                "enabled": "true",
+                "type": "FTDManualNatRule",
+                "dns": "false",
+                "destinationInterface": {
+                    "name": outside_seczone_name,
+                    "id": outside_seczone_id,
+                    "type": "SecurityZone"
+                },
+                "interfaceIpv6": "false",
+                "fallThrough": "false",
+                "routeLookup": "false",
+                "noProxyArp": "false",
+                "netToNet": "false",
+                "sourceInterface": {
+                    "name": vni_seczone_name,
+                    "id": vni_seczone_id,
+                    "type": "SecurityZone"
+                },
+                "natType": "DYNAMIC"
+                }
+            r = self.rest_post(url, post_data)
+            return r  
+        except Exception as e:
+            logger.exception(e)
+            return None
 
+    def check_and_create_platform_policy(self, policy_name):
+        """
+        Purpose:    To create platform policy in FMC if not already present
+        Parameters: Platform policy name
+        Returns:    Platform policy ID
+        Raises:
+        """
+        try:
+            pol_id = self.get_platform_policy_id_by_name(policy_name) 
+            if pol_id:
+                return pol_id
+            else:
+                logger.info('Platform policy does not exist,Creating platform policy in FMC ..')
+
+                api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies"
+                url = self.server + api_path
+                post_data = {
+                    "type": "FTDPlatformSettingsPolicy",
+                    "name": policy_name,
+                    "description": "Platform Settings for FTD health check"
+                    }
+                r = self.rest_post(url, post_data)
+                return r.json()['id']
+        except Exception as e:
+            logger.exception(e)
+            return None
+        
+    def check_and_create_nat_policy(self,policy_name):
+        """
+        Purpose:    To create NAT policy in FMC if not already present
+        Parameters: NAT policy name
+        Returns:    NAT policy ID
+        Raises:
+        """
+        try:
+            pol_id = self.get_nat_policy_id_by_name(policy_name) 
+            if pol_id:
+                return pol_id
+            else:
+                logger.info('NAT policy does not exist, Creating NAT policy in FMC ..')
+
+                api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies"
+                url = self.server + api_path
+                post_data = {
+                    "type": "FTDNatPolicy",
+                    "name": policy_name,
+                    "description": "NAT Policy for Dual-arm configuration"
+                    }
+                r = self.rest_post(url, post_data)
+                return r.json()['id']
+        except Exception as e:
+            logger.exception(e)
+            return None 
+            
     def get_nic_id_by_name(self, device_id, nic_name):
         """
         Purpose:    Get Nic Id by device & nic name
@@ -504,7 +637,7 @@ class FirepowerManagementCenter:
 
         return "UN-CONFIGURED"
 
-    def check_static_route(self, device_id, interface_name, _object_name, gate_way):
+    def check_static_route(self, device_id, interface_name, _object_name, gate_way): 
         """
         Purpose:    Check if a static route exists on a device
         Parameters: Device, Interface name, Network, Gateway
@@ -604,10 +737,10 @@ class FirepowerManagementCenter:
         r = self.rest_put(url, put_data)
         return r
 		
-    def enable_vtep(self, device_id, nic_id, nic, nic_name):
+    def enable_vtep(self, device_id, nic_name, nic_id):
         """
-        Purpose:    Configure an Nic interface as DHCP
-        Parameters: Device Name, Nic, Nic name
+        Purpose:    Enable VTEP
+        Parameters: Device ID, Nic name, Nic ID
         Returns:    REST put response
         Raises:
         """
@@ -635,13 +768,14 @@ class FirepowerManagementCenter:
         r = self.rest_put(url, put_data)
         return r	
 		
-    def add_vni(self, device_id, sec_zone_id):
+    def add_vni(self, device_id, proxy_type, vni_nic_name, sec_zone_id): 
         """
         Purpose:    Add VNI
-        Parameters: Device Name, Zone
+        Parameters: Device ID, proxy type (single-arm / dual-arm),  VNI interface name, Security Zone ID for VNI interface
         Returns:    REST put response
         Raises:
         """
+
         api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
 		           device_id + "/vniinterfaces"	    
         url = self.server + api_path
@@ -652,20 +786,17 @@ class FirepowerManagementCenter:
             "enabled": "true",
             "vtepID": 1,
             "enableProxy": "true",
-            "ifname": "vni1",
+            "proxyType" : proxy_type,
+            "ifname": vni_nic_name,
             "securityZone": {
                 "id": sec_zone_id,
                 "type": "SecurityZone"
            }
         }
-
-
-
-		
         r = self.rest_put(url, put_data)
         return r
 
-    def create_static_route(self, device_id, interface_name, _type, _object_name, _object_id, gate_way, metric):
+    def create_static_route(self, device_id, interface_name, _type, _object_name, _object_id, gate_way, metric): 
         """
         Purpose:    To create static route on device
         Parameters: Device, Interface Name, Host, Gateway, Metric
@@ -674,7 +805,7 @@ class FirepowerManagementCenter:
         """
 
         api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
-                   device_id + "/routing/ipv4staticroutes"  # param
+                   device_id + "/routing/ipv4staticroutes"  
         url = self.server + api_path
 
         post_data = {
@@ -764,7 +895,7 @@ class FirepowerManagementCenter:
             if 'type' in r.json():
                 if r.json()['type'] == 'DeploymentRequest':
                     return r.json()['metadata']['task']['id']
-        return ''
+        return None
 
     def check_reg_status_from_fmc(self, vm_name):
         """
@@ -814,7 +945,6 @@ class FirepowerManagementCenter:
                     logger.error("Unable to find object %s" % obj_name)
                     return ''
         return obj_id
-
     def get_memory_metrics_from_fmc(self, device_id):
         """
         Purpose:    Fetch Memory Metric
@@ -827,7 +957,7 @@ class FirepowerManagementCenter:
             # api_suffix = '/operational/metrics?filter=metric%3Amemory&offset=0&limit=1&expanded=true'
             # url = self.server + api_path + device_id + api_suffix
 
-            # New Health Monitoring API
+            #Health Monitoring API
             api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/health/metrics'
             # Values are fetched from last one minute at interval of 10 sec (step).
             end_time = int(time.time())
@@ -877,8 +1007,8 @@ class FirepowerManagementCenter:
             return r.json()["targets"]
         else:
             return []
-
-    def get_nat_policy_id(self, pol_name):
+  
+    def get_nat_policy_id_by_name(self, pol_name):
         """
         Purpose:    Gets policy id
         Parameters: Policy Name
@@ -888,12 +1018,112 @@ class FirepowerManagementCenter:
         api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies"
         url = self.server + api_path + '?offset=0&limit=10000'
         r = self.rest_get(url)
-        for item in r.json()['items']:
-            if item['name'] == pol_name:
-                return str(item['id'])
-        else:
-            return None
+        # Search for policy by name
+        if 'items' in r.json():
+            for item in r.json()['items']:
+                if item['name'] == pol_name:
+                    return str(item['id'])    
+        return None
 
+    def associate_policy_to_device_group(self, policy_type, policy_name, policy_id, device_grp_name, device_grp_id):
+        """
+        Purpose:  Associates  Policy to FTD Device Group
+        Parameters: Policy type,  Policy name , Policy ID , Device Group name , Device Group ID 
+        Returns: Response 
+        Raises:
+        """
+        try:
+            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/assignment/policyassignments"
+            url = self.server + api_path
+            post_data = {
+                        "type": "PolicyAssignment",
+                        "policy": {
+                                "type": policy_type,
+                                "name": policy_name,
+                                "id": policy_id
+                            },
+                        "targets": [
+                                {
+                                "type": "DeviceGroup",
+                                "name": device_grp_name,
+                                "id": device_grp_id
+                            }
+                            ]
+                            }
+                            
+            r = self.rest_post(url, post_data)  
+            return r  
+        except Exception as e:
+            logger.exception(e)
+            return None 
+        
+    def check_http_access_settings(self, platform_policy_id,health_check_port,inside_seczone_name,inside_seczone_id): 
+        """
+        Purpose: Checks if required HTTP access setting is configured in platform policy
+        Parameters: Platform policy ID
+        Returns: 'CONFIGURED' or 'UN-CONFIGURED'
+        Raises:
+        """
+        try:
+            api_path ='/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies/' 
+            url = self.server + api_path + platform_policy_id  + '/httpaccesssettings?offset=0&limit=25&expanded=true'
+            r = self.rest_get(url)
+            any_obj_id = self.get_group_objectid_by_name('any')
+            if 'items' in r.json():
+                for item in r.json()['items']:
+                    if 'enableHttpServer' in item and 'port' in item:
+                        if str(item['port']) == str(health_check_port) and item['enableHttpServer'] is True:
+                            if 'httpConfiguration' in item:
+                                http_configs = item['httpConfiguration']
+                                for config in http_configs:
+                                    if config['ipAddress']['name']=='any' and config['ipAddress']['id']==any_obj_id:
+                                        int_objects = config['interfaces']['objects']
+                                        for int_object in int_objects:
+                                            if int_object['name'] == inside_seczone_name and int_object['id']==inside_seczone_id:
+                                                return "CONFIGURED"    
+            return "UN-CONFIGURED"
+        except Exception as e:
+            logger.exception(e)
+            return "MIS-CONFIGURED"
+            
+    def create_http_access_settings(self,platform_pol_id,health_check_port,inside_seczone_name,inside_seczone_id):
+        """
+        Purpose:  Creates HTTP access settings in  platform policy for enabling health check on inside interface
+        Parameters: Health check port , security zone
+        Returns: Response 
+        Raises:
+        """
+
+        api_path ='/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies/' + platform_pol_id + '/httpaccesssettings/' + platform_pol_id
+        url = self.server + api_path 
+        any_obj_id = self.get_group_objectid_by_name('any')
+        put_data = {
+                    "type": "HttpAccessSetting",
+                    "id": platform_pol_id,
+                    "enableHttpServer": "true",
+                    "port": health_check_port,
+                    "httpConfiguration": [
+                        {
+                        "ipAddress": {
+                            "name": "any",
+                            "id": any_obj_id,
+                            "type": "Network"
+                        },
+                        "interfaces": {
+                            "objects": [
+                            {
+                                "name": inside_seczone_name,
+                                "id": inside_seczone_id,
+                                "type": "SecurityZone"
+                            }
+                            ]
+                        }
+                        }
+                    ]
+                    }
+        r = self.rest_put(url,put_data)
+        return r    
+           
 
 class DerivedFMC(FirepowerManagementCenter):
     """
@@ -904,17 +1134,19 @@ class DerivedFMC(FirepowerManagementCenter):
 
         self.d_grp_name = ''
         self.a_policy_name = ''
-        self.nat_policy_name = ''
+        self.nat_policy_name = '' ##NLB
         self.seczone_name = []
+        self.vni_seczone_name = ''
         self.network_obj_name = []
-        self.host_obj_name = []
+        self.host_obj_name = [] ##NLB
 
         self.d_grp_id = ''
         self.a_policy_id = ''
-        self.nat_policy_id = ''
+        self.nat_policy_id = '' ## NLB
         self.seczone_obj_pair = {}
         self.network_obj_pair = {}
-        self.host_obj_pair = {}
+        self.host_obj_pair = {} ##NLB
+        self.vni_seczone_id = '' ##GWLB
 
         self.reachable = False
         self.configuration = {}
@@ -941,9 +1173,9 @@ class DerivedFMC(FirepowerManagementCenter):
         self.configuration.update({'fmc_reachable': self.reachable})
         return self.reachable
 
-    def set_fmc_configuration(self):
+    def set_fmc_configuration(self, is_geneve_support, proxy_type):
         """
-        Purpose:    To update DerivedFMC class parameters
+        Purpose:    To update DerivedFMC class parameters : fetching required policies' and objects' IDs from FMC
         Parameters:
         Returns:    Object
         Raises:
@@ -953,31 +1185,34 @@ class DerivedFMC(FirepowerManagementCenter):
             self.configuration.update({"device_grp": {self.d_grp_name: self.d_grp_id}})
         if self.a_policy_name:
             self.a_policy_id = self.get_access_policy_id_by_name(self.a_policy_name)
-            self.configuration.update({"access_policy": {self.a_policy_name: self.a_policy_id}})
-        if self.nat_policy_name:
-            self.nat_policy_id = self.get_nat_policy_id(self.nat_policy_name)
+            self.configuration.update({"access_policy": {self.a_policy_name: self.a_policy_id}})        
+        if is_geneve_support == 'disable' and self.nat_policy_name:
+            self.nat_policy_id = self.get_nat_policy_id_by_name(self.nat_policy_name)
             self.configuration.update({"nat_policy": {self.nat_policy_name: self.nat_policy_id}})
         if self.seczone_name:
             for i in self.seczone_name:
                 self.seczone_obj_pair.update({i: self.get_security_objectid_by_name(i)})
-            self.configuration.update({"security_zones": self.seczone_obj_pair})
+            self.configuration.update({"inside_outside_security_zones": self.seczone_obj_pair})
+        if proxy_type == 'DUAL_ARM' and self.vni_seczone_name:
+            self.vni_seczone_id = self.get_security_objectid_by_name(self.vni_seczone_name) 
+            self.configuration.update({"vni_security_zone": {self.vni_seczone_name: self.vni_seczone_id}})   
         if self.network_obj_name:
             for i in self.network_obj_name:
                 self.network_obj_pair.update({i: self.get_network_objectid_by_name(i)})
             self.configuration.update({"net_objects": self.network_obj_pair})
-        if self.host_obj_name:
+        if is_geneve_support == 'disable' and self.host_obj_name:
             for i in self.host_obj_name:
                 self.host_obj_pair.update({i: self.get_host_objectid_by_name(i)})
             self.configuration.update({"host_objects": self.host_obj_pair})
 
         self.network_objects, self.host_objects = self.get_network_host_objectids()
         self.group_objects = self.get_group_objects()
+        logger.info('fmc_configuration: {}'.format(self.configuration))
         logger.info(json.dumps(self.configuration, separators=(',', ':')))
-
         return
 
     def update_fmc_config_user_input(self, d_grp_name, a_policy_name, l_seczone_name,
-                                     l_network_obj_name, l_host_obj_name = None, nat_policy_name = None):
+                                     l_network_obj_name, l_host_obj_name = None, nat_policy_name = None, vni_seczone_name = None):
         """
         Purpose:    To take parameters to DerivedFMC class
         Parameters:
@@ -990,12 +1225,12 @@ class DerivedFMC(FirepowerManagementCenter):
         self.seczone_name = l_seczone_name
         self.network_obj_name = l_network_obj_name
         self.host_obj_name = l_host_obj_name
-
+        self.vni_seczone_name = vni_seczone_name
         return
 
-    def check_fmc_configuration(self, is_geneve_support):
+    def check_fmc_configuration(self, is_geneve_support, proxy_type):
         """
-        Purpose:    To inspect if Derived FMC class has all required variables
+        Purpose:    To check if deployed FMC has all required policies / objects created 
         Parameters:
         Returns:    self.configuration_status
         Raises:
@@ -1011,21 +1246,15 @@ class DerivedFMC(FirepowerManagementCenter):
                 r = self.get_policy_assign_targets(self.a_policy_id)
                 if not utl.find_value_in_list(r, self.d_grp_id):
                     return self.configuration_status
-
             for (k, v) in self.seczone_obj_pair.items():
                 if v is None:
                     return self.configuration_status
-            for (k, v) in self.network_obj_pair.items():
-                if v is None:
-                    return self.configuration_status
-                
             if is_geneve_support == "enable":
                 pass
             else:
                 for (k, v) in self.host_obj_pair.items():
                     if v is None:
                         return self.configuration_status
-
             if is_geneve_support == "enable": 
                 pass
             elif self.nat_policy_id == '':
@@ -1033,8 +1262,12 @@ class DerivedFMC(FirepowerManagementCenter):
             else:
                 r = self.get_policy_assign_targets(self.nat_policy_id)
                 if not utl.find_value_in_list(r, self.d_grp_id):
-                    return self.configuration_status
-
+                    return self.configuration_status 
+            #Check vni security zone is created for DualArm deployments    
+            if proxy_type == 'DUAL_ARM':
+                if self.vni_seczone_id == '':
+                    return self.configuration_status           
+               
         self.configuration_status = 'CONFIGURED'
         self.configuration.update({'fmc_configuration_status': self.configuration_status})
         return self.configuration_status
@@ -1100,3 +1333,31 @@ class DerivedFMC(FirepowerManagementCenter):
         except Exception as e:
             logger.exception(e)
             return None
+        
+
+    def check_and_associate_policy_to_device_group(self, policy_type, policy_name, policy_id):
+        """
+        Purpose:    Associate policy to FTD device group (if not already associated)
+        Parameters: Policy type , Policy name, policy ID
+        Returns: 'SUCCESS' or 'FAIL'
+        Raises:
+        """
+        try: 
+            #If policy already assigned to device group return success
+            r = self.get_policy_assign_targets(policy_id)
+            if utl.find_value_in_list(r, self.d_grp_id):
+                return 'SUCCESS'
+            #Else assign to device group and return success
+            else:
+                logger.info('Associating Policy %s to FTD device group..' % policy_name)
+                r = self.associate_policy_to_device_group(policy_type, policy_name, policy_id, self.d_grp_name, self.d_grp_id)
+                if r is None:
+                    raise Exception('Error associating policy %s to FTD device group' % policy_name)
+                if r.status_code != 200 and r.status_code != 201:
+                    logger.error("response: " + str(r.json()))
+                    return 'FAIL'
+                return 'SUCCESS'
+        except Exception as e:
+            logger.exception(e)
+            return 'FAIL'
+        

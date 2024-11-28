@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -47,10 +47,7 @@ def lambda_handler(event, context):
 
     life_cycle_action = 'FAIL'
     
-    if user_input['GWLBSUPPORT'] == "No":
-        const.DISABLE_REGISTER_TARGET = True
-    else:
-        const.DISABLE_REGISTER_TARGET = False
+    const.DISABLE_REGISTER_TARGET = False
     
     # EC2 Lifecycle Action
     try:
@@ -152,8 +149,6 @@ def create_interface_and_attach(ec2_instance):
 
     # Attach Data interface
     for dev_index in range(2, int(user_input['max_number_of_interfaces'])):
-        if dev_index == 3 and user_input['GWLBSUPPORT'] == "Yes":
-            continue
         eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(dev_index)
         sec_grp_id = user_input[const.SECURITY_GROUP_PREFIX + str(dev_index)]
         subnet_id_list = const.SUBNET_ID_LIST_PREFIX + str(dev_index)
@@ -168,13 +163,10 @@ def create_interface_and_attach(ec2_instance):
             logger.error(subnet_id)
             return 'FAIL'
 
-        # Create interface in the subnet with security group
         interface_id = ec2_instance.create_interface(str(subnet_id[0]), sec_grp_id, eni_name)
 
         if interface_id:
             # Attach interface to instance with device index
-            if dev_index == 4 and user_input['GWLBSUPPORT'] == "Yes":
-                dev_index = dev_index - 1 
             attachment, err = ec2_instance.attach_interface(interface_id, dev_index)
             if not attachment:
                 ec2_instance.delete_interface(interface_id)

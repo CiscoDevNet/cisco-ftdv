@@ -30,6 +30,7 @@ import shutil
 cluster_manager_zip = 'cluster_manager.zip'
 cluster_lifecycle_zip = 'cluster_lifecycle.zip'
 lambda_layer_zip = 'cluster_layer.zip'
+custom_metric_publisher_zip = 'custom_metrics_publisher.zip'
 full_dir_path = os.path.dirname(os.path.realpath(__file__)) + '/'
 target_path = full_dir_path + "target/"
 
@@ -119,6 +120,13 @@ def zip_():
 
     list_of_files = ['aws.py', 'manager.py', 'constant.py', 'ngfw.py', 'fmc.py', 'utility.py', 'Configuration.json']
     cmd = 'zip -jr ' + target_path + cluster_manager_zip + ' '
+    for file in list_of_files:
+        file = full_dir_path + 'lambda-python-files/' + file
+        cmd = cmd + file + ' '
+    execute_cmd(cmd)
+
+    list_of_files = ['aws.py', 'custom_metrics_publisher.py', 'constant.py', 'ngfw.py', 'fmc.py', 'utility.py']
+    cmd = 'zip -jr ' + target_path + custom_metric_publisher_zip + ' '
     for file in list_of_files:
         file = full_dir_path + 'lambda-python-files/' + file
         cmd = cmd + file + ' '

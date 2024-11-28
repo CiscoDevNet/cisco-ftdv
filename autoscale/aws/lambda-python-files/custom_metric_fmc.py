@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -40,17 +40,14 @@ def lambda_handler(event, context):
     Returns:
     Raises:
     """
-    # utl.put_line_in_log('Custom Metric Publisher Lambda Handler started', 'thick')
     logger.info("Received event: " + json.dumps(event, separators=(',', ':')))
 
     if const.DISABLE_CUSTOM_METRIC_PUBLISH_LAMBDA is True:
         logger.info("Custom Metric Publisher Lambda running is disabled! Check constant.py")
-        # utl.put_line_in_log('Custom Metric Publisher Lambda Handler finished', 'thick')
         return
     try:
         if event["detail-type"] == "Scheduled Event":
             handle_cron_event(event)
-            # utl.put_line_in_log('Custom Metric Publisher Lambda Handler finished', 'thick')
             return
     except Exception as e:
         logger.debug(str(e))
@@ -63,19 +60,16 @@ def lambda_handler(event, context):
             try:
                 if event['detail']['EC2InstanceId']:
                     handle_ec2_launch_event()
-                # utl.put_line_in_log('AutoScale Manager Lambda Handler finished', 'thick')
                 return
             except Exception as e:
                 logger.error("Unable to get instance ID from event, not a new instance launch event")
                 logger.error("Error occurred {}".format(repr(e)))
-                # utl.put_line_in_log('AutoScale Manager Lambda Handler finished', 'thick')
                 return
     except Exception as e:
         logger.debug(str(e))
         pass
     logger.info("Received an event but not an EC2 launch CloudWatch event")
 
-    # utl.put_line_in_log('Custom Metric Publisher Lambda Handler finished', 'thick')
     return
 
 
@@ -86,7 +80,7 @@ def handle_cron_event(event):
     Returns:
     Raises:
     """
-    # utl.put_line_in_log('Cron Handler Started', 'thin')
+   
     # AutoScale Group class initialization
     asg = AutoScaleGroup(user_input['AutoScaleGrpName'])
     instances_list = asg.get_instance_list()
@@ -116,10 +110,6 @@ def handle_cron_event(event):
         logger.exception("Exception {}".format(e))
         logger.info("Will DISABLE Cron job for Custom Metric Collection"
                     "check if FMC is accessible & has mentioned device group")
-        # Decided to not to disable Publisher if FMC is unreachable
-        # Initialize CloudWatchEvent class
-        # cw_event = CloudWatchEvent(user_input['cron_event_name'])
-        # # cw_event.stop_cron_job()
     else:
         fmc_devices_list, device_id_list = fmc.get_member_list_in_device_grp(device_grp_id)
         query_device_dict = dict(zip(fmc_devices_list, device_id_list))
@@ -214,7 +204,6 @@ def get_memory_metric_pair(fmc, pair_of_metric_name_value, intersection_list, qu
         if response is None:
             logger.error("Unable to get metrics for instance: " + device_name)
         try:
-            # metric_value = response["items"][0]["healthMonitorMetric"]["value"]
             metric_value = float(json.loads(response["items"][0]["response"])["data"]["result"][0]["values"][-1][1])
             ftdv_memory_metric_dict.update({device_name: metric_value})
             if i == 0:

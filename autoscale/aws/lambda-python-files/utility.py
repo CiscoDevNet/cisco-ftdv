@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -106,11 +106,13 @@ def get_user_input_lifecycle_ftdv():
         "SUBNET_ID_LIST_3": [],
         "SECURITY_GRP_2": "",
         "SECURITY_GRP_3": "",
-        "LB_ARN_OUTSIDE": "",
+        "LB_ARN": "",
         "LB_DEREGISTRATION_DELAY": "",
         "CONFIGURE_ASAV_TOPIC_ARN": "",
         "USER_NOTIFY_TOPIC_ARN": "",
-        "FTD_LICENSE_TYPE": ""
+        "FTD_LICENSE_TYPE": "",
+        "GENEVE_SUPPORT": "",
+        "PROXY_TYPE": "",
     }
 
     try:
@@ -126,7 +128,7 @@ def get_user_input_lifecycle_ftdv():
         user_input['SECURITY_GRP_2'] = os.environ['SECURITY_GRP_2']
         user_input['SUBNET_ID_LIST_3'] = os.environ['OUTSIDE_SUBNET'].split('::')
         user_input['SECURITY_GRP_3'] = os.environ['SECURITY_GRP_3']
-        user_input['LB_ARN_OUTSIDE'] = os.environ['LB_ARN_OUTSIDE']
+        user_input['LB_ARN'] = os.environ['LB_ARN']
         user_input['LB_DEREGISTRATION_DELAY'] = os.environ['LB_DEREGISTRATION_DELAY']
         user_input['CONFIGURE_ASAV_TOPIC_ARN'] = os.environ['CONFIGURE_ASAV_TOPIC_ARN']
         try:
@@ -134,6 +136,16 @@ def get_user_input_lifecycle_ftdv():
         except KeyError as e:
             logger.debug("Exception occurred: {}".format(repr(e)))
             user_input['USER_NOTIFY_TOPIC_ARN'] = None
+        try:    
+            user_input['GENEVE_SUPPORT'] = os.environ['GENEVE_SUPPORT']  
+        except KeyError as e:
+            logger.debug("Exception occurred: {}".format(repr(e)))
+            user_input['GENEVE_SUPPORT'] = "disable"     
+        try:    
+            user_input['PROXY_TYPE'] = os.environ['PROXY_TYPE']  
+        except KeyError as e:
+            logger.debug("Exception occurred: {}".format(repr(e)))
+            user_input['PROXY_TYPE'] = None      
     except Exception as e:
         logger.error("Exception: {}".format(e))
         logger.error("Unable to find OS environment variables")
@@ -215,21 +227,21 @@ def get_user_input_manager():
         "AutoScaleManagerTopic": "",
         "USER_NOTIFY_TOPIC_ARN": "",
         "A_CRON_JOB_NAME": "",
-        "LB_ARN_OUTSIDE": "",
+        "LB_ARN": "",
         "FmcIp": "",
         "FmcUserName": "",
         "FmcPassword": "",
         "NgfwUserName": "admin",
         "NgfwPassword": "",
         "TargetGrpHealthPort": "",
-		"GENEVE_SUPPORT": ""
-    }
+        "GENEVE_SUPPORT": "",
+        "PROXY_TYPE": ""
+    }  
 
     try:
         geneve_support = os.environ["GENEVE_SUPPORT"]
     except:
         geneve_support = "disable"
-
     if geneve_support == "enable":
         schema1 = {
             "type": "object",
@@ -254,7 +266,7 @@ def get_user_input_manager():
                     "type": "string",
                     "pattern": "^...*$"
                 },
-                "LB_ARN_OUTSIDE": {
+                "LB_ARN": {
                     "type": "string",
                     "pattern": "^...*$"
                 },
@@ -278,6 +290,10 @@ def get_user_input_manager():
                     "type": "string",
                     "pattern": "^...*$"
                 },
+                "PROXY_TYPE": {
+                    "type": "string",
+                    "pattern": "^((SINGLE_ARM)|(DUAL_ARM))$"
+                },
                 "TargetGrpHealthPort": {
                     "type": "string",
                     "pattern": "^()([1-9]|[1-5]?[0-9]{2,4}|6[1-4][0-9]{3}|65[1-4][0-9]{2}|655[1-2][0-9]|6553[0-5])$"
@@ -294,166 +310,17 @@ def get_user_input_manager():
                 "AutoScaleManagerTopic",
                 "USER_NOTIFY_TOPIC_ARN",
                 "A_CRON_JOB_NAME",
-                "LB_ARN_OUTSIDE",
+                "LB_ARN",
                 "FmcIp",
                 "FmcUserName",
                 "FmcPassword",
                 "NgfwUserName",
                 "NgfwPassword",
+                "PROXY_TYPE",
                 "TargetGrpHealthPort"
             ]
         }
             
-        schema2 = {
-            "type":"object",
-            "properties": {
-                "licenseCaps":{
-                    "type":"array",
-                    "items":{
-                        "type":"string",
-                        "pattern":"^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
-                    }
-                },
-                "fmcIpforDeviceReg":{
-                    "type":"string",
-                    "pattern":"^((DONTRESOLVE)|((?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}))$"
-                },
-                "RegistrationId":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "NatId":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "fmcAccessPolicyName":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "fmcInsideNicName":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "fmcOutsideNicName":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "fmcInsideNic":{
-                    "type":"string",
-                    "pattern":"^.*0/(0|1)$"
-                },
-                "fmcOutsideNic":{
-                    "type":"string",
-                    "pattern":"^.*0/(0|1)$"
-                },
-                "fmcOutsideZone":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "fmcInsideZone":{
-                    "type":"string",
-                    "pattern":"^...*$"
-                },
-                "MetadataServerObjectName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "interfaceConfig":{
-                    "type":"array",
-                    "items":{
-                        "type":"object",
-                        "properties":{
-                            "managementOnly": {
-                                "type":"string",
-                                "pattern":"^...*$"
-                            },
-                            "MTU":{
-                                "type":"string",
-                                "pattern":"^[1-9][0-9][0-9][0-9]$"
-                            },
-                            "securityZone":{
-                                "type":"object",
-                                "properties":{
-                                    "name":{
-                                        "type":"string",
-                                        "pattern":"^...*$"
-                                    }
-                                },
-                                "required":[
-                                    "name"
-                                ]
-                            },
-                            "mode":{
-                                "type":"string",
-                                "pattern":"^...*$"
-                            },
-                            "ifname":{
-                                "type":"string",
-                                "pattern":"^...*$"
-                            },
-                            "name":{
-                                "type":"string",
-                                "pattern":"^.*0/(0|1)$"
-                            }
-                        },
-                        "required":[
-                            "managementOnly",
-                            "MTU",
-                            "securityZone",
-                            "mode",
-                            "ifname",
-                            "name"
-                        ]
-                    }
-                },
-                "trafficRoutes":{
-                    "type":"array",
-                    "items":{
-                        "type":"object",
-                        "properties":{
-                            "interface":{
-                                "type":"string",
-                                "pattern":"^...*$"
-                            },
-                            "network":{
-                                "type":"string",
-                                "pattern":"^...*$"
-                            },
-                            "gateway":{
-                                "type":"string",
-                                "pattern":"(^$|^..*$|^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$)"
-                            },
-                            "metric":{
-                                "type":"string",
-                                "pattern":"^[1-9]\\d*$"
-                            }
-                        },
-                        "required":[
-                            "interface",
-                            "network",
-                            "gateway",
-                            "metric"
-                        ]
-                    }
-                }
-            },
-            "required":[
-                "licenseCaps",
-                "fmcIpforDeviceReg",
-                "RegistrationId",
-                "NatId",
-                "fmcAccessPolicyName",
-                "fmcInsideNicName",
-                "fmcOutsideNicName",
-                "fmcInsideNic",
-                "fmcOutsideNic",
-                "fmcOutsideZone",
-                "fmcInsideZone",
-                "MetadataServerObjectName",
-                "interfaceConfig",
-                "trafficRoutes"
-            ]
-        }
     else:
         schema1 = {
             "type": "object",
@@ -527,163 +394,7 @@ def get_user_input_manager():
                 "TargetGrpHealthPort"
             ]
         }
-
-        schema2 = {
-            "type": "object",
-            "properties": {
-                "licenseCaps": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "pattern": "^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
-                    }
-                },
-                "fmcIpforDeviceReg": {
-                    "type": "string",
-                    "pattern": "^((DONTRESOLVE)|((?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}))$"
-                },
-                "RegistrationId": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "NatId": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcAccessPolicyName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcNatPolicyName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcInsideNicName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcOutsideNicName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcInsideNic": {
-                    "type": "string",
-                    "pattern": "^.*0/(0|1)$"
-                },
-                "fmcOutsideNic": {
-                    "type": "string",
-                    "pattern": "^.*0/(0|1)$"
-                },
-                "fmcOutsideZone": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "fmcInsideZone": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "MetadataServerObjectName": {
-                    "type": "string",
-                    "pattern": "^...*$"
-                },
-                "interfaceConfig": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "managementOnly": {
-                                "type": "string",
-                                "pattern": "^...*$"
-                            },
-                            "MTU": {
-                                "type": "string",
-                                "pattern": "^[1-9][0-9][0-9][0-9]$"
-                            },
-                            "securityZone": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "pattern": "^...*$"
-                                    }
-                                },
-                                "required": [
-                                    "name"
-                                ]
-                            },
-                            "mode": {
-                                "type": "string",
-                                "pattern": "^...*$"
-                            },
-                            "ifname": {
-                                "type": "string",
-                                "pattern": "^...*$"
-                            },
-                            "name": {
-                                "type": "string",
-                                "pattern": "^.*0/(0|1)$"
-                            }
-                        },
-                        "required": [
-                            "managementOnly",
-                            "MTU",
-                            "securityZone",
-                            "mode",
-                            "ifname",
-                            "name"
-                        ]
-                    }
-                },
-                "trafficRoutes": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "interface": {
-                                "type": "string",
-                                "pattern": "^...*$"
-                            },
-                            "network": {
-                                "type": "string",
-                                "pattern": "^...*$"
-                            },
-                            "gateway": {
-                                "type": "string",
-                                "pattern": "(^$|^..*$|^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$)"
-                            },
-                            "metric": {
-                                "type": "string",
-                                "pattern": "^[1-9]\\d*$"
-                            }
-                        },
-                        "required": [
-                            "interface",
-                            "network",
-                            "gateway",
-                            "metric"
-                        ]
-                    }
-                }
-            },
-            "required": [
-                "licenseCaps",
-                "fmcIpforDeviceReg",
-                "RegistrationId",
-                "NatId",
-                "fmcAccessPolicyName",
-                "fmcNatPolicyName",
-                "fmcInsideNicName",
-                "fmcOutsideNicName",
-                "fmcInsideNic",
-                "fmcOutsideNic",
-                "fmcOutsideZone",
-                "fmcInsideZone",
-                "MetadataServerObjectName",
-                "interfaceConfig",
-                "trafficRoutes"
-            ]
-        }
-
+    
     try:
         env_var['AutoScaleGrpName'] = os.environ['ASG_NAME']
         env_var['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
@@ -697,7 +408,7 @@ def get_user_input_manager():
             logger.debug(e)
             env_var['USER_NOTIFY_TOPIC_ARN'] = ''
 
-        env_var['LB_ARN_OUTSIDE'] = os.environ['LB_ARN_OUTSIDE']
+        env_var['LB_ARN'] = os.environ['LB_ARN']
         env_var['FmcIp'] = os.environ['FMC_SERVER']
         env_var['FmcUserName'] = os.environ['FMC_USERNAME']
         env_var['FmcPassword'] = os.environ['FMC_PASSWORD']
@@ -722,6 +433,12 @@ def get_user_input_manager():
             logger.debug("No KMS ARN found in os.env['KMS_ENC'], password should be in plain-text")
         except Exception as e:
             logger.exception(e)
+        try:    
+            env_var['PROXY_TYPE'] = os.environ['PROXY_TYPE']  
+        except KeyError as e:
+            logger.debug("Exception occurred: {}".format(repr(e)))
+            env_var['PROXY_TYPE'] = None   
+
         env_var['TargetGrpHealthPort'] = os.environ['TG_HEALTH_PORT']
 
     except ValueError as e:
@@ -730,7 +447,7 @@ def get_user_input_manager():
         exit(1)
     except KeyError as e:
         logger.exception(e)
-        logger.error("Please check If all Lambda function variables exist in variable section")
+        logger.error("Please check If all Manager Lambda function variables exist in variables section")
         exit(1)
     except Exception as e:
         logger.exception(e)
@@ -743,7 +460,20 @@ def get_user_input_manager():
     except Exception as e:
         logger.exception(e)
 
+    ##Identify Config file, schema file based on topology
+    # if geneve_support == "disable":
+    #     prefix = const.NLB_PREFIX
+    # elif geneve_support == "enable":
+    #     if env_var['PROXY_TYPE'] == "SINGLE_ARM":
+    #         prefix = const.GWLB_SINGLE_ARM_PREFIX   
+    #     elif env_var['PROXY_TYPE'] == "DUAL_ARM":
+    #         prefix = const.GWLB_DUAL_ARM_PREFIX   
+    # config_json_name = prefix + const.JSON_LOCAL_FILENAME
+    # config_json_schema_name = prefix + const.JSON_SCHEMA_LOCAL_FILENAME      
+        
     try:
+        with open(const.JSON_SCHEMA_LOCAL_FILENAME) as schema2_file:
+            schema2 = json.load(schema2_file)
         with open(const.JSON_LOCAL_FILENAME) as json_file:
             json_var = json.load(json_file)
             logger.debug("User provided JSON Configuration: " + json.dumps(json_var, separators=(',', ':')))
@@ -756,8 +486,6 @@ def get_user_input_manager():
         logger.error("Configuration.json is not a valid JSON document")
     except Exception as e:
         logger.exception(e)
-	
-    #read Geneve support flag	
     try:
         env_var['GENEVE_SUPPORT'] = os.environ['GENEVE_SUPPORT']
     except:
