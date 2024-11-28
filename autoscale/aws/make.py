@@ -1,5 +1,5 @@
 """
-Copyright (c) 2020 Cisco Systems Inc or its affiliates.
+Copyright (c) 2024 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -118,7 +118,7 @@ def clean():
 def zip_():
     print("zip_ creates lambda zip files with only required python files")
 
-    list_of_files = ['aws.py', 'manager.py', 'constant.py', 'ngfw.py', 'fmc.py', 'utility.py', 'Configuration.json']
+    list_of_files = ['aws.py', 'manager.py', 'constant.py', 'ngfw.py', 'fmc.py', 'utility.py', 'Configuration.json', 'Configuration-schema.json']
     cmd = 'zip -jr ' + target_path + autoscale_manager_zip + ' '
     for file in list_of_files:
         file = full_dir_path + 'lambda-python-files/' + file

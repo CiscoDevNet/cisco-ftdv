@@ -1,5 +1,5 @@
 """
-Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -123,9 +123,9 @@ class NgfwInstance (CiscoEc2Instance):
                 raise Exception("ERROR forming stable session!")   
             chan.send('show cluster info\n')
             time.sleep(3)
-            resp = chan.recv(9999)
+            resp2 = chan.recv(9999)
             connectmgr.close()
-            return resp.decode("utf-8")
+            return resp2.decode("utf-8")
         except:
             logger.error("ERROR: in connect cluster")
             raise Exception("Cluster connection failed")

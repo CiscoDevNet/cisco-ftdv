@@ -1,4 +1,4 @@
-#  Copyright (c) 2022 Cisco Systems Inc or its affiliates.
+#  Copyright (c) 2023 Cisco Systems Inc or its affiliates.
 #
 #  All Rights Reserved.
 #
@@ -15,7 +15,7 @@
 #  limitations under the License.
 
 AWSTemplateFormatVersion: 2010-09-09
-Description: NGFWv - Cluster pre-requisites
+Description: NGFWv - AutoScaling Multi-AZ Cluster pre-requisites
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -25,19 +25,16 @@ Metadata:
           - ClusterName
           - ClusterNumber
           - NoOfAZs
-          - AZ
-          - UseGWLB
+          - ListOfAZs
           - VpcCidr
-          - MgmtSubnetName
-          - MgmtSubnetCidr
-          - InsideSubnetName
-          - InsideSubnetCidr
-          - OutsideSubnetName
-          - OutsideSubnetCidr
-          - CCLSubnetName
-          - CCLSubnetCidr
+          - MgmtSubnetNames
+          - MgmtSubnetCidrs
+          - InsideSubnetNames
+          - InsideSubnetCidrs
+          - CCLSubnetNames
+          - CCLSubnetCidrs
           - LambdaAZs
-          - LambdaSubnetName
+          - LambdaSubnetNames
           - LambdaSubnetCidrs
     ParameterLabels:
       ClusterName:
@@ -48,42 +45,43 @@ Metadata:
         default: VPC CIDR
       NoOfAZs:
         default: Number of Availibility Zones
-      AZ:
-        default: Availibility Zone
-      UseGWLB:
-        default: Use Gateway Load Balancer
-      MgmtSubnetName:
-        default: Name of the Management Subnet
-      MgmtSubnetCidr:
-        default: Management subnet CIDR
-      InsideSubnetName:
+      ListOfAZs:
+        default: Availibility Zone list for launching NGFWvs
+      MgmtSubnetNames:
+        default: Names of the Management Subnet
+      MgmtSubnetCidrs:
+        default: Management subnet CIDRs
+      InsideSubnetNames:
         default: Name of the Inside Subnet
-      InsideSubnetCidr:
+      InsideSubnetCidrs:
         default: Inside subnet CIDR
-      OutsideSubnetName:
-        default: Name of the Outside Subnet
-      OutsideSubnetCidr:
-        default: Outside subnet CIDR
-      CCLSubnetName:
+      CCLSubnetNames:
         default: Name of the CCL Subnet
-      CCLSubnetCidr:
+      CCLSubnetCidrs:
         default: CCL subnet CIDR
       LambdaAZs:
         default: List of Lambda AZs
-      LambdaSubnetName:
+      LambdaSubnetNames:
         default: Name of the Lambda Subnets
       LambdaSubnetCidrs:
         default: Lambda Subnet CIDRs
 
 Conditions:
-  noGWLB: !Not
-    - !Equals
-      - "Yes"
-      - !Ref UseGWLB
-  supportGWLB: !Not
-    - !Equals
-      - "No"
-      - !Ref UseGWLB
+  support1zone: !Equals
+    - !Ref NoOfAZs
+    - 1
+  support2zone: !Equals
+    - !Ref NoOfAZs
+    - 2
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
+  supportmultizone: 
+    !Or [
+      !Equals [2, !Ref NoOfAZs],
+      !Equals [3, !Ref NoOfAZs]
+    ]
+
 Parameters:
   ClusterName:
     Description: Enter unique Cluster name
@@ -102,73 +100,56 @@ Parameters:
     Type: String
     AllowedPattern: >-
       ^((25[0-5]|2[0-4][0-9]|[1]?[0-9][0-9]?)(\.|\/)){4}([0-9]|[1-2][0-9]|3[0-2])$
-    Default: 10.1.0.0/16
+    Default: 10.5.0.0/16
   NoOfAZs:
-    Description: Only 1 AZ is supported.
+    Description: >-
+      Total Number of Availability Zones into which subnet will be created (Min 1 and Max 3 depends on Region).
+      PLEASE SELECT NoOfAZs = 2 OR 3  ONLY FOR RELEASES 7.6.0 AND ABOVE. FOR LOWER RELEASES, SELECT 1.
+      Management, Inside, CCL subnets will span across AZs based on below parameter.
     Type: Number
     AllowedValues:
       - 1
-    Default: 1
-  AZ:
-    Description: Enter 1 valid Availability Zone
+      - 2
+      - 3
+    Default: 3
+  ListOfAZs:
+    Description: Select Availability Zones(Count should match with Number of Availability Zones)
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  MgmtSubnetNames:
+    Description: Management subnets name (With Internet GW as Route)
     Type: CommaDelimitedList
-    Default: us-east-1a
-  UseGWLB:
-    Description: >-
-      Please select "Yes", if you like to use Gateway Load Balancer.
-    Type: String
-    AllowedValues:
-     - "Yes"
-     - "No"
-    Default: "Yes"
-  MgmtSubnetName:
-    Description: Enter Management subnet name (With Internet GW as Route)
-    Type: String
-    Default: ManagementSubnet
-  MgmtSubnetCidr:
-    Description: Enter Management subnet CIDR
+    Default: MgmtSubnet-1,MgmtSubnet-2,MgmtSubnet-3
+  MgmtSubnetCidrs:
+    Description: Management subnets Cidr list
     Type: CommaDelimitedList
-    Default: 10.1.250.0/24
-  InsideSubnetName:
-    Description: Enter Inside subnet name (With Private Route)
-    Type: String
-    Default: InsideSubnet
-  InsideSubnetCidr:
-    Description: Enter Inside subnet CIDR
+    Default: 10.5.250.0/27,10.5.251.0/27,10.5.252.0/27
+  InsideSubnetNames:
+    Description: Inside subnets name (With Private Route)
     Type: CommaDelimitedList
-    Default: 10.1.100.0/24
-  OutsideSubnetName:
-    Description: >-
-      Enter Outside subnet name (With Internet GW as Route)
-      - *SKIP this field, if you are using Gateway Load Balancer.
-    Type: String
-    Default: OutsideSubnet
-  OutsideSubnetCidr:
-    Description: >-
-      Enter Outside subnet CIDR
-      - *SKIP this field, if you are using Gateway Load Balancer.
+    Default: InsideSubnet-1,InsideSubnet-2,InsideSubnet-3
+  InsideSubnetCidrs:
+    Description: Inside subnets Cidr list
     Type: CommaDelimitedList
-    Default: 10.1.200.0/24
-  CCLSubnetName:
+    Default: 10.5.100.0/27,10.5.101.0/27,10.5.102.0/27
+  CCLSubnetNames:
     Description: Enter CCL subnet name
-    Type: String
-    Default: CCLSubnet
-  CCLSubnetCidr:
+    Type: CommaDelimitedList
+    Default: CCLSubnet-1,CCLSubnet-2,CCLSubnet-3
+  CCLSubnetCidrs:
     Description: Enter CCL subnet CIDR
     Type: CommaDelimitedList
-    Default: 10.1.90.0/24
+    Default: 10.5.90.0/27,10.5.91.0/27,10.5.92.0/27
   LambdaAZs:
-    Description: Enter 2 Lambda Availability Zones
-    Type: CommaDelimitedList
-    Default: us-east-1a,us-east-1b
-  LambdaSubnetName:
+    Description: Select 2 Availability Zones for Lambda
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  LambdaSubnetNames:
     Description: Enter Lambda Subnets name (With NAT GW as Route), for Lambda Functions
     Type: CommaDelimitedList
     Default: LambdaSubnet-1,LambdaSubnet-2
   LambdaSubnetCidrs:
     Description: Enter Lambda Subnet CIDRs
     Type: CommaDelimitedList
-    Default: 10.1.50.0/24,10.1.51.0/24
+    Default: 10.5.50.0/24,10.5.51.0/24
 Resources:
   VpcCluster:
     Type: AWS::EC2::VPC
@@ -183,43 +164,92 @@ Resources:
   subnetMgmt0:
     Type: AWS::EC2::Subnet
     Properties:
-      CidrBlock: !Select ['0', !Ref MgmtSubnetCidr ]
-      AvailabilityZone: !Select ['0', !Ref AZ ]
+      CidrBlock: !Select ['0', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref MgmtSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref MgmtSubnetNames ] ] ]
+  subnetMgmt1:
+    Condition: supportmultizone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref MgmtSubnetNames ] ] ]
+  subnetMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref MgmtSubnetNames ] ] ]
 
   subnetInside0:
     Type: AWS::EC2::Subnet
     Properties:
-      CidrBlock: !Select ['0', !Ref InsideSubnetCidr ]
-      AvailabilityZone: !Select ['0', !Ref AZ ]
+      CidrBlock: !Select ['0', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref InsideSubnetName ] ]
-
-  subnetOutside0:
-    Condition: noGWLB
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref InsideSubnetNames ] ] ]
+  subnetInside1:
+    Condition: supportmultizone
     Type: AWS::EC2::Subnet
     Properties:
-      CidrBlock: !Select ['0', !Ref OutsideSubnetCidr ]
-      AvailabilityZone: !Select ['0', !Ref AZ ]
+      CidrBlock: !Select ['1', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref OutsideSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref InsideSubnetNames ] ] ]
+  subnetInside2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref InsideSubnetNames ] ] ]
 
   subnetCCL0:
     Type: AWS::EC2::Subnet
     Properties:
-      CidrBlock: !Select ['0', !Ref CCLSubnetCidr ]
-      AvailabilityZone: !Select ['0', !Ref AZ ]
+      CidrBlock: !Select ['0', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Ref CCLSubnetName ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref CCLSubnetNames ] ] ]
+  subnetCCL1:
+    Condition: supportmultizone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref CCLSubnetNames ] ] ]
+  subnetCCL2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref CCLSubnetNames ] ] ]
 
 # -------------------------------------------
 # Lambda Subnet
@@ -232,7 +262,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref LambdaSubnetName ] ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref LambdaSubnetNames ] ] ]
   subnetLambda1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -241,7 +271,7 @@ Resources:
       VpcId: !Ref VpcCluster
       Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref LambdaSubnetName ] ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref LambdaSubnetNames ] ] ]
 # -------------------------------------------
   igwf952ea9c:
     Type: AWS::EC2::InternetGateway
@@ -324,11 +354,11 @@ Resources:
       NatGatewayId: !Ref ngwf952ea10
 # -------------------------------------------
 # Network ACls for Subnets
-  aclOutside:
+  aclGeneral:
     Type: AWS::EC2::NetworkAcl
     Properties:
       VpcId: !Ref VpcCluster
-  aclOutsideEgress:
+  aclGeneralEgress:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       CidrBlock: 0.0.0.0/0
@@ -336,15 +366,15 @@ Resources:
       Protocol: '-1'
       RuleAction: allow
       RuleNumber: '100'
-      NetworkAclId: !Ref aclOutside
-  aclOutsideIgress:
+      NetworkAclId: !Ref aclGeneral
+  aclGeneralIgress:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       CidrBlock: 0.0.0.0/0
       Protocol: '-1'
       RuleAction: allow
       RuleNumber: '100'
-      NetworkAclId: !Ref aclOutside
+      NetworkAclId: !Ref aclGeneral
   aclInside:
     Type: AWS::EC2::NetworkAcl
     Properties:
@@ -371,35 +401,67 @@ Resources:
   subnetaclMgmt0:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      NetworkAclId: !Ref aclOutside
+      NetworkAclId: !Ref aclGeneral
       SubnetId: !Ref subnetMgmt0
   subnetAclInside0:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
       NetworkAclId: !Ref aclInside
       SubnetId: !Ref subnetInside0
-  subnetAclOutside0:
-    Condition: noGWLB
-    Type: AWS::EC2::SubnetNetworkAclAssociation
-    Properties:
-      NetworkAclId: !Ref aclOutside
-      SubnetId: !Ref subnetOutside0
   CCLAclSubnet0:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
       NetworkAclId: !Ref aclInside
       SubnetId: !Ref subnetCCL0
+
+  subnetaclMgmt1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetMgmt1
+  subnetAclInside1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside1
+  CCLAclSubnet1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL1
+
+  subnetaclMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetMgmt2
+  subnetAclInside2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside2
+  CCLAclSubnet2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL2
 # -------------------------------------------
 # Lambda Subnet ACl
   subnetAclLambda0:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      NetworkAclId: !Ref aclOutside
+      NetworkAclId: !Ref aclGeneral
       SubnetId: !Ref subnetLambda0
   subnetAclLambda1:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      NetworkAclId: !Ref aclOutside
+      NetworkAclId: !Ref aclGeneral
       SubnetId: !Ref subnetLambda1
 # -------------------------------------------
 # Security Groups for Lambda & Instances
@@ -410,7 +472,7 @@ Resources:
         VpcId: !Ref VpcCluster
         Tags:
         - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ftdv-instance-sg' ] ]
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ftdv-instance-sg1' ] ]
         SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -430,7 +492,6 @@ Resources:
           ToPort: 65535
           CidrIp: 0.0.0.0/0
   InsideInterfaceSGwithGWLB:
-    Condition: supportGWLB
     Type: AWS::EC2::SecurityGroup
     Properties:
         GroupDescription: Security Group for Instances Inside interface (GWLB)
@@ -456,48 +517,6 @@ Resources:
           FromPort: 0
           ToPort: 65535
           CidrIp: 0.0.0.0/0
-  InsideInterfaceSGwithoutGWLB:
-    Condition: noGWLB
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-        GroupDescription: Security Group for Instances Inside interface (No GWLB)
-        VpcId: !Ref VpcCluster
-        Tags:
-        - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-interface-sg' ] ]
-        SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: !Ref VpcCidr
-        SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: 0.0.0.0/0
-  OutsideInterfaceSG:
-    Condition: noGWLB
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-        GroupDescription: Security Group for Instances Outside interface
-        VpcId: !Ref VpcCluster
-        Tags:
-        - Key: Name
-          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'outside-interface-sg' ] ]
-        SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: !Ref VpcCidr
-        SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: 0.0.0.0/0
   CCLInterfaceSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -510,12 +529,12 @@ Resources:
         - IpProtocol: -1
           FromPort: -1
           ToPort: -1
-          CidrIp: !Select ['0', !Ref CCLSubnetCidr ]
+          CidrIp: !Ref VpcCidr
         SecurityGroupEgress:
         - IpProtocol: -1
           FromPort: -1
           ToPort: -1
-          CidrIp: !Select ['0', !Ref CCLSubnetCidr ]
+          CidrIp: !Ref VpcCidr
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -567,15 +586,21 @@ Resources:
     Properties:
       RouteTableId: !Ref routeTable1
       SubnetId: !Ref subnetMgmt0
-  subnetrouteOutside0:
-    Condition: noGWLB
+  subnetrouteMgmt1:
+    Condition: supportmultizone
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref routeTable1
-      SubnetId: !Ref subnetOutside0
+      SubnetId: !Ref subnetMgmt1
+  subnetrouteMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt2
 # -------------------------------------------
 # Private Subnet Route Table Association
-  subnetrouteinside:
+  subnetrouteinside0:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref routeTable3
@@ -585,6 +610,30 @@ Resources:
     Properties:
       RouteTableId: !Ref routeTable4
       SubnetId: !Ref subnetCCL0
+  subnetrouteinside1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside1
+  subnetrouteccl1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL1
+  subnetrouteinside2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside2
+  subnetrouteccl2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL2
 # -------------------------------------------
 # NATed Lambda Subnet Route Table Association
   subnetLambda0Route:
@@ -679,25 +728,36 @@ Outputs:
   VpcName:
     Description: Name of the VPC created
     Value: !Ref VpcCluster
-  AZ:
-    Value: !Join [',', [!Select ['0', !Ref AZ]]]
-    Description: Availability zone
-  UseGWLB:
-      Value: !Ref UseGWLB
-      Description: Use Gateway Load Balancer
+  ListOfAZs:
+    Value: !Join [',', !Ref ListOfAZs]
+    Description: Availability zones for NGFWv instances
   MgmtSubnetIds:
-    Value: !Ref subnetMgmt0
-    Description: Mangement subnet ID
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1, !Ref subnetMgmt2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1]]
+        - !Join [',', [!Ref subnetMgmt0]]
+    Description: List of Mangement subnet IDs (comma seperated)
   InsideSubnetIds:
-    Value: !Ref subnetInside0
-    Description: Inside subnet ID
-  OutsideSubnetIds:
-    Condition: noGWLB
-    Value: !Ref subnetOutside0
-    Description: Outside subnet ID
-  CCLSubnetId:
-    Value: !Ref subnetCCL0
-    Description: CCL subnet ID
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetInside0, !Ref subnetInside1, !Ref subnetInside2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetInside0, !Ref subnetInside1]]
+        - !Join [',', [!Ref subnetInside0]]
+    Description: List of Inside subnet IDs (comma seperated)
+  CCLSubnetIds:
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetCCL0, !Ref subnetCCL1, !Ref subnetCCL2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetCCL0, !Ref subnetCCL1]]
+        - !Join [',', [!Ref subnetCCL0]]
+    Description: List of CCL subnet IDs (comma seperated)
   LambdaSubnetIds:
     Value: !Join [',', [!Ref subnetLambda0, !Ref subnetLambda1 ]]
     Description: List of lambda subnet IDs (comma seperated)
@@ -705,15 +765,8 @@ Outputs:
     Value: !Ref InstanceSG
     Description: Security Group ID for Instances Management Interface
   InInterfaceSGId:
-    Value: !If
-      - noGWLB
-      - !Ref InsideInterfaceSGwithoutGWLB
-      - !Ref InsideInterfaceSGwithGWLB
-    Description: Security Group ID for Instances Inside Interface
-  OutInterfaceSGId:
-    Condition: noGWLB
-    Value: !Ref OutsideInterfaceSG
-    Description: Security Group ID for Instances Outside Interface
+    Description:  Security Group ID for Inside Interfaces 
+    Value: !Ref InsideInterfaceSGwithGWLB
   LambdaSecurityGroupId:
     Value: !Ref LambdaSecurityGroup
     Description: Security Group ID for Lambda Functions

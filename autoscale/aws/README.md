@@ -1,4 +1,4 @@
-# Cisco NGFWv AutoScale Solution for AWS - Phase 2
+# Cisco NGFWv AutoScale Solution for AWS
 
 Cisco provides CloudFormation Templates and scripts for deploying an auto-scaling tier of NGFWv firewalls
 using several AWS services, including Lambda, auto scaling groups, Elastic Load Balancing (ELB), Amazon
@@ -10,11 +10,17 @@ environment.<br>
 The NGFWv Auto Scale solution is a CloudFormation template-based deployment that provides:
 
 * Completely automated NGFWv instance registration and de-registration with the FMC.
-* NAT policy, Access Policy, and Routes automatically applied to scaled-out NGFWv instances.
+* Access Policy, Platform Policy, NAT policy (for Dual-arm)  and Routes automatically applied to scaled-out NGFWv instances.
 * Support for Load Balancers and multi-availability zones.
 * From 7.2 release Gateway load balancer support is added, refer configuration guide for more details
 * Support for enabling and disabling the Auto Scale feature.
-* Works only with FMC; the Firepower Device Manager is not supported.
+* Works only with Firepower Management Centre ; the Firepower Device Manager is not supported.
+* From 7.6 release Dual-Arm support is added, refer configuration guide for more details
+* From 7.6 release, for Single-Arm topology, inside interface is registered to GWLB instead of outside interface.
+* Sample Configuration.json, Configuration-schema.json files are given in the directory "sample-az-configuration-jsons". <br>
+For deploying GWLB single-arm topology: refer files with 'gwlb-single-arm' prefix. <br>
+For deploying GWLB dual-arm topology: refer files with 'gwlb-dual-arm' prefix. <br>
+For deploying NLB single-arm topology: refer files with 'nlb' prefix. <br>
 
 *Disclaimer: It is required to have prior understanding of AWS deployments & resources*
 
@@ -28,19 +34,14 @@ Use case remains same as previous release.
 
 *	Public IP requirement made optional for NGFWv Management interface
 *	Lambda Functions are placed in VPC (Allowing user to make secured inbound-connection rule for FMC & NGFWv)
-*	Lambda Layer created by CloudFormation stack itself (User still has to create zip file)
 *	Enabling AutoScale Manager Lambda to do FMC validation
 *	Usage Launch Template for AutoScale group instead of Launch Configuration
-*	All Target Groups under External-LB can be updated with Gig0/1 interface IP(Allowing user to have more than one ports on LB)
+*	All Target Groups under External-LB can be updated with Gig0/0 interface IP(Allowing user to have more than one ports on LB)
 *	Provided Infrastructure template ( From scratch deployment )
 *	Added Custom Metric Publisher Lambda for NGFWv memory publish from FMC ( python serverless function & AWS Scheduled Event)
-*	Migrated all constants to constant.py file
-*	Made it easier to deploy ( removed nested stack concept )
-*	Removed custom scaling ( no exceptional value addition as of now )
 *	Separate Thresholds for CPU & Memory provided
 *	Optionally can choose CPU only, Memory only or Both for scaling
-*	Avoided too many emails to User (Introduce a new SNS topic only for User publication )
-*	Tags gets created for EC2 instance & AutoScale group with current status
+
 
 ## Solution-design-modifications
 In this solution, <br>

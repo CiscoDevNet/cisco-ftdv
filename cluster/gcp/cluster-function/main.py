@@ -113,7 +113,9 @@ def cluster_handler(event, context):
         print("IP for Login : "+ management_ip)
         print("IP for Registration : "+ registration_ip)
         loop_counter = loop_counter + 1
-        info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip":management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
+        info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip":management_ip, "registration_ip": registration_ip, "project_id":
+                     project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id":
+                     reg_task_id,"resourceNamePrefix": resourceNamePrefix}
         next_attempt = True
         boot_time= 240
         print("Wait for " + str(boot_time)+ "-secs before trying to login 1st FTDv VM ("+ vm_name + ")")
@@ -141,7 +143,10 @@ def cluster_handler(event, context):
         loop_counter = loop_counter + 1
         reg_status = prev_info["reg_status"]
         reg_task_id = prev_info["reg_task_id"]
-        info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
+        resourceNamePrefix = prev_info["resourceNamePrefix"]
+        info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip,
+                     "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status,
+                     "reg_task_id": reg_task_id,"resourceNamePrefix": resourceNamePrefix}
      except:
         print("Retry-Except Block: Either Exception Generated from Retrigger call or This is First Time Triggered Call")
 
@@ -227,7 +232,9 @@ def cluster_handler(event, context):
                     management_ip = octets[0] +'.'+ octets[1] +'.'+ octets[2] + '.'+ unit
                     if bool(ipTable) is True:
                         registration_ip = ipTable[management_ip]
-                    info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
+                    info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip,
+                                 "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter,
+                                 "reg_status": reg_status, "reg_task_id": reg_task_id, "resourceNamePrefix": resourceNamePrefix}
                     bf.closeShell(ssh)
                     print("Reattempt "+ str(info_dict))
                     return
@@ -266,13 +273,31 @@ def cluster_handler(event, context):
             print("reg_status: "+ reg_status)
             
             if reg_status != 'SUCCESS':
-                info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip, "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status, "reg_task_id": reg_task_id}
+                info_dict = {"Retry_function":"yes", "ipTable": ipTable, "management_ip": management_ip, "registration_ip": registration_ip,
+                             "project_id": project_id, "vm_name": vm_name, "min_nodes": min_nodes, "loop_counter": loop_counter, "reg_status": reg_status,
+                             "reg_task_id": reg_task_id,"resourceNamePrefix": resourceNamePrefix}
                 bf.closeShell(ssh)
                 print("Reattempt "+ str(info_dict))
                 return
             else:
                 print('REGISTRATION SUCCESSFUL')
                 bf.verify_cluster_member(fmc, channel,min_nodes,cls_grp_name=cls_grp_name)
+                api = discovery.build('compute', 'v1', cache_discovery=False)
+                firewall_rule_name = resourceNamePrefix + '-ftdv-hc-firewall-rule'
+                print(f"Enabling Health Check Firewall Rule {firewall_rule_name} After policy deployment")
+                firewall = api.firewalls().get(project=project_id, firewall=firewall_rule_name).execute()
+                # Check if the firewall rule is disabled
+                if 'disabled' in firewall and firewall['disabled']:
+                    # Enable the firewall rule by setting 'disabled' to False
+                    firewall['disabled'] = False
+
+                    # Use the patch method to update the firewall rule
+                    request = api.firewalls().patch(project=project_id, firewall=firewall_rule_name, body=firewall)
+                    response = request.execute()
+
+                    print(f"Enabled firewall rule:{firewall_rule_name} with {response['name']}")
+                else:
+                    print(f"Firewall rule '{firewall_rule_name}' is already enabled or does not have a 'disabled' attribute.")
         else:
             bf.closeShell(ssh)
             print("Reattempt "+ str(info_dict))
