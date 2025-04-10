@@ -1,0 +1,10 @@
+azure-functions==1.18.0
+azure-mgmt-compute==31.0.0
+azure-mgmt-resource==22.0.0
+azure-mgmt-network==23.0.0
+azure-mgmt-monitor==6.0.2
+azure-identity==1.16.0
+paramiko==3.4.0
+requests==2.32.3
+sockets==1.0.0
+urllib3==2.2.2
