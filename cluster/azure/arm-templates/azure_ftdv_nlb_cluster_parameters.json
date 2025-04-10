@@ -1,0 +1,129 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceNamePrefix": {
+      "value": "ngfwv"
+    },
+    "virtualNetworkRg": {
+      "value": "cisco-virtualnet-rg"
+    },
+    "virtualNetworkName": {
+      "value": "cisco-virtualnet"
+    },
+    "virtualNetworkCidr": {
+      "value": "10.0.0.0/16"
+    },
+    "mgmtSubnet": {
+      "value": "mgmt"
+    },
+    "insideSubnet": {
+      "value": "inside"
+    },
+    "insideNetworkGatewayIp": {
+      "value": "10.0.3.1"
+    },
+    "internalLoadBalancerIP": {
+      "value": "10.0.3.4"
+    },
+    "outsideSubnet": {
+      "value": "outside"
+    },
+    "outsideNetworkGatewayIp": {
+      "value": "10.0.4.1"
+    },
+    "insideZoneName": {
+      "value": "inside-sz"
+    },
+    "outsideZoneName": {
+      "value": "outside-sz"
+    },
+    "cclSubnet": {
+      "value": "ccl"
+    },
+    "cclSubnetStartAddr": {
+      "value": "10.0.5.4"
+    },
+    "cclSubnetEndAddr": {
+      "value": "10.0.5.253"
+    },
+    "functionHostingPlan": {
+      "value": "consumption"
+    },
+    "functionAppSubnet": {
+      "value": "function-app-subnet"
+    },
+    "functionAppSubnetCIDR": {
+      "value": "10.0.6.0/24"
+    },
+    "softwareVersion": {
+      "value": "77089.0.0"
+    },
+    "vmSize": {
+      "value": "Standard_D4_v2"
+    },
+    "ftdLicensingSku": {
+      "value": "ftdv-azure-payg"
+    },
+    "ftdVmManagementUserName": {
+      "value": "cisco"
+    },
+    "ftdVmManagementUserPassword": {
+      "value": "C!sc0Cluster@03"
+    },
+    "ftdAdminUserPassword": {
+      "value": "C!sc0Cluster@03"
+    },
+    "fmcIpAddress": {
+      "value": "1.2.3.4"
+    },
+    "fmcUserName": {
+      "value": "fmcUser"
+    },
+    "fmcPassword": {
+      "value": "C!sc0Cluster@03"
+    },
+    "policyName": {
+      "value": "myPolicy"
+    },
+    "licenseCapability": {
+      "value": "BASE,MALWARE,THREAT"
+    },
+    "ftdvPerformanceTier": {
+      "value": "FTDv30"
+    },
+    "clusterGroupName": {
+      "value": "ClusterGroup"
+    },
+    "healthCheckPortNumber": {
+      "value": "7777"
+    },
+    "ftdvNodeCount": {
+      "value": 4
+    },
+    "scalingMetricsList": {
+      "value": "CPU"
+    },
+    "cpuScaleInThreshold": {
+      "value": "10"
+    },
+    "cpuScaleOutThreshold": {
+      "value": "80"
+    },
+    "memoryScaleInThreshold": {
+      "value": "0"
+    },
+    "memoryScaleOutThreshold": {
+      "value": "0"
+    },
+    "metricsAverageDuration": {
+      "value": "1"
+    },
+    "initDeploymentMode": {
+      "value": "BULK"
+    },
+    "scalingPolicy": {
+      "value": "POLICY-1"
+    }
+  }
+}

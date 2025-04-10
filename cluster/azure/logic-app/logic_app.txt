@@ -1,0 +1,600 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "AutoScaleManager": {
+                "inputs": {
+                    "function": {
+                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/AutoScaleManager"
+                    }
+                },
+                "runAfter": {
+                    "minimumConfigVerification": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Function"
+            },
+            "Initialize_action_type": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "SCALEOUTTYPE",
+                            "type": "String",
+                            "value": "none"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize_counters_": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Initialize_counters_": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "FTDCOUNT",
+                            "type": "Integer",
+                            "value": 0
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "AutoScaleManager": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "No Action: True, Scaling Required: False": {
+                "actions": {
+                    "No_Action_required": {
+                        "inputs": {
+                            "runStatus": "Succeeded"
+                        },
+                        "runAfter": {},
+                        "type": "Terminate"
+                    }
+                },
+                "else": {
+                    "actions": {
+                        "True: Scalein, False: Scaleout": {
+                            "actions": {
+                                "Delay_For_connection_Draining": {
+                                    "inputs": {
+                                        "interval": {
+                                            "count": 5,
+                                            "unit": "Minute"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Deploy_Changes_to_FTD": [
+                                            "Succeeded",
+                                            "Failed"
+                                        ]
+                                    },
+                                    "type": "Wait"
+                                },
+                                "DeleteAlertRules": {
+                                    "inputs": {
+                                        "body": "@body('AutoScaleManager')",
+                                        "function": {
+                                            "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeleteAlertRules"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "FtdScaleIn": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function"
+                                },
+                                "Delay_For_FMC_To_Update_Node_State": {
+                                    "inputs": {
+                                        "interval": {
+                                            "count": 5,
+                                            "unit": "Minute"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "DeleteAlertRules": [
+                                            "Succeeded",
+                                            "Failed"
+                                        ]
+                                    },
+                                    "type": "Wait"
+                                },
+                                "Deploy_Changes_to_FTD": {
+                                    "inputs": {
+                                        "body": "@body('AutoScaleManager')",
+                                        "function": {
+                                            "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeployConfiguration"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "DisableHealthProbe": [
+                                            "Succeeded",
+                                            "Failed"
+                                        ]
+                                    },
+                                    "type": "Function"
+                                },
+                                "DeviceDeRegister": {
+                                    "inputs": {
+                                        "body": "@body('AutoScaleManager')",
+                                        "function": {
+                                            "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeviceDeRegister"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Delay_For_FMC_To_Update_Node_State": [
+                                            "Succeeded",
+                                            "Failed"
+                                        ]
+                                    },
+                                    "type": "Function"
+                                },
+                                "DisableHealthProbe": {
+                                    "inputs": {
+                                        "body": "@body('AutoScaleManager')",
+                                        "function": {
+                                            "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DisableHealthProbe"
+                                        },
+                                        "retryPolicy": {
+                                            "type": "none"
+                                        }
+                                    },
+                                    "runAfter": {},
+                                    "type": "Function"
+                                },
+                                "FtdScaleIn": {
+                                    "inputs": {
+                                        "body": "@body('AutoScaleManager')",
+                                        "function": {
+                                            "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/FtdScaleIn"
+                                        },
+                                        "retryPolicy": {
+                                            "type": "none"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Delay_For_connection_Draining": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function"
+                                }
+                            },
+                            "else": {
+                                "actions": {
+                                    "Branch_based_on_Scale-Out_or_Invalid_condition": {
+                                        "actions": {
+                                            "Cooldown_time": {
+                                                "inputs": {
+                                                    "interval": {
+                                                        "count": 10,
+                                                        "unit": "Second"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "CreateAlertRules": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "Wait"
+                                            },
+                                            "CreateAlertRules": {
+                                                "inputs": {
+                                                    "body": "@body('GetFtdIPs')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/CreateAlertRules"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "DeployConfiguration": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "Function"
+                                            },
+                                            "Delay": {
+                                                "inputs": {
+                                                    "interval": {
+                                                        "count": 10,
+                                                        "unit": "Minute"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Set_variable_2": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "Wait"
+                                            },
+                                            "FtdScaleOut": {
+                                                "inputs": {
+                                                    "body": "@body('AutoScaleManager')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/FtdScaleOut"
+                                                    },
+                                                    "retryPolicy": {
+                                                        "type": "none"
+                                                    }
+                                                },
+                                                "runAfter": {},
+                                                "type": "Function"
+                                            },
+                                            "Parse_JSON": {
+                                                "inputs": {
+                                                    "content": "@body('AutoScaleManager')",
+                                                    "schema": {
+                                                        "properties": {
+                                                            "COMMAND": {
+                                                                "type": "string"
+                                                            },
+                                                            "COUNT": {
+                                                                "type": "string"
+                                                            },
+                                                            "TYPE": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "FtdScaleOut": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "ParseJson"
+                                            },
+                                            "ConfigureFtdInterfaces": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('DeviceRegister')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/ConfigureFtdInterfaces"
+                                                        }
+                                                },
+                                                "runAfter": {
+                                                    "DeleteUnRegisteredFTD": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "CreateStaticRoutes": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('GetFtdIPs')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/CreateStaticRoutes"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "ConfigureFtdInterfaces": [
+                                                        "Succeeded",
+                                                        "Failed"
+                                                    ]
+                                                }
+                                            },
+                                            "Delay_For_FMC_To_Update_State": {
+                                                "type": "Wait",
+                                                "inputs": {
+                                                    "interval": {
+                                                        "count": 2,
+                                                        "unit": "Minute"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "DeviceRegister": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "DeleteUnRegisteredFTD": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('DeviceRegister')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeleteUnRegisteredFTD"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Wait_until_deployment_is_in_progress": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "DeployConfiguration": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('GetFtdIPs')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeployConfiguration"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "CreateStaticRoutes": [
+                                                        "Succeeded",
+                                                        "Failed"
+                                                    ]
+                                                }
+                                            },
+                                            "DeviceRegister": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('GetFtdIPs')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeviceRegister"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Wait_for_FTD_to_come_up_and_ready_for_registration_with_FMC": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "Get_Control_Node_Details": {
+                                                "type": "Until",
+                                                "expression": "@contains(body('GetFtdIPs'), 'ftdDevName')",
+                                                "limit": {
+                                                    "count": 10,
+                                                    "timeout": "PT10M"
+                                                },
+                                                "actions": {
+                                                    "GetFtdIPs": {
+                                                        "type": "Function",
+                                                        "inputs": {
+                                                            "body": {
+                                                                "COUNT": "@{variables('FTDCOUNT')}",
+                                                                "TYPE": "@{variables('SCALEOUTTYPE')}"
+                                                            },
+                                                            "function": {
+                                                                "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/GetFtdIPs"
+                                                            }
+                                                        }
+                                                    },
+                                                    "Delay_4": {
+                                                        "type": "Wait",
+                                                        "inputs": {
+                                                            "interval": {
+                                                                "count": 1,
+                                                                "unit": "Minute"
+                                                            }
+                                                        },
+                                                        "runAfter": {
+                                                            "GetFtdIPs": [
+                                                                "Succeeded",
+                                                                "Failed"
+                                                            ]
+                                                        }
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Delay": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            
+                                            "Wait_for_FTD_to_come_up_and_ready_for_registration_with_FMC": {
+                                                "type": "Until",
+                                                "expression": "@contains(body('WaitForFtdToComeUp'), 'READY')",
+                                                "limit": {
+                                                    "count": 5000,
+                                                    "timeout": "PT10M"
+                                                },
+                                                "actions": {
+                                                    "Delay_3": {
+                                                        "type": "Wait",
+                                                        "inputs": {
+                                                            "interval": {
+                                                                "count": 10,
+                                                                "unit": "Second"
+                                                            }
+                                                        },
+                                                        "runAfter": {
+                                                            "WaitForFtdToComeUp": [
+                                                                "Succeeded"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "WaitForFtdToComeUp": {
+                                                        "type": "Function",
+                                                        "inputs": {
+                                                            "body": "@body('GetFtdIPs')",
+                                                            "function": {
+                                                                "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/WaitForFtdToComeUp"
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Get_Control_Node_Details": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "Wait_until_deployment_is_in_progress": {
+                                                "type": "Until",
+                                                "expression": "@contains(body('WaitForDeploymentTask'), 'COMPLETED')",
+                                                "limit": {
+                                                    "count": 1000,
+                                                    "timeout": "PT10M"
+                                                },
+                                                "actions": {
+                                                    "Delay_2": {
+                                                        "type": "Wait",
+                                                        "inputs": {
+                                                            "interval": {
+                                                                "count": 30,
+                                                                "unit": "Second"
+                                                            }
+                                                        },
+                                                        "runAfter": {
+                                                            "DeviceRegister_2": [
+                                                                "Succeeded",
+                                                                "Failed"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "DeviceRegister_2": {
+                                                        "type": "Function",
+                                                        "inputs": {
+                                                            "body": "@body('GetFtdIPs')",
+                                                            "function": {
+                                                                "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/DeviceRegister"
+                                                            }
+                                                        }
+                                                    },
+                                                    "WaitForDeploymentTask": {
+                                                        "type": "Function",
+                                                        "inputs": {
+                                                            "body": "@body('GetFtdIPs')",
+                                                            "function": {
+                                                                "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/WaitForDeploymentTask"
+                                                            }
+                                                        },
+                                                        "runAfter": {
+                                                            "Delay_2": [
+                                                                "Succeeded"
+                                                            ]
+                                                        }
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Delay_For_FMC_To_Update_State": [
+                                                        "Succeeded"
+                                                    ]
+                                                }
+                                            },
+                                            "Set_variable": {
+                                                "inputs": {
+                                                    "name": "FTDCOUNT",
+                                                    "value": "@int(body('Parse_JSON')?['COUNT'])"
+                                                },
+                                                "runAfter": {
+                                                    "Parse_JSON": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "SetVariable"
+                                            },
+                                            "Set_variable_2": {
+                                                "inputs": {
+                                                    "name": "SCALEOUTTYPE",
+                                                    "value": "@body('Parse_JSON')?['TYPE']"
+                                                },
+                                                "runAfter": {
+                                                    "Set_variable": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "SetVariable"
+                                            }
+                                        },
+                                        "else": {
+                                            "actions": {
+                                                "Invalid_condition..Terminate": {
+                                                    "inputs": {
+                                                        "runError": {
+                                                            "code": "500",
+                                                            "message": "Return value in invalid"
+                                                        },
+                                                        "runStatus": "Failed"
+                                                    },
+                                                    "runAfter": {},
+                                                    "type": "Terminate"
+                                                }
+                                            }
+                                        },
+                                        "expression": {
+                                            "and": [
+                                                {
+                                                    "contains": [
+                                                        "@body('AutoScaleManager')",
+                                                        "SCALEOUT"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "runAfter": {},
+                                        "type": "If"
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "contains": [
+                                            "@body('AutoScaleManager')",
+                                            "SCALEIN"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "runAfter": {},
+                            "type": "If"
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "contains": [
+                                "@body('AutoScaleManager')",
+                                "NOACTION"
+                            ]
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize_action_type": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "If"
+            },
+            "minimumConfigVerification": {
+                "inputs": {
+                    "function": {
+                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/minimumConfigVerification"
+                    },
+                    "retryPolicy": {
+                        "type": "none"
+                    }
+                },
+                "runAfter": {},
+                "type": "Function"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {},
+        "triggers": {
+            "Recurrence": {
+                "conditions": [],
+                "evaluatedRecurrence": {
+                    "frequency": "Minute",
+                    "interval": 5
+                },
+                "inputs": {},
+                "recurrence": {
+                    "frequency": "Minute",
+                    "interval": 5
+                },
+                "runtimeConfiguration": {
+                    "concurrency": {
+                        "runs": 1
+                    }
+                },
+                "type": "Recurrence"
+            }
+        }
+    },
+    "parameters": {}
+}

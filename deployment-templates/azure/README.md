@@ -28,8 +28,8 @@ You can customize this file for your Azure deployment environment.<br>
 ```
 
 ## References
-* [Software Downloads Home - Secure Firewall Threat Defense Virtual](https://software.cisco.com/download/home/286306503/type/286306337/release/7.6.0)
-* [Software Downloads Home - Secure Firewall Management Center Virtual](https://software.cisco.com/download/home/286259687/type/286271056/release/7.6.0)
+* [Software Downloads Home - Secure Firewall Threat Defense Virtual](https://software.cisco.com/download/home/286306503/type/286306337/release/7.7.0)
+* [Software Downloads Home - Secure Firewall Management Center Virtual](https://software.cisco.com/download/home/286259687/type/286271056/release/7.7.0)
 * [CSFTDv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/azure/ftdv-azure-gsg/ftdv-azure-deploy.html#id_82702)
 * [CSFMCv deployment](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/fmcv/fpmc-virtual/fpmc-virtual-azure.html#id_106502)
 

@@ -24,6 +24,11 @@ Some of the key features of the CSFTDv Auto Scale include:
 * Clustering lets you group multiple threat defense units together as a single logical device. 
 * A cluster provides all the convenience of a single device (management, integration into a network) while achieving the increased throughput and redundancy of multiple devices.
 
+### Cluster Autoscale
+CSFTDv 7.7.0 and later now supports clustering with dynamic scaling of nodes in the Azure region. It allows you to 
+scale-in or scale-out nodes from the cluster based on the network traffic. It uses logic based on the resource 
+utilization statistics from Azure VMSS metrics such as CPU and Memory to dynamically add or remove a node from a cluster.
+
 ### Resources
 
 * On GCP for CSFTDv7.2.0 and above: [Code](cluster/gcp/)     |     [README](cluster/gcp/README.md)         |     [Deployment/Configuration Guide](cluster/gcp/ftdv-cluster-public.pdf)
@@ -31,6 +36,8 @@ Some of the key features of the CSFTDv Auto Scale include:
 * On AWS for CSFTDv7.2.0 and above: [Code](cluster/aws/)     |     [README](cluster/aws/README.md)     |     [Deployment/Configuration Guide](cluster/aws/ftdv-cluster-public.pdf)
 
 * On Azure for CSFTDv7.3.0 and above: [Code](cluster/azure/)     |     [README](cluster/azure/README.md)         |     [Deployment/Configuration Guide](cluster/azure/ftdv-cluster-public.pdf)
+
+* On Azure for CSFTDv7.7.0 and above: [Code](cluster/azure/)     |     [README](cluster/azure/README.md)         |     [Deployment/Configuration Guide](cluster/azure/ftdv-cluster-public.pdf)
 
 ## AWS GuardDuty Integration with Cisco Secure Firewall
 This solution make use of the threat analysis data/results from Amazon GuardDuty (malicious IPs generating threats, attacks etc.) and feeds that information(malicious IP) to the Cisco Secure Firewall Threat Defense Virtual via the managers: *Cisco Secure Firewall Management Center Virtual* , *Cisco Secure Firewall Device Manager* to protect the underlying network and applications against future threats originating from these sources(malicious IP).
