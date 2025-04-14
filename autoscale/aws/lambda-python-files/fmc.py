@@ -786,13 +786,16 @@ class FirepowerManagementCenter:
             "enabled": "true",
             "vtepID": 1,
             "enableProxy": "true",
-            "proxyType" : proxy_type,
             "ifname": vni_nic_name,
             "securityZone": {
                 "id": sec_zone_id,
                 "type": "SecurityZone"
            }
         }
+        ## Fix backward-compatibility for <= 7.6.0
+        ## Default proxyType = SINGLE_ARM if not specified in put_data
+        if proxy_type == 'DUAL_ARM':
+            put_data.update({"proxyType": "DUAL_ARM"})
         r = self.rest_put(url, put_data)
         return r
 
