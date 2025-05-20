@@ -53,6 +53,8 @@ NOTE: If you encounter a dependency conflict during installation,  such as for p
 
 (3) Copy the resultant cluster_layer.zip file to the directory 'lambda-python-files' present in the cloned repository. <br>
 
+(4) If you are using private ip for FMCv registration then make sure that you change "USE_PUBLIC_IP_FOR_FMC_CONN" to "False" in ../lambda-python-files/constant.py.
+
 ## Create "cluster_manager.zip", "cluster_lifecycle.zip" and "custom_metrics_publisher.zip"
 A make.py file can be found in the cloned repository top directory. Running this will Zip the python files into Zip
 files and copy to a "target" folder. <br>
@@ -78,7 +80,8 @@ Go to "CloudFormation" on AWS Console. <br>
 3. Click on "Next", Read all the Parameter's Label & instructions carefully. Add/Update Template parameters according to your requirement. <br>
 4. Click "Next" and "Create stack" <br>
 5. Once deployment is complete, go to "Outputs" and note S3 "BucketName". <br>
-6. Go to S3, Open S3 bucket which is deployed using infra template. Upload previously-created "cluster_layer.zip, "cluster_manager.zip", "cluster_lifecycle.zip" and "custom_metrics_publisher.zip" to the S3 Bucket
+6. Go to S3, Open S3 bucket which is deployed using infra template. Upload previously-created "cluster_layer.zip, "cluster_manager.zip", "cluster_lifecycle.zip" and "custom_metrics_publisher.zip" to the S3 Bucket <br>
+7. Add EIP of Lambda NAT Gateway in FMCv's security group.
 
 ## Deploy "deploy_ngfw_cluster.yaml"
 Go to "CloudFormation" on AWS Console. <br>
