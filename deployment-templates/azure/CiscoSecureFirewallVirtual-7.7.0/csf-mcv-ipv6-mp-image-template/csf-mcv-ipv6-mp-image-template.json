@@ -1,0 +1,358 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "type": "string",
+            "defaultValue": "cisco-mcv",
+            "metadata": {
+                "description": "Name of the FMC VM"
+            }
+        },
+        "softwareVersion": {
+            "type": "string",
+            "defaultValue": "77091.0.0",
+            "metadata": {
+                "description": "The software version text, this is the image version from the VM offer. Please check the documentation for more details."
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "cisco",
+            "metadata": {
+                "description": "Passwords must be 12 to 72 characters long, must have : lowercase, uppercase, numbers & special characters and must have no more than 2 repeating or sequential(ASCII) characters in any order."
+          }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password for the Virtual Machine. Passwords must be 12 to 72 chars and have at least 3 of the following: Lowercase, uppercase, numbers, special chars"
+            }
+        },
+        "customData": {
+            "type": "string",
+            "defaultValue": "{\"AdminPassword\": \"Password@2025\",\"Hostname\": \"cisco-mcv\", \"IPv6Mode\": \"DHCP\"}",
+            "metadata": {
+                "description": "Custom Data (Day 0 config) passed to the FTDv."
+            }
+        },
+        "availabilityZone": {
+            "type": "int",
+            "defaultValue": 0,
+            "minValue": 0,
+            "maxValue": 3,
+            "metadata": {
+                "description": "Specify the availability zone for deployment. Ensure that selected region supports availability zones and value provided is correct. Set to 0 if you do not want to use Availability Zones"
+            }
+        },
+        "vmStorageAccount": {
+            "type": "string",
+            "metadata": {
+                "description": "A storage account name (boot diags require a storage account). Between 3 and 24 characters. Lowercase letters and numbers only"
+            }
+        },
+        "virtualNetworkResourceGroup": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the virtual network's Resource Group"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the virtual network"
+            }
+        },
+        "mgmtSubnetName": {
+            "type": "string",
+            "metadata": {
+                "description": "The FMCv management interface will attach to this subnet"
+            }
+        },
+        "ipAllocationMethod": {
+            "type": "string",
+            "defaultValue": "Static",
+            "allowedValues": [ "Static" , "Dynamic" ],
+            "metadata": {
+                "description": "IP allocation from Azure. Static : Manual, Dynamic : DHCP"
+            }
+        },
+        "mgmtSubnetIP": {
+            "type": "string",
+            "metadata": {
+                "description": "FMC IP on the mgmt interface (example: 192.168.0.10)"
+            }
+        },
+        "mgmtSubnetIPv6": {
+            "type": "string",
+            "metadata": {
+                "description": "FMC IPv6 on the mgmt interface (example: ace:cab:deca:dddd::6)"
+            }
+        },
+        "VmSize": {
+            "type": "string",
+            "defaultValue": "Standard_D4_v2",
+            "allowedValues": [ "Standard_D4_v2" ],
+            "metadata": {
+                "description": "FMC VM Size (Standard_D4_v2 or Standard_D4)"
+            }
+        },
+        "location": {
+          "type": "string",
+          "defaultValue": "[resourceGroup().location]",
+          "metadata": {
+            "description": "Location for all resources."
+          }
+        },
+        "baseStorageURI": {
+           "type": "string",
+           "defaultValue": ".blob.core.windows.net",
+           "metadata": {
+              "description": "Base suffix for Azure storage URIs."
+           }
+        },
+        "publicInboundPorts" : {
+            "type" : "string",
+            "defaultValue": "None",
+            "allowedValues": [
+                "None",
+                "AllowSelectedPorts"
+            ],
+            "metadata" : {
+                "description" : "Whether public inbound ports are allowed or not."
+            }
+        },
+        "selectedInboundPorts" : {
+            "type" : "array",
+            "defaultValue": [
+                "443",
+                "22",
+                "8305"
+            ],
+            "metadata" : {
+                "description" : "Selected public inbound ports to be allowed in network security group."
+            }
+        }
+    },
+    "variables": {
+        "imagePublisher": "cisco",
+        "imageOffer": "cisco-fmcv",
+        "imageSKU": "fmcv-azure-byol",
+        "subnet1Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('mgmtSubnetName'))]",
+        "vmNic0Name":"[concat(parameters('vmName'),'-nic0')]",
+        "vmNic0NsgName":"[concat(variables('vmNic0Name'),'-NSG')]",
+        "vmMgmtPublicIPAddressName": "[concat(parameters('vmName'),'nic0-ip')]",
+        "vmMgmtPublicIPAddressType": "Static",
+        "vmMgmtPublicIPAddressDnsName": "[variables('vmMgmtPublicIPAddressName')]",
+        "selectedAvailZone":"[if(equals(parameters('availabilityZone'), 0), json('null'), array(parameters('availabilityZone')))]",
+        "pipSku": "Standard",
+        "vmMgmtPublicIPv6AddressName": "[concat(parameters('vmName'),'nic0-ipv6')]",
+        "vmMgmtPublicIPv6AddressType": "Static",
+        "nsgRuleObj" : {
+            "22" : {
+                "name": "SSH-Rule",
+                "properties": {
+                    "description": "Allow SSH",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "22",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 100,
+                    "direction": "Inbound"
+                }
+            },
+            "8305" : {
+                "name": "SFtunnel-Rule",
+                "properties": {
+                    "description": "Allow SFtunnel",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "8305",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 110,
+                    "direction": "Inbound"
+                }
+            },
+            "443" : {
+                "name": "HTTPS-Rule",
+                "properties": {
+                    "description": "Allow HTTPS",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "443",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 120,
+                    "direction": "Inbound"
+                }
+            }
+        },
+        "nsgCopyCount": "[if(equals(parameters('publicInboundPorts'),'None'), 0, length(parameters('selectedInboundPorts')))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2023-06-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('vmMgmtPublicIPAddressName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[variables('pipSku')]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "[variables('vmMgmtPublicIpAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('vmMgmtPublicIPAddressDnsName')]"
+                }
+            },
+            "zones": "[variables('selectedAvailZone')]"
+        },
+        {
+            "apiVersion": "2023-06-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('vmMgmtPublicIPv6AddressName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+               "name": "[variables('pipSku')]"
+            },
+            "properties": {
+               "publicIPAllocationMethod": "[variables('vmMgmtPublicIPv6AddressType')]",
+               "publicIPAddressVersion": "IPv6"
+            },
+            "zones": "[variables('selectedAvailZone')]"
+         },
+        {
+            "apiVersion": "2022-07-01",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('vmNic0NsgName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "copy": [
+                    {
+                        "name": "securityRules",
+                        "count": "[variables('nsgCopyCount')]",
+                        "input": "[variables('nsgRuleObj')[parameters('selectedInboundPorts')[copyIndex('securityRules')]]]"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2023-06-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic0Name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups',variables('vmNic0NsgName'))]",
+                "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "[parameters('ipAllocationMethod')]",
+                            "privateIPAddress" : "[parameters('mgmtSubnetIP')]",
+                            "subnet": {
+                                "id": "[variables('subnet1Ref')]"
+                            },
+                            "publicIPAddress":{
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "ipconfig1-v6",
+                        "properties": {
+                           "privateIPAllocationMethod": "[parameters('ipAllocationMethod')]",
+                           "privateIPAddressVersion": "IPv6",
+                           "privateIPAddress": "[parameters('mgmtSubnetIPv6')]",
+                           "subnet": {
+                              "id": "[variables('subnet1Ref')]"
+                           },
+                           "publicIPAddress": {
+                              "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPv6AddressName'))]"
+                           }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups/', variables('vmNic0NsgName'))]"
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('vmStorageAccount')]",
+            "apiVersion": "2023-04-01",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "location": "[parameters('location')]",
+            "kind": "Storage",
+            "properties": {}
+        },
+        {
+            "apiVersion": "2022-11-01",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vmName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/', parameters('vmStorageAccount'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces/',variables('vmNic0Name'))]"
+            ],
+            "plan": {
+                "name": "[variables('imageSKU')]",
+                "publisher": "[variables('imagePublisher')]",
+                "product": "[variables('imageOffer')]"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[parameters('vmName')]",
+                    "adminUsername": "[parameters('AdminUsername')]",
+                    "adminPassword": "[parameters('AdminPassword')]",
+                    "customData": "[base64(parameters('customData'))]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku": "[variables('imageSKU')]",
+                        "version": "[parameters('softwareVersion')]"
+                    },
+                    "osDisk": {
+                        "osType": "Linux",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "properties": {
+                                "primary": true
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic0Name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[uri(concat('http://',parameters('vmStorageAccount'),parameters('baseStorageURI')), '')]"
+                    }
+                }
+            },
+            "zones": "[variables('selectedAvailZone')]"
+        }
+    ],
+    "outputs": {  }
+}

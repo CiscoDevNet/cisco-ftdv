@@ -1,0 +1,105 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "value": "csf-tdv"
+    },
+    "vmImageId": {
+      "value": "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/providers/Microsoft.Compute/images/{image-name}"
+    },
+    "adminUsername": {
+      "value": "cisco"
+    },
+    "adminPassword": {
+      "value": "Password@2022"
+    },
+    "vmStorageAccount": {
+      "value": "ciscovmtdv"
+    },
+    "availabilityZone": {
+      "value": null
+    },
+    "customData": {
+      "value": "{\"AdminPassword\": \"Password@2022\",\"Hostname\": \"cisco-tdv\", \"ManageLocally\":\"No\", \"IPv6Mode\": \"DHCP\"}"
+    },
+    "virtualNetworkNewOrExisting": {
+      "value": "new"
+    },
+    "virtualNetworkResourceGroup": {
+      "value": "cisco-tdv-rg"
+    },
+    "virtualNetworkName": {
+      "value": "cisco-tdv-vnet"
+    },
+    "virtualNetworkAddressPrefixes": {
+      "value": "10.151.0.0/16"
+    },
+    "virtualNetworkv6AddressPrefixes": {
+      "value": "ace:cab:deca::/48"
+    },
+    "Subnet1Name": {
+      "value": "mgmt"
+    },
+    "Subnet1Prefix": {
+      "value": "10.151.1.0/24"
+    },
+    "Subnet1IPv6Prefix": {
+      "value": "ace:cab:deca:1111::/64"
+    },
+    "subnet1StartAddress": {
+      "value": "10.151.1.4"
+    },
+    "subnet1v6StartAddress": {
+      "value": "ace:cab:deca:1111::6"
+    },
+    "Subnet2Name": {
+      "value": "diag"
+    },
+    "Subnet2Prefix": {
+      "value": "10.151.2.0/24"
+    },
+    "Subnet2IPv6Prefix": {
+      "value": "ace:cab:deca:2222::/64"
+    },
+    "subnet2StartAddress": {
+      "value": "10.151.2.4"
+    },
+    "subnet2v6StartAddress": {
+      "value": "ace:cab:deca:2222::6"
+    },
+    "Subnet3Name": {
+      "value": "inside"
+    },
+    "Subnet3Prefix": {
+      "value": "10.151.3.0/24"
+    },
+    "Subnet3IPv6Prefix": {
+      "value": "ace:cab:deca:3333::/64"
+    },
+    "subnet3StartAddress": {
+      "value": "10.151.3.4"
+    },
+    "subnet3v6StartAddress": {
+      "value": "ace:cab:deca:3333::6"
+    },
+    "Subnet4Name": {
+      "value": "outside"
+    },
+    "Subnet4Prefix": {
+      "value": "10.151.4.0/24"
+    },
+    "Subnet4IPv6Prefix": {
+      "value": "ace:cab:deca:4444::/64"
+    },
+    "subnet4StartAddress": {
+      "value": "10.151.4.4"
+    },
+    "subnet4v6StartAddress": {
+      "value": "ace:cab:deca:4444::6"
+    },
+    "vmSize": {
+      "value": "Standard_D3_v2"
+    }
+  }
+}
