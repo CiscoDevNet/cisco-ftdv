@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "value": "cisco-mcv"
+    },
+    "vmImageId": {
+      "value": "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/providers/Microsoft.Compute/images/{image-name}"
+    },
+    "adminUsername": {
+      "value": "cisco"
+    },
+    "adminPassword": {
+      "value": "Password@2022"
+    },
+    "customData": {
+      "value": "{\"AdminPassword\": \"Password@2025\",\"Hostname\": \"cisco-mcv\", \"IPv6Mode\": \"DHCP\"}"
+    },
+    "availabilityZone": {
+      "value": 0
+    },
+    "vmStorageAccount": {
+      "value": "ciscomcvstorage"
+    },
+    "virtualNetworkResourceGroup": {
+      "value": "cisco-mcv-rg"
+    },
+    "virtualNetworkName": {
+      "value": "cisco-mcv-vnet"
+    },
+    "ipAllocationMethod":{
+      "value": "Dynamic"
+    },
+    "mgmtSubnetName": {
+      "value": "mgmt"
+    },
+    "mgmtSubnetIP": {
+      "value": "10.4.1.15"
+    },
+    "mgmtSubnetIPv6": {
+      "value": "ace:cab:deca:dddd::c3"
+    },
+    "VmSize": {
+      "value": "Standard_D4_v2"
+    },
+    "publicInboundPorts": {
+      "value": "none"
+    }
+  }
+}
