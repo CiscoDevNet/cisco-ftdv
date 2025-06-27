@@ -195,6 +195,29 @@ class AutoScaleGroup:
             logger.error("General Error in getting instance details" + str(e))
             return None
         return instance_list
+
+    def get_instance_lifecycle_state(self, instance_id):
+        """
+        Purpose:        To get Instance lifecycle State ['InService', 'Pending', 'Terminating']
+        Parameters:      Instance ID
+        Returns:         Instance Lifecycle state      
+        Raises:
+        """
+       
+        try:
+            response = self.asg_client.describe_auto_scaling_groups(
+                AutoScalingGroupNames=[
+                    self.groupname
+                ]
+            )
+            lifecycle_state = next(instance['LifecycleState'] for asg in response['AutoScalingGroups'] for instance in asg['Instances'] if instance['InstanceId'] == instance_id)
+        except botocore.exceptions.ClientError as e:
+            logger.error("Botocore Error: {}".format(e.response['Error']))
+            return None
+        except Exception as e:
+            logger.error("General Error in getting instance details" + str(e))
+            return None
+        return lifecycle_state    
     
     def get_asgroup_size(self):
         """
