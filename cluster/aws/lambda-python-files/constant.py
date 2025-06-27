@@ -77,8 +77,10 @@ JSON_LOCAL_FILENAME = 'Configuration.json'
 # Custom Metric Publisher Constants
 # ------------------------------------------------------------------------------
 DISABLE_CUSTOM_METRIC_PUBLISH_LAMBDA = False
-# These below values are used in CloudFormation Stack..
-# also do change it on AWS resources or CloudFormation
+DELETE_JUNK_NODES_FROM_FMC = True # Set to False if you don't want Lambda to delete nodes from FMC even after they are deleted from AWS.
+
+# Below values are used in CloudFormation Stack..
+# Also do change it on AWS resources or CloudFormation
 METRIC_NAME_SPACE = 'Cisco-NGFWv-Cluster-Group'
 NO_DEV_IN_FMC_NOT_IN_AWS = 'DevicesOnlyInFmc'
 NO_DEV_IN_AWS_NOT_IN_FMC = 'DevicesOnlyInAws'
