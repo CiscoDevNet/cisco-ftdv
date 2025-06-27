@@ -101,20 +101,26 @@ def handle_cron_event(event):
 
     # Update aws instance list as vm_name list
     append_str = user_input['ClusterGrpName'] + '-'
-    #aws_instance_name_list = [append_str + suf for suf in instances_list]
     aws_instance_name_list = []
     dict_asg = {}
     asg_group_ips = []
+    ## Only consider instances having 'Running' state and 'InService' lifecycle state as valid
     for asg_instance_id in instances_list:
-        if const.USE_PUBLIC_IP_FOR_FMC_CONN is True:
-            instance_ip = EC2Instance(asg_instance_id).get_public_ip()
-            asg_group_ips.append(instance_ip)
-        else:
-            instance_ip = EC2Instance(asg_instance_id).get_private_ip()
-            asg_group_ips.append(instance_ip)
-        asg_instance_name = append_str + asg_instance_id
-        aws_instance_name_list.append(asg_instance_name)
-        dict_asg[asg_instance_name] = instance_ip
+        instance_state = EC2Instance(asg_instance_id).get_instance_state()
+        instance_lifecycle_state = asg.get_instance_lifecycle_state(asg_instance_id)
+        logger.debug('Instance {} in state {}, lifecycle state {}'.format(asg_instance_id, instance_state, instance_lifecycle_state))
+        if instance_lifecycle_state == 'InService' and instance_state == 'running':
+            if const.USE_PUBLIC_IP_FOR_FMC_CONN is True:
+                instance_ip = EC2Instance(asg_instance_id).get_public_ip()
+                asg_group_ips.append(instance_ip)
+            else:
+                instance_ip = EC2Instance(asg_instance_id).get_private_ip()
+                asg_group_ips.append(instance_ip)
+            asg_instance_name = append_str + asg_instance_id
+            aws_instance_name_list.append(asg_instance_name)
+            dict_asg[asg_instance_name] = instance_ip
+    logger.debug("Autoscale Group Instance names = {}".format(dict_asg)) 
+    logger.debug("Autoscale Group Instance IPs = {}".format(asg_group_ips))    
     # FMC class initialization
     fmc = FirepowerManagementCenter(user_input['FmcServer'], user_input['FmcMetUserName'], user_input['FmcMetPassword'])
     try:
@@ -128,10 +134,6 @@ def handle_cron_event(event):
         logger.exception("Exception {}".format(e))
         logger.info("Will DISABLE Cron job for Custom Metric Collection & "
                     "checks if FMC is accessible & has mentioned device group")
-        # Decided to not to disable Publisher if FMC is unreachable
-        # Initialize CloudWatchEvent class
-        # cw_event = CloudWatchEvent(user_input['cron_event_name'])
-        # # cw_event.stop_cron_job()
     else:
         fmc_devices_list, device_id_list = fmc.get_cluster_members(device_grp_id)
         ftd_hostnames = {}
@@ -140,6 +142,9 @@ def handle_cron_event(event):
             ftd_hostnames[ftdv_instance_id] = hostname_for_id
         common_values_from_dict = list(set(list(dict_asg.values())) & set(list(ftd_hostnames.values()))) 
         query_device_dict = dict(zip(fmc_devices_list, device_id_list))
+
+        logger.info("Instances present in both FMC, AWS AutoScale Group  = {}".format(common_values_from_dict))
+        
         #intersection_list = utl.intersection(aws_instance_name_list, fmc_devices_list)
         intersection_list = []
         for common_ip in range(len(common_values_from_dict)):
@@ -174,24 +179,29 @@ def handle_cron_event(event):
         # Publish Metrics to CloudWatch
         update_cloudwatch_metric(pair_of_metric_name_value)
 
-        logger.info("List of instance name in AWS AutoScale Group: {}".format(aws_instance_name_list))
+        logger.info("List of instance names in AWS AutoScale Group: {}".format(aws_instance_name_list))
         logger.info("List of members in FMC device group: {}".format(fmc_devices_list))
         logger.info("Memory Metric per FTDv: " + json.dumps(ftdv_memory_metric_dict, separators=(',', ': ')))
         logger.info("Metrics published: " + json.dumps(pair_of_metric_name_value, separators=(',', ': ')))
-        #####Deleting junk from cluster######
-        if len(device_id_list) > 0:
-            junk_list = []
-            for junk_node in set(list(ftd_hostnames.values())):
-                if junk_node not in asg_group_ips:
-                    extra_node = list(ftd_hostnames.keys())[list(ftd_hostnames.values()).index(junk_node)]
-                    junk_list.append(extra_node)
-            if len(junk_list) > 0:
-                logger.info("Extra nodes in FMC Cluster: " + str(junk_list))
-                fmc.get_auth_token()
-                for node_to_delete in junk_list:
-                    response_data = fmc.delete_device(node_to_delete)
-                    logger.info("Deleted junk node from FMC Cluster: " + str(response_data.json()))
-                junk_list.clear()
+        #####Deleting junk nodes from FMC######
+        
+        if const.DELETE_JUNK_NODES_FROM_FMC:
+            ## If more nodes in FMC than valid common nodes in AWS Group and FMC, delete junk nodes from FMC
+            if len(device_id_list) > len(common_values_from_dict):
+                logger.debug('Checking for junk nodes in FMC')
+                junk_list = []
+                for junk_node in set(list(ftd_hostnames.values())):
+                    if junk_node not in asg_group_ips:
+                        extra_node = list(ftd_hostnames.keys())[list(ftd_hostnames.values()).index(junk_node)]
+                        logger.debug("Junk node in FMC Cluster: " + str(extra_node))
+                        junk_list.append(extra_node)      
+                if len(junk_list) > 0:
+                    logger.info("List of Junk nodes in FMC Cluster: " + str(junk_list))
+                    fmc.get_auth_token()
+                    for node_to_delete in junk_list:
+                        response_data = fmc.delete_device(node_to_delete)
+                        logger.info("Deleted junk node from FMC Cluster: " + str(response_data.json()))
+                    junk_list.clear()
     utl.put_line_in_log('Cron Handler Finished', 'thin')
     return
 
