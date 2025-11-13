@@ -1,0 +1,781 @@
+#  Copyright (c) 2024 Cisco Systems Inc or its affiliates.
+#
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: NGFWv - AutoScale with GWLB pre-requisites
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Pod Configuration
+        Parameters:
+          - PodName
+          - PodNumber
+          - S3BktName
+          - DualStack
+          - VpcCidr
+          - NoOfAZs
+          - ListOfAZs
+          - MgmtSubnetName
+          - MgmtSubnetCidrs
+          - InsideSubnetName
+          - InsideSubnetCidrs
+          - OutsideSubnetName
+          - OutsideSubnetCidrs
+          - ConnectorAttachmentSubnetName
+          - ConnectorAttachmentSubnetCidrs
+          - LambdaSubnetName
+          - LambdaSubnetCidrs
+    ParameterLabels:
+      PodName:
+        default: Pod Name
+      PodNumber:
+        default: Pod Number
+      S3BktName:
+        default: S3 Bucket Name
+      DualStack:
+        default: Dual Stack (IPv6 Support)
+      VpcCidr:
+        default: VPC CIDR
+      NoOfAZs:
+        default: Number of Availability Zones
+      MgmtSubnetName:
+        default: Name of the Management Subnets
+      MgmtSubnetCidr:
+        default: Management subnet CIDRs
+      InsideSubnetName:
+        default: Name of the Inside Subnets
+      InsideSubnetCidr:
+        default: Inside subnet CIDRs
+      OutsideSubnetName:
+        default: Name of the Outside Subnets
+      OutsideSubnetCidr:
+        default: Outside subnet CIDRs
+      ConnectorAttachmentSubnetName:
+        default: Name of the Subnet used to attach TGW / CWAN connectors
+      ConnectorAttachmentSubnetCidrs:
+        default: Connector attachment subnet CIDRs
+      LambdaSubnetName:
+        default: Name of the Lambda Subnets
+      LambdaSubnetCidrs:
+        default: Lambda Subnet CIDRs
+Conditions:
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
+  enableIPv6: !Equals
+    - !Ref DualStack
+    - "True"
+Parameters:
+  PodName:
+    Description: Pod name
+    Type: String
+    Default: infrastructure
+    MinLength: 3
+    MaxLength: 15
+  PodNumber:
+    Description: Pod number for unique reference
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 99
+  S3BktName:
+    Description: The S3 Bucket name for lambda function, within 25 characters.
+    Type: String
+    AllowedPattern: '(?=^.{3,25}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: must be a valid S3 bucket name (within 25 chars, due to lambda restrictions to access S3 bucket)
+  DualStack:
+    Description: If "False" Deploys IPv4 VPC. If "True" deploys (IPv4 + IPv6) VPC
+    Type: String
+    Default: "False"
+    AllowedValues:
+      - "True"
+      - "False"
+  VpcCidr:
+    Description: Enter IPv4 CIDR block for a new VPC
+    Type: String
+    AllowedPattern: >-
+      ^((25[0-5]|2[0-4][0-9]|[1]?[0-9][0-9]?)(\.|\/)){4}([0-9]|[1-2][0-9]|3[0-2])$
+    Default: 10.1.0.0/16
+  NoOfAZs:
+    Description: >-
+      Total Number of Availability Zones into which subnet will be created (Min 2 and Max 3 depends on Region).
+      Lambda subnets will be created only in first 2 AZs.
+      Management, Inside & Outside subnets will span across 3 AZs based on this parameter.
+    Type: Number
+    AllowedValues:
+      - 2
+      - 3
+    Default: 3
+  ListOfAZs:
+    Description: Availability Zones
+    Type: CommaDelimitedList
+    Default: us-east-1a,us-east-1b,us-east-1c
+  MgmtSubnetName:
+    Description: Management subnets name (With Internet GW as Route)
+    Type: CommaDelimitedList
+    Default: MgmtSubnet-1,MgmtSubnet-2,MgmtSubnet-3
+  MgmtSubnetCidrs:
+    Description: Management subnets IPv4 Cidr list
+    Type: CommaDelimitedList
+    Default: 10.1.10.0/24,10.1.11.0/24,10.1.12.0/24
+  InsideSubnetName:
+    Description: Inside subnets name (With Private Route)
+    Type: CommaDelimitedList
+    Default: InsideSubnet-1,InsideSubnet-2,InsideSubnet-3
+  InsideSubnetCidrs:
+    Description: Inside subnets IPv4 Cidr list
+    Type: CommaDelimitedList
+    Default: 10.1.20.0/24,10.1.21.0/24,10.1.22.0/24
+  OutsideSubnetName:
+    Description: Outside subnets name
+    Type: CommaDelimitedList
+    Default: OutsideSubnet-1,OutsideSubnet-2,OutsideSubnet-3
+  OutsideSubnetCidrs:
+    Description: Outside subnets IPv4 Cidr list
+    Type: CommaDelimitedList
+    Default: 10.1.30.0/24,10.1.31.0/24,10.1.32.0/24
+  ConnectorAttachmentSubnetName:
+    Description: Connector Attachment subnets name
+    Type: CommaDelimitedList
+    Default: ConnectorAttachmentSubnet-1,ConnectorAttachmentSubnet-2,ConnectorAttachmentSubnet-3
+  ConnectorAttachmentSubnetCidrs:
+    Description: Connector Attachment subnets IPv4 Cidr list
+    Type: CommaDelimitedList
+    Default: 10.1.40.0/24,10.1.41.0/24,10.1.42.0/24
+  LambdaSubnetName:
+    Description: Lambda Subnets names (With NAT GW as Route), for Lambda Functions
+    Type: CommaDelimitedList
+    Default: LambdaSubnet-1,LambdaSubnet-2
+  LambdaSubnetCidrs:
+    Description: Lambda Subnets IPv4  Cidr list
+    Type: CommaDelimitedList
+    Default: 10.1.50.0/24,10.1.51.0/24
+
+Resources:
+  VpcAutoScale:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'vpc' ] ]
+  VpcCidrBlockIPv6:
+    Type: AWS::EC2::VPCCidrBlock
+    Condition: enableIPv6
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref VpcAutoScale
+  subnetMgmt0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 0, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['0', !Ref MgmtSubnetName ] ] ]
+  subnetMgmt1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 1, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['1', !Ref MgmtSubnetName ] ] ]
+  subnetMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 2, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['2', !Ref MgmtSubnetName ] ] ]
+  subnetInside0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 3, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['0', !Ref InsideSubnetName ] ] ]
+  subnetInside1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 4, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['1', !Ref InsideSubnetName ] ] ]
+  subnetInside2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 5, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['2', !Ref InsideSubnetName ] ] ]
+  subnetOutside0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref OutsideSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 6, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['0', !Ref OutsideSubnetName ] ] ]
+  subnetOutside1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref OutsideSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 7, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['1', !Ref OutsideSubnetName ] ] ]
+  subnetOutside2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref OutsideSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 8, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['2', !Ref OutsideSubnetName ] ] ]
+
+  subnetConnectorAttachment0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref ConnectorAttachmentSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 9, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['0', !Ref ConnectorAttachmentSubnetName ] ] ]
+  subnetConnectorAttachment1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref ConnectorAttachmentSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 10, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['1', !Ref ConnectorAttachmentSubnetName ] ] ]
+  subnetConnectorAttachment2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref ConnectorAttachmentSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 11, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['2', !Ref ConnectorAttachmentSubnetName ] ] ]
+# -------------------------------------------
+# Lambda Subnet
+# -------------------------------------------
+  subnetLambda0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 12, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['0', !Ref LambdaSubnetName ] ] ]
+  subnetLambda1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcAutoScale
+      Ipv6CidrBlock: !If
+        - enableIPv6
+        - !Select [ 13, !Cidr [ !Select [ 0, !GetAtt VpcAutoScale.Ipv6CidrBlocks], 16, 64 ] ]
+        - !Ref AWS::NoValue
+      AssignIpv6AddressOnCreation: !If [ enableIPv6, true, !Ref AWS::NoValue ]
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, !Select ['1', !Ref LambdaSubnetName ] ] ]
+# -------------------------------------------
+  igwf952ea9c:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'internet-gw' ] ]
+  egressOnlyIGW:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Condition: enableIPv6
+    Properties:
+      VpcId: !Ref VpcAutoScale
+  gw1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcAutoScale
+      InternetGatewayId: !Ref igwf952ea9c
+  eipNat:
+     Type: AWS::EC2::EIP
+     Properties:
+        Domain: vpc
+  ngwf952ea10:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt eipNat.AllocationId
+      SubnetId: !Ref subnetMgmt0
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'nat-gw' ] ]
+  dopt3a55d05f:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Join ['', [!Ref PodName, !Ref PodNumber, '.compute.internal' ]]
+      DomainNameServers:
+        - AmazonProvidedDNS
+  dhcpassoc1:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      VpcId: !Ref VpcAutoScale
+      DhcpOptionsId: !Ref dopt3a55d05f
+# -------------------------------------------
+# Route Table
+  routeTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcAutoScale
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'with-internet-gw' ] ]
+  routeTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcAutoScale
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'with-nat-gw' ] ]
+# -------------------------------------------
+# Route
+  route1:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable1
+      GatewayId: !Ref igwf952ea9c
+    DependsOn: gw1
+  route1IPv6:
+    Type: AWS::EC2::Route
+    Condition: enableIPv6
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref routeTable1
+      GatewayId: !Ref igwf952ea9c
+    DependsOn: gw1
+  routeNGW:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable2
+      NatGatewayId: !Ref ngwf952ea10
+  routeNGWIPv6:
+    Type: AWS::EC2::Route
+    Condition: enableIPv6
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref routeTable2
+      EgressOnlyInternetGatewayId: !Ref egressOnlyIGW
+# -------------------------------------------
+# Security Groups for Lambda & Instances
+  InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instance Management Interface
+        VpcId: !Ref VpcAutoScale
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'instance-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: ::/0
+          - !Ref AWS::NoValue
+  InsideInterfaceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Inside interface or interface in trusted zone
+        VpcId: !Ref VpcAutoScale
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'in-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: udp
+            FromPort: 6081
+            ToPort: 6081
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: tcp
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        SecurityGroupEgress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: udp
+            FromPort: 6081
+            ToPort: 6081
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: tcp
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+  OutsideInterfaceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Outside interface or interface in non-trusted zone
+        VpcId: !Ref VpcAutoScale
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'out-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: ::/0
+          - !Ref AWS::NoValue
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for NGFWv Instances
+        VpcId: !Ref VpcAutoScale
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'lambda-functions-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: !Select [0, !GetAtt VpcAutoScale.Ipv6CidrBlocks]
+          - !Ref AWS::NoValue
+        SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - !If
+          - enableIPv6
+          - IpProtocol: "-1"
+            FromPort: 0
+            ToPort: 65535
+            CidrIpv6: ::/0
+          - !Ref AWS::NoValue
+# -------------------------------------------
+# Public Subnet Route Table Association
+  subnetrouteMgmt0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt0
+  subnetrouteMgmt1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt1
+  subnetrouteMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt2
+  subnetrouteOutside0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetOutside0
+  subnetrouteOutside1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetOutside1
+  subnetrouteOutside2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetOutside2
+# -------------------------------------------
+# NATed Lambda Subnet Route Table Association
+  subnetLambda0Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda0
+  subnetLambda1Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda1
+# -------------------------------------------
+# S3 Bucket for AutoScale
+  S3bucketAutoScale:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Ref S3BktName
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+      
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  S3bucketAutoScalePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3bucketAutoScale
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketAutoScale, "/*"] ]
+            Principal: "*"
+            Condition:
+              StringEquals:
+                aws:SourceVpce:
+                  - !Ref VpcEndpointS3
+# -------------------------------------------
+# VPC Endpoint Creation
+  VpcEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketAutoScale, "/*"] ]
+            Principal: "*"
+      RouteTableIds:
+        - !Ref routeTable1
+        - !Ref routeTable2
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VpcAutoScale
+# -------------------------------------------
+Outputs:
+  BucketName:
+    Value: !Ref S3bucketAutoScale
+    Description: Name of the sample Amazon S3 bucket with Private Static Web hosting Configuration
+  BucketUrl:
+    Value: !GetAtt S3bucketAutoScale.WebsiteURL
+    Description: URL of S3 Bucket Static Website
+  VpcName:
+    Description: Name of the VPC created
+    Value: !Ref VpcAutoScale
+  ListOfAZs:
+    Value: !If
+      - support3zone
+      - !Join [',', [!Select ['0', !Ref ListOfAZs ], !Select ['1', !Ref ListOfAZs ], !Select ['2', !Ref ListOfAZs ] ]]
+      - !Join [',', [!Select ['0', !Ref ListOfAZs ], !Select ['1', !Ref ListOfAZs ] ]]
+    Description: List of Availability zones
+  MgmtSubnetIds:
+    Value: !If
+      - support3zone
+      - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1, !Ref subnetMgmt2 ]]
+      - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1 ] ]
+    Description: List of Mangement subnet IDs (comma seperated)
+  InsideSubnetIds:
+    Value: !If
+      - support3zone
+      - !Join [',', [!Ref subnetInside0, !Ref subnetInside1, !Ref subnetInside2 ]]
+      - !Join [',', [!Ref subnetInside0, !Ref subnetInside1 ]]
+    Description: List of inside subnet IDs (comma seperated)
+  OutsideSubnetIds:
+    Value: !If
+      - support3zone
+      - !Join [',', [!Ref subnetOutside0, !Ref subnetOutside1, !Ref subnetOutside2 ]]
+      - !Join [',', [!Ref subnetOutside0, !Ref subnetOutside1 ]]
+    Description: List of outside subnet IDs (comma seperated)
+  ConnectorAttachmentSubnetIds:
+    Value: !If
+      - support3zone
+      - !Join [',', [!Ref subnetConnectorAttachment0, !Ref subnetConnectorAttachment1, !Ref subnetConnectorAttachment2 ]]
+      - !Join [',', [!Ref subnetConnectorAttachment0, !Ref subnetConnectorAttachment1 ]]
+    Description: List of Connector Attachment subnet IDs (comma seperated)
+  LambdaSubnetIds:
+    Value: !Join [',', [!Ref subnetLambda0, !Ref subnetLambda1 ]]
+    Description: List of lambda subnet IDs (comma seperated)
+  InstanceSGId:
+    Value: !Ref InstanceSG
+    Description: Security Group ID for Instances Management Interface
+  InInterfaceSGId:
+    Value: !Ref InsideInterfaceSG
+    Description: Security Group ID for NGFWv Instances Inside Interface
+  OutInterfaceSGId:
+    Value: !Ref OutsideInterfaceSG
+    Description: Security Group ID for Instances Outside Interface
+  LambdaSecurityGroupId:
+    Value: !Ref LambdaSecurityGroup
+    Description: Security Group ID for Lambda Functions
+  EIPforNATgw:
+    Value: !Ref eipNat
+    Description: EIP reserved for NAT GW
