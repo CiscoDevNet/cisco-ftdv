@@ -1,5 +1,9 @@
 {
-  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "licenseCaps": [
+    "BASE",
+    "MALWARE",
+    "THREAT"
+  ],
   "fmcIpforDeviceReg": "DONTRESOLVE",
   "RegistrationId": "cisco",
   "NatId": "cisco",
@@ -27,7 +31,7 @@
       "name": "TenGigabitEthernet0/1",
       "managementOnly": "false",
       "MTU": "1500",
-      "mode": "NONE", 
+      "mode": "NONE",
       "securityZone": {
         "name": "Outside-sz"
       }

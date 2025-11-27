@@ -1,0 +1,778 @@
+#  Copyright (c) 2023 Cisco Systems Inc or its affiliates.
+#
+#  All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: NGFWv - AutoScaling Multi-AZ Cluster pre-requisites
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Cluster Configurtion
+        Parameters:
+          - ClusterName
+          - ClusterNumber
+          - NoOfAZs
+          - ListOfAZs
+          - VpcCidr
+          - MgmtSubnetNames
+          - MgmtSubnetCidrs
+          - InsideSubnetNames
+          - InsideSubnetCidrs
+          - CCLSubnetNames
+          - CCLSubnetCidrs
+          - LambdaAZs
+          - LambdaSubnetNames
+          - LambdaSubnetCidrs
+    ParameterLabels:
+      ClusterName:
+        default: Cluster Name
+      ClusterNumber:
+        default: Cluster Number
+      VpcCidr:
+        default: VPC CIDR
+      NoOfAZs:
+        default: Number of Availibility Zones
+      ListOfAZs:
+        default: Availibility Zone list for launching NGFWvs
+      MgmtSubnetNames:
+        default: Names of the Management Subnet
+      MgmtSubnetCidrs:
+        default: Management subnet CIDRs
+      InsideSubnetNames:
+        default: Name of the Inside Subnet
+      InsideSubnetCidrs:
+        default: Inside subnet CIDR
+      CCLSubnetNames:
+        default: Name of the CCL Subnet
+      CCLSubnetCidrs:
+        default: CCL subnet CIDR
+      LambdaAZs:
+        default: List of Lambda AZs
+      LambdaSubnetNames:
+        default: Name of the Lambda Subnets
+      LambdaSubnetCidrs:
+        default: Lambda Subnet CIDRs
+
+Conditions:
+  support1zone: !Equals
+    - !Ref NoOfAZs
+    - 1
+  support2zone: !Equals
+    - !Ref NoOfAZs
+    - 2
+  support3zone: !Equals
+    - !Ref NoOfAZs
+    - 3
+  supportmultizone: 
+    !Or [
+      !Equals [2, !Ref NoOfAZs],
+      !Equals [3, !Ref NoOfAZs]
+    ]
+
+Parameters:
+  ClusterName:
+    Description: Enter unique Cluster name
+    Type: String
+    Default: cluster-infra
+    MinLength: 3
+    MaxLength: 15
+  ClusterNumber:
+    Description: Enter unique Cluster number
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 99
+  VpcCidr:
+    Description: Enter the CIDR block for a new VPC
+    Type: String
+    AllowedPattern: >-
+      ^((25[0-5]|2[0-4][0-9]|[1]?[0-9][0-9]?)(\.|\/)){4}([0-9]|[1-2][0-9]|3[0-2])$
+    Default: 10.5.0.0/16
+  NoOfAZs:
+    Description: >-
+      Total Number of Availability Zones into which subnet will be created (Min 1 and Max 3 depends on Region).
+      PLEASE SELECT NoOfAZs = 2 OR 3  ONLY FOR RELEASES 7.6.0 AND ABOVE. FOR LOWER RELEASES, SELECT 1.
+      Management, Inside, CCL subnets will span across AZs based on below parameter.
+    Type: Number
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+    Default: 3
+  ListOfAZs:
+    Description: Select Availability Zones(Count should match with Number of Availability Zones)
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  MgmtSubnetNames:
+    Description: Management subnets name (With Internet GW as Route)
+    Type: CommaDelimitedList
+    Default: MgmtSubnet-1,MgmtSubnet-2,MgmtSubnet-3
+  MgmtSubnetCidrs:
+    Description: Management subnets Cidr list
+    Type: CommaDelimitedList
+    Default: 10.5.250.0/27,10.5.251.0/27,10.5.252.0/27
+  InsideSubnetNames:
+    Description: Inside subnets name (With Private Route)
+    Type: CommaDelimitedList
+    Default: InsideSubnet-1,InsideSubnet-2,InsideSubnet-3
+  InsideSubnetCidrs:
+    Description: Inside subnets Cidr list
+    Type: CommaDelimitedList
+    Default: 10.5.100.0/27,10.5.101.0/27,10.5.102.0/27
+  CCLSubnetNames:
+    Description: Enter CCL subnet name
+    Type: CommaDelimitedList
+    Default: CCLSubnet-1,CCLSubnet-2,CCLSubnet-3
+  CCLSubnetCidrs:
+    Description: Enter CCL subnet CIDR
+    Type: CommaDelimitedList
+    Default: 10.5.90.0/27,10.5.91.0/27,10.5.92.0/27
+  LambdaAZs:
+    Description: Select 2 Availability Zones for Lambda
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  LambdaSubnetNames:
+    Description: Enter Lambda Subnets name (With NAT GW as Route), for Lambda Functions
+    Type: CommaDelimitedList
+    Default: LambdaSubnet-1,LambdaSubnet-2
+  LambdaSubnetCidrs:
+    Description: Enter Lambda Subnet CIDRs
+    Type: CommaDelimitedList
+    Default: 10.5.50.0/24,10.5.51.0/24
+Resources:
+  VpcCluster:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'vpc' ] ]
+  subnetMgmt0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref MgmtSubnetNames ] ] ]
+  subnetMgmt1:
+    Condition: supportmultizone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref MgmtSubnetNames ] ] ]
+  subnetMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref MgmtSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref MgmtSubnetNames ] ] ]
+
+  subnetInside0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref InsideSubnetNames ] ] ]
+  subnetInside1:
+    Condition: supportmultizone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref InsideSubnetNames ] ] ]
+  subnetInside2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref InsideSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref InsideSubnetNames ] ] ]
+
+  subnetCCL0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref CCLSubnetNames ] ] ]
+  subnetCCL1:
+    Condition: supportmultizone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref CCLSubnetNames ] ] ]
+  subnetCCL2:
+    Condition: support3zone
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['2', !Ref CCLSubnetCidrs ]
+      AvailabilityZone: !Select ['2', !Ref ListOfAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['2', !Ref CCLSubnetNames ] ] ]
+
+# -------------------------------------------
+# Lambda Subnet
+# -------------------------------------------
+  subnetLambda0:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['0', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['0', !Ref LambdaAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['0', !Ref LambdaSubnetNames ] ] ]
+  subnetLambda1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Select ['1', !Ref LambdaSubnetCidrs ]
+      AvailabilityZone: !Select ['1', !Ref LambdaAZs ]
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, !Select ['1', !Ref LambdaSubnetNames ] ] ]
+# -------------------------------------------
+  igwf952ea9c:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'internet-gw' ] ]
+  gw1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VpcCluster
+      InternetGatewayId: !Ref igwf952ea9c
+  eipNat:
+     Type: AWS::EC2::EIP
+     Properties:
+        Domain: vpc
+  ngwf952ea10:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt eipNat.AllocationId
+      SubnetId: !Ref subnetMgmt0
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'nat-gw' ] ]
+  dopt3a55d05f:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Join ['', [!Ref ClusterName, !Ref ClusterNumber, '.compute.internal' ]]
+      DomainNameServers:
+        - AmazonProvidedDNS
+  dchpassoc1:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      VpcId: !Ref VpcCluster
+      DhcpOptionsId: !Ref dopt3a55d05f
+# -------------------------------------------
+# Route Table
+  routeTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'with-internet-gw' ] ]
+  routeTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'with-nat-gw' ] ]
+  routeTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-rt' ] ]
+  routeTable4:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcCluster
+      Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ccl-rt' ] ]
+# -------------------------------------------
+# Route
+  route1:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable1
+      GatewayId: !Ref igwf952ea9c
+    DependsOn: gw1
+  routeNGW:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref routeTable2
+      NatGatewayId: !Ref ngwf952ea10
+# -------------------------------------------
+# Network ACls for Subnets
+  aclGeneral:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VpcCluster
+  aclGeneralEgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclGeneral
+  aclGeneralIgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclGeneral
+  aclInside:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VpcCluster
+  aclInsideEgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: 0.0.0.0/0
+      Egress: 'true'
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclInside
+  aclInsideIgress:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      Protocol: '-1'
+      RuleAction: allow
+      RuleNumber: '100'
+      NetworkAclId: !Ref aclInside
+# -------------------------------------------
+# NGFWv Subnet ACl
+  subnetaclMgmt0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetMgmt0
+  subnetAclInside0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside0
+  CCLAclSubnet0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL0
+
+  subnetaclMgmt1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetMgmt1
+  subnetAclInside1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside1
+  CCLAclSubnet1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL1
+
+  subnetaclMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetMgmt2
+  subnetAclInside2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetInside2
+  CCLAclSubnet2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclInside
+      SubnetId: !Ref subnetCCL2
+# -------------------------------------------
+# Lambda Subnet ACl
+  subnetAclLambda0:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetLambda0
+  subnetAclLambda1:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref aclGeneral
+      SubnetId: !Ref subnetLambda1
+# -------------------------------------------
+# Security Groups for Lambda & Instances
+  InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for NGFWv Instance Management Interface
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'ftdv-instance-sg1' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8305
+          ToPort: 8305
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  InsideInterfaceSGwithGWLB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances Inside interface (GWLB)
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'inside-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: udp
+          FromPort: 6081
+          ToPort: 6081
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  CCLInterfaceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Instances CCL interface
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'CCL-interface-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !Ref VpcCidr
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Lambda functions
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'lambda-functions-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  FmcSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Security Group for Cisco FMCv device
+        VpcId: !Ref VpcCluster
+        Tags:
+        - Key: Name
+          Value: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'fmcv-instance-sg' ] ]
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref VpcCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: !Ref VpcCidr
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+# -------------------------------------------
+# Public Subnet Route Table Association
+  subnetrouteMgmt0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt0
+  subnetrouteMgmt1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt1
+  subnetrouteMgmt2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable1
+      SubnetId: !Ref subnetMgmt2
+# -------------------------------------------
+# Private Subnet Route Table Association
+  subnetrouteinside0:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside0
+  subnetrouteccl:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL0
+  subnetrouteinside1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside1
+  subnetrouteccl1:
+    Condition: supportmultizone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL1
+  subnetrouteinside2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable3
+      SubnetId: !Ref subnetInside2
+  subnetrouteccl2:
+    Condition: support3zone
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable4
+      SubnetId: !Ref subnetCCL2
+# -------------------------------------------
+# NATed Lambda Subnet Route Table Association
+  subnetLambda0Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda0
+  subnetLambda1Route:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref routeTable2
+      SubnetId: !Ref subnetLambda1
+# -------------------------------------------
+# S3 Bucket for Cluster
+  S3bucketCluster:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: 'true'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+  S3bucketClusterPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3bucketCluster
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketCluster, "/*"] ]
+            Principal: "*"
+            Condition:
+              StringEquals:
+                aws:SourceVpce:
+                  - !Ref VpcEndpointS3
+# -------------------------------------------
+# VPC Endpoint Creation
+  VpcEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketCluster, "/*"] ]
+            Principal: "*"
+      RouteTableIds:
+        - !Ref routeTable1
+        - !Ref routeTable2
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VpcCluster
+# -------------------------------------------
+# Launch Template for FMCv, won't launch instance, needs to update with required AMI ID
+  FmclaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn:
+      - FmcSG
+      - subnetMgmt0
+    Properties:
+      LaunchTemplateName: !Join ['-', [!Ref ClusterName, !Ref ClusterNumber, 'fmc-launch-template' ] ]
+      LaunchTemplateData:
+        EbsOptimized: false
+        InstanceType: c5.4xlarge
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeleteOnTermination: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref FmcSG
+            SubnetId: !Ref subnetMgmt0
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              DeleteOnTermination: true
+              VolumeSize: 300
+        UserData:
+          Fn::Base64: !Sub |
+            { "AdminPassword": "Cisco123789!", "Hostname": "FMCv" }
+Outputs:
+  BucketName:
+    Value: !Ref S3bucketCluster
+    Description: Name of the Amazon S3 bucket
+  BucketUrl:
+    Value: !GetAtt S3bucketCluster.WebsiteURL
+    Description: URL of S3 Bucket Static Website
+  VpcName:
+    Description: Name of the VPC created
+    Value: !Ref VpcCluster
+  ListOfAZs:
+    Value: !Join [',', !Ref ListOfAZs]
+    Description: Availability zones for NGFWv instances
+  MgmtSubnetIds:
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1, !Ref subnetMgmt2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetMgmt0, !Ref subnetMgmt1]]
+        - !Join [',', [!Ref subnetMgmt0]]
+    Description: List of Mangement subnet IDs (comma seperated)
+  InsideSubnetIds:
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetInside0, !Ref subnetInside1, !Ref subnetInside2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetInside0, !Ref subnetInside1]]
+        - !Join [',', [!Ref subnetInside0]]
+    Description: List of Inside subnet IDs (comma seperated)
+  CCLSubnetIds:
+    Value: !If 
+      - support3zone
+      - !Join [',', [!Ref subnetCCL0, !Ref subnetCCL1, !Ref subnetCCL2]]
+      - !If
+        - supportmultizone
+        - !Join [',', [!Ref subnetCCL0, !Ref subnetCCL1]]
+        - !Join [',', [!Ref subnetCCL0]]
+    Description: List of CCL subnet IDs (comma seperated)
+  LambdaSubnetIds:
+    Value: !Join [',', [!Ref subnetLambda0, !Ref subnetLambda1 ]]
+    Description: List of lambda subnet IDs (comma seperated)
+  InstanceSGId:
+    Value: !Ref InstanceSG
+    Description: Security Group ID for Instances Management Interface
+  InInterfaceSGId:
+    Description:  Security Group ID for Inside Interfaces 
+    Value: !Ref InsideInterfaceSGwithGWLB
+  LambdaSecurityGroupId:
+    Value: !Ref LambdaSecurityGroup
+    Description: Security Group ID for Lambda Functions
+  FmcInstanceSGID:
+    Value: !Ref FmcSG
+    Description: Security Group ID for FMC if user would like to launch in this VPC itself
+  EIPforNATgw:
+    Value: !Ref eipNat
+    Description: EIP reserved for NAT GW

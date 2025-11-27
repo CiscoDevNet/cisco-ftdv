@@ -1528,7 +1528,6 @@ class FirepowerManagementCenter:
                     logger.error("Unable to find object %s" % obj_name)
                     return ''
         return obj_id
-
     def get_memory_metrics_from_fmc(self, device_id):
         """
         Purpose:    Fetch Memory Metric
@@ -1946,5 +1945,4 @@ class DerivedFMC(FirepowerManagementCenter):
         except Exception as e:
             logger.exception(e)
             return 'FAIL'
-
         

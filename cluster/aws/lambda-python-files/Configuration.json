@@ -1,0 +1,8 @@
+{
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "performanceTier": "FTDv50",
+  "fmcIpforDeviceReg": "DONTRESOLVE",
+  "RegistrationId": "cisco",
+  "NatId": "cisco",
+  "fmcAccessPolicyName": "AWS-ACL"
+}

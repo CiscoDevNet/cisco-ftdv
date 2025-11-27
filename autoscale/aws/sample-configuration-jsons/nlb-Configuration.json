@@ -1,5 +1,9 @@
 {
-  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
+  "licenseCaps": [
+    "BASE",
+    "MALWARE",
+    "THREAT"
+  ],
   "fmcIpforDeviceReg": "DONTRESOLVE",
   "RegistrationId": "cisco",
   "NatId": "cisco",

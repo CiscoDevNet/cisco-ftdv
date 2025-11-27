@@ -1,0 +1,861 @@
+{
+   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+   "contentVersion": "1.0.0.0",
+   "parameters": {
+      "vmName": {
+         "type": "string",
+         "defaultValue": "FTDv-vm",
+         "metadata": {
+            "description": "Name of the FTDv Virtual Machine."
+         }
+      },
+      "vmImageId": {
+         "type": "string",
+         "metadata": {
+            "description": "The ID of the image used for deployment. /subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/providers/Microsoft.Compute/images/{image-name}"
+         }
+      },
+      "adminUsername": {
+         "type": "string",
+         "defaultValue": "cisco",
+         "metadata": {
+            "description": "Username for the Virtual Machine. admin, Administrator among other values are disallowed - see Azure docs"
+         }
+      },
+      "adminPassword": {
+         "type": "securestring",
+         "metadata": {
+            "description": "Password for the Virtual Machine. Passwords must be 12 to 72 chars and have at least 3 of the following: Lowercase, uppercase, numbers, special chars"
+         }
+      },
+      "vmStorageAccount": {
+         "type": "string",
+         "metadata": {
+            "description": "A storage account name (boot diags require a storage account). Between 3 and 24 characters. Lowercase letters and numbers only"
+         }
+      },
+      "availabilityZone": {
+         "type": "int",
+         "defaultValue": 0,
+         "minValue": 0,
+         "maxValue": 3,
+         "metadata": {
+            "description": "Specify the availability zone for deployment. Ensure that selected region supports availability zones and value provided is correct. Set to 0 if you do not want to use Availability Zones"
+         }
+      },
+      "customData": {
+         "type": "string",
+         "defaultValue": "{\"AdminPassword\": \"Password@2022\",\"Hostname\": \"cisco-tdv\", \"ManageLocally\":\"No\", \"IPv6Mode\": \"DHCP\"}",
+         "metadata": {
+            "description": "Custom Data (Day 0 config) passed to the FTDv."
+         }
+      },
+      "virtualNetworkNewOrExisting": {
+         "type": "string",
+         "defaultValue": "new",
+         "allowedValues": [
+            "new",
+            "existing"
+         ],
+         "metadata": {
+            "description": "This parameters determines whether a new Virtual Network should be created or an existing Virtual Network is to be used"
+         }
+      },
+      "virtualNetworkResourceGroup": {
+         "type": "string",
+         "metadata": {
+            "description": "Name of the Resource Group containing the Virtual Network. In case 'virtualNetworkNewOrExisting' is 'new', this value should be same as RG selected for template deployment"
+         }
+      },
+      "virtualNetworkName": {
+         "type": "string",
+         "metadata": {
+            "description": "Name of the virtual network"
+         }
+      },
+      "virtualNetworkAddressPrefixes": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "IPv4 address prefix for the virtual network, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "virtualNetworkv6AddressPrefixes": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "IPv6 address prefix for the virtual network, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "Subnet1Name": {
+         "type": "string",
+         "metadata": {
+            "description": "Management subnet name"
+         }
+      },
+      "Subnet1Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "Management subnet IPv4 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "Subnet1IPv6Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "Management subnet IPv6 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "subnet1StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "FTDv IPv4 address on the mgmt interface"
+         }
+      },
+      "subnet1v6StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "FTDv IPv6 address on the mgmt interface"
+         }
+      },
+      "Subnet2Name": {
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv diagnostic0/0 interface will attach to this subnet"
+         }
+      },
+      "Subnet2Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "Diag Subnet IPv4 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "Subnet2IPv6Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "Diag Subnet IPv6 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "subnet2StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "FTDv IPv4 address on the diag interface"
+         }
+      },
+      "subnet2v6StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "FTDv IPv6 address on the diag interface"
+         }
+      },
+      "Subnet3Name": {
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data1 interface will attach to this subnet"
+         }
+      },
+      "Subnet3Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data1 Subnet IPv4 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "Subnet3IPv6Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data1 Subnet IPv6 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "subnet3StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "IPv4 address on the data1 interface"
+         }
+      },
+      "subnet3v6StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "IPv6 address on the data1 interface"
+         }
+      },
+      "Subnet4Name": {
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data2 interface will attach to this subnet"
+         }
+      },
+      "Subnet4Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data2 Subnet IPv4 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "Subnet4IPv6Prefix": {
+         "defaultValue": "",
+         "type": "string",
+         "metadata": {
+            "description": "The FTDv data2 Subnet IPv6 Prefix, this is required only if 'virtualNetworkNewOrExisting' is set to 'new'"
+         }
+      },
+      "subnet4StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "The IPv4 address on the data2 interface"
+         }
+      },
+      "subnet4v6StartAddress": {
+         "type": "string",
+         "metadata": {
+            "description": "The IPv6 address on the data2 interface"
+         }
+      },
+      "vmSize": {
+         "type": "string",
+         "defaultValue": "Standard_D3_v2",
+         "allowedValues": [
+            "Standard_D3",
+            "Standard_D3_v2",
+            "Standard_D4_v2",
+            "Standard_D5_v2",
+            "Standard_D8s_v3",
+            "Standard_D16s_v3",
+            "Standard_F8s_v2",
+            "Standard_F16s_v2"
+         ],
+         "metadata": {
+            "description": "FTDv VM Size."
+         }
+      },
+      "location": {
+        "type": "string",
+        "defaultValue": "[resourceGroup().location]",
+        "metadata": {
+          "description": "Location for all resources."
+        }
+      },
+      "baseStorageURI": {
+         "type": "string",
+         "defaultValue": ".blob.core.windows.net",
+         "metadata": {
+            "description": "Base suffix for Azure storage URIs."
+         }
+      }
+   },
+   "variables": {
+      "subnet1Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('Subnet1Name'))]",
+      "subnet2Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('Subnet2Name'))]",
+      "subnet3Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('Subnet3Name'))]",
+      "subnet4Ref": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets/', parameters('virtualNetworkName'), parameters('Subnet4Name'))]",
+      "vmNic0Name": "[concat(parameters('vmName'),'-nic0')]",
+      "vmNic1Name": "[concat(parameters('vmName'),'-nic1')]",
+      "vmNic2Name": "[concat(parameters('vmName'),'-nic2')]",
+      "vmNic3Name": "[concat(parameters('vmName'),'-nic3')]",
+      "routeTable1Name": "[concat(parameters('Subnet1Name'),'-FTDv-RouteTable')]",
+      "routeTable2Name": "[concat(parameters('Subnet2Name'),'-FTDv-RouteTable')]",
+      "routeTable3Name": "[concat(parameters('Subnet3Name'),'-FTDv-RouteTable')]",
+      "routeTable4Name": "[concat(parameters('Subnet4Name'),'-FTDv-RouteTable')]",
+      "routeTable1Id": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/routeTables',variables('routeTable1Name'))]",
+      "routeTable2Id": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/routeTables',variables('routeTable2Name'))]",
+      "routeTable3Id": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/routeTables',variables('routeTable3Name'))]",
+      "routeTable4Id": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/routeTables',variables('routeTable4Name'))]",
+      "mgtNsgName": "[concat(parameters('vmName'),'-SSH-SecurityGroup')]",
+      "dataNsgName": "[concat(parameters('vmName'),'-Data-Net-SecurityGroup')]",
+      "vmMgmtPublicIPAddressName": "[concat(parameters('vmName'),'nic0-ip')]",
+      "vmMgmtPublicIPv6AddressName": "[concat(parameters('vmName'),'nic0-v6ip')]",
+      "vmMgmtPublicIPAddressType": "Static",
+      "vmMgmtPublicIPAddressDnsName": "[variables('vmMgmtPublicIPAddressName')]",
+      "selectedAvailZone": "[if(equals(parameters('availabilityZone'), 0), json('null'), array(parameters('availabilityZone')))]",
+      "pipSku": "Standard"
+   },
+   "resources": [
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/publicIPAddresses",
+         "name": "[variables('vmMgmtPublicIPAddressName')]",
+         "location": "[parameters('location')]",
+         "sku": {
+            "name": "[variables('pipSku')]"
+         },
+         "properties": {
+            "publicIPAllocationMethod": "[variables('vmMgmtPublicIpAddressType')]",
+            "dnsSettings": {
+               "domainNameLabel": "[variables('vmMgmtPublicIPAddressDnsName')]"
+            }
+         },
+         "zones": "[variables('selectedAvailZone')]"
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/publicIPAddresses",
+         "name": "[variables('vmMgmtPublicIPv6AddressName')]",
+         "location": "[parameters('location')]",
+         "sku": {
+            "name": "[variables('pipSku')]"
+         },
+         "properties": {
+            "publicIPAllocationMethod": "[variables('vmMgmtPublicIpAddressType')]",
+            "publicIPAddressVersion": "IPv6"
+         },
+         "zones": "[variables('selectedAvailZone')]"
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkSecurityGroups",
+         "name": "[variables('mgtNsgName')]",
+         "location": "[parameters('location')]",
+         "properties": {
+            "securityRules": [
+               {
+                  "name": "SSH-Rule",
+                  "properties": {
+                     "description": "Allow SSH",
+                     "protocol": "Tcp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "22",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 100,
+                     "direction": "Inbound"
+                  }
+               },
+               {
+                  "name": "SFtunnel-Rule",
+                  "properties": {
+                     "description": "Allow tcp 8305",
+                     "protocol": "Tcp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "8305",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 101,
+                     "direction": "Inbound"
+                  }
+               },
+               {
+                  "name": "HTTPs-Rule",
+                  "properties": {
+                     "description": "Allow HTTPs (TCP 443) for FDM UI access",
+                     "protocol": "Tcp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "443",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 102,
+                     "direction": "Inbound"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkSecurityGroups",
+         "name": "[variables('dataNsgName')]",
+         "location": "[parameters('location')]",
+         "properties": {
+            "securityRules": [
+               {
+                  "name": "UDP-Rule1",
+                  "properties": {
+                     "description": "Allow UDP",
+                     "protocol": "Udp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "500",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 120,
+                     "direction": "Inbound"
+                  }
+               },
+               {
+                  "name": "UDP-Rule2",
+                  "properties": {
+                     "description": "Allow UDP",
+                     "protocol": "Udp",
+                     "sourcePortRange": "*",
+                     "destinationPortRange": "4500",
+                     "sourceAddressPrefix": "Internet",
+                     "destinationAddressPrefix": "*",
+                     "access": "Allow",
+                     "priority": 130,
+                     "direction": "Inbound"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "name": "[variables('routeTable1Name')]",
+         "type": "Microsoft.Network/routeTables",
+         "condition": "[equals(parameters('virtualNetworkNewOrExisting'),'new')]",
+         "apiVersion": "2022-07-01",
+         "location": "[parameters('location')]",
+         "properties": {
+            "routes": [
+               {
+                  "name": "Route-Subnet1-To-Internet",
+                  "properties": {
+                     "addressPrefix": "::/0",
+                     "nextHopType": "Internet"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "name": "[variables('routeTable2Name')]",
+         "type": "Microsoft.Network/routeTables",
+         "condition": "[equals(parameters('virtualNetworkNewOrExisting'),'new')]",
+         "apiVersion": "2022-07-01",
+         "location": "[parameters('location')]",
+         "properties": {
+            "routes": [
+               {
+                  "name": "Route-Subnet3-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet3Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet2StartAddress')]"
+                  }
+               },
+               {
+                  "name": "Route-Subnet4-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet4Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet2StartAddress')]"
+                  }
+               },
+               {
+                  "name": "v6Route-Subnet3-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet3IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet2v6StartAddress')]"
+                  }
+               },
+               {
+                  "name": "v6Route-Subnet4-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet4IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet2v6StartAddress')]"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "name": "[variables('routeTable3Name')]",
+         "type": "Microsoft.Network/routeTables",
+         "condition": "[equals(parameters('virtualNetworkNewOrExisting'),'new')]",
+         "apiVersion": "2022-07-01",
+         "location": "[parameters('location')]",
+         "properties": {
+            "routes": [
+               {
+                  "name": "Route-Subnet2-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet2Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet3StartAddress')]"
+                  }
+               },
+               {
+                  "name": "Route-Subnet4-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet4Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet3StartAddress')]"
+                  }
+
+               },
+               {
+                  "name": "v6Route-Subnet2-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet2IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet3v6StartAddress')]"
+                  }
+               },
+               {
+                  "name": "v6Route-Subnet4-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet4IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet3v6StartAddress')]"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "name": "[variables('routeTable4Name')]",
+         "type": "Microsoft.Network/routeTables",
+         "condition": "[equals(parameters('virtualNetworkNewOrExisting'),'new')]",
+         "apiVersion": "2022-07-01",
+         "location": "[parameters('location')]",
+         "properties": {
+            "routes": [
+               {
+                  "name": "Route-Subnet2-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet2Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet4StartAddress')]"
+                  }
+               },
+               {
+                  "name": "Route-Subnet3-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet3Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet4StartAddress')]"
+                  }
+               },
+               {
+                  "name": "v6Route-Subnet2-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet2IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet4v6StartAddress')]"
+                  }
+               },
+               {
+                  "name": "v6Route-Subnet3-To-FTDv",
+                  "properties": {
+                     "addressPrefix": "[parameters('Subnet3IPv6Prefix')]",
+                     "nextHopType": "VirtualAppliance",
+                     "nextHopIpAddress": "[parameters('subnet4v6StartAddress')]"
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "name": "[parameters('virtualNetworkName')]",
+         "type": "Microsoft.Network/virtualNetworks",
+         "apiVersion": "2022-07-01",
+         "condition": "[equals(parameters('virtualNetworkNewOrExisting'),'new')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Network/routeTables', variables('routeTable1Name'))]",
+            "[resourceId('Microsoft.Network/routeTables', variables('routeTable2Name'))]",
+            "[resourceId('Microsoft.Network/routeTables', variables('routeTable3Name'))]",
+            "[resourceId('Microsoft.Network/routeTables', variables('routeTable4Name'))]"
+         ],
+         "properties": {
+            "addressSpace": {
+               "addressPrefixes": [
+                  "[parameters('virtualNetworkAddressPrefixes')]",
+                  "[parameters('virtualNetworkv6AddressPrefixes')]"
+               ]
+            },
+            "subnets": [
+               {
+                  "name": "[parameters('Subnet1Name')]",
+                  "properties": {
+                     "addressPrefixes": [
+                        "[parameters('Subnet1Prefix')]",
+                        "[parameters('Subnet1IPv6Prefix')]"
+                     ],
+                     "routeTable": {
+                        "id": "[variables('routeTable1Id')]"
+                     }
+                  }
+               },
+               {
+                  "name": "[parameters('Subnet2Name')]",
+                  "properties": {
+                     "addressPrefixes": [
+                        "[parameters('Subnet2Prefix')]",
+                        "[parameters('Subnet2IPv6Prefix')]"
+                     ],
+                     "routeTable": {
+                        "id": "[variables('routeTable2Id')]"
+                     }
+                  }
+               },
+               {
+                  "name": "[parameters('Subnet3Name')]",
+                  "properties": {
+                     "addressPrefixes": [
+                        "[parameters('Subnet3Prefix')]",
+                        "[parameters('Subnet3IPv6Prefix')]"
+                     ],
+                     "routeTable": {
+                        "id": "[variables('routeTable3Id')]"
+                     }
+                  }
+               },
+               {
+                  "name": "[parameters('Subnet4Name')]",
+                  "properties": {
+                     "addressPrefixes": [
+                        "[parameters('Subnet4Prefix')]",
+                        "[parameters('Subnet4IPv6Prefix')]"
+                     ],
+                     "routeTable": {
+                        "id": "[variables('routeTable4Id')]"
+                     }
+                  }
+               }
+            ]
+         }
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic0Name')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups',variables('mgtNsgName'))]",
+            "[resourceId('Microsoft.Network/publicIPAddresses', variables('vmMgmtPublicIPAddressName'))]",
+            "[resourceId('Microsoft.Network/virtualNetworks',parameters('virtualNetworkName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('subnet1StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet1Ref')]"
+                     },
+                     "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPAddressName'))]"
+                     }
+                  }
+               },
+               {
+                  "name": "ipconfig-v6",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddressVersion": "IPv6",
+                     "privateIPAddress": "[parameters('subnet1v6StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet1Ref')]"
+                     },
+                     "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('vmMgmtPublicIPv6AddressName'))]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('mgtNsgName'))]"
+            },
+            "enableAcceleratedNetworking": false,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic1Name')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Network/virtualNetworks',parameters('virtualNetworkName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('subnet2StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet2Ref')]"
+                     }
+                  }
+               },
+               {
+                  "name": "ipconfig-v6",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddressVersion": "IPv6",
+                     "privateIPAddress": "[parameters('subnet2v6StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet2Ref')]"
+                     }
+                  }
+               }
+            ],
+            "enableAcceleratedNetworking": false,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic2Name')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups',variables('dataNsgName'))]",
+            "[resourceId('Microsoft.Network/virtualNetworks',parameters('virtualNetworkName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('subnet3StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet3Ref')]"
+                     }
+                  }
+               },
+               {
+                  "name": "ipconfig-v6",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddressVersion": "IPv6",
+                     "privateIPAddress": "[parameters('subnet3v6StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet3Ref')]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataNsgName'))]"
+            },
+            "enableAcceleratedNetworking": true,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "apiVersion": "2022-07-01",
+         "type": "Microsoft.Network/networkInterfaces",
+         "name": "[variables('vmNic3Name')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups',variables('dataNsgName'))]",
+            "[resourceId('Microsoft.Network/virtualNetworks',parameters('virtualNetworkName'))]"
+         ],
+         "properties": {
+            "ipConfigurations": [
+               {
+                  "name": "ipconfig1",
+                  "properties": {
+                     "privateIPAllocationMethod": "Static",
+                     "privateIPAddress": "[parameters('subnet4StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet4Ref')]"
+                     }
+                  }
+               },
+               {
+                  "name": "ipconfig-v6",
+                  "properties": {
+                     "privateIPAllocationMethod": "Dynamic",
+                     "privateIPAddressVersion": "IPv6",
+                     "privateIPAddress": "[parameters('subnet4v6StartAddress')]",
+                     "subnet": {
+                        "id": "[variables('subnet4Ref')]"
+                     }
+                  }
+               }
+            ],
+            "networkSecurityGroup": {
+               "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataNsgName'))]"
+            },
+            "enableAcceleratedNetworking": true,
+            "enableIPForwarding": true
+         }
+      },
+      {
+         "type": "Microsoft.Storage/storageAccounts",
+         "name": "[concat(parameters('vmStorageAccount'))]",
+         "apiVersion": "2021-04-01",
+         "sku": {
+            "name": "Standard_LRS"
+         },
+         "location": "[parameters('location')]",
+         "kind": "Storage",
+         "properties": {}
+      },
+      {
+         "apiVersion": "2022-11-01",
+         "type": "Microsoft.Compute/virtualMachines",
+         "name": "[parameters('vmName')]",
+         "location": "[parameters('location')]",
+         "dependsOn": [
+            "[resourceId('Microsoft.Storage/storageAccounts', parameters('vmStorageAccount'))]",
+            "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic0Name'))]",
+            "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic1Name'))]",
+            "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic2Name'))]",
+            "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic3Name'))]"
+         ],
+         "properties": {
+            "hardwareProfile": {
+               "vmSize": "[parameters('vmSize')]"
+            },
+            "osProfile": {
+               "computername": "[parameters('vmName')]",
+               "adminUsername": "[parameters('AdminUsername')]",
+               "adminPassword": "[parameters('AdminPassword')]",
+               "customData": "[base64(parameters('customData'))]"
+            },
+            "storageProfile": {
+               "imageReference": {
+                  "id": "[parameters('vmImageId')]"
+               },
+               "osDisk": {
+                  "osType": "Linux",
+                  "caching": "ReadWrite",
+                  "createOption": "FromImage"
+               }
+            },
+            "networkProfile": {
+               "networkInterfaces": [
+                  {
+                     "properties": {
+                        "primary": true
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic0Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic1Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic2Name'))]"
+                  },
+                  {
+                     "properties": {
+                        "primary": false
+                     },
+                     "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic3Name'))]"
+                  }
+               ]
+            },
+            "diagnosticsProfile": {
+               "bootDiagnostics": {
+                  "enabled": true,
+                  "storageUri": "[uri(concat('http://', parameters('vmStorageAccount'), parameters('baseStorageURI')), '')]"
+               }
+            }
+         },
+         "zones": "[variables('selectedAvailZone')]"
+      }
+   ],
+   "outputs": {}
+}

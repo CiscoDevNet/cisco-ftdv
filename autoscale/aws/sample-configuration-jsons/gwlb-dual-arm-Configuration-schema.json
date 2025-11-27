@@ -1,108 +1,118 @@
 {
-    "type":"object",
+    "type": "object",
     "properties": {
-        "licenseCaps":{
-            "type":"array",
-            "items":{
-                "type":"string",
-                "pattern":"^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
+        "licenseCaps": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^((BASE)|(MALWARE)|(THREAT)|(URLFilter)|(PROTECT)|(VPN)|(CONTROL))$"
             }
         },
-        "fmcIpforDeviceReg":{
-          "type": "string",
-          "anyOf": [{"pattern": "DONTRESOLVE"}, {"format": "ipv4"}, {"format": "ipv6"}]
+        "fmcIpforDeviceReg": {
+            "type": "string",
+            "anyOf": [
+                {
+                    "pattern": "DONTRESOLVE"
+                },
+                {
+                    "format": "ipv4"
+                },
+                {
+                    "format": "ipv6"
+                }
+            ]
         },
-        "RegistrationId":{
-            "type":"string",
-            "pattern":"^...*$"
+        "RegistrationId": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "NatId":{
-            "type":"string",
-            "pattern":"^...*$"
+        "NatId": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcAccessPolicyName":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcAccessPolicyName": {
+            "type": "string",
+            "pattern": "^...*$"
         },
         "fmcNatPolicyName": {
             "type": "string",
             "pattern": "^...*$"
         },
-        "fmcPlatformPolicyName":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcPlatformPolicyName": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcInsideNicName":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcInsideNicName": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcOutsideNicName":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcOutsideNicName": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcVNINicName":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcVNINicName": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcInsideNic":{
-            "type":"string",
-            "pattern":"^.*0/(0|1)$"
+        "fmcInsideNic": {
+            "type": "string",
+            "pattern": "^.*0/(0|1)$"
         },
-        "fmcOutsideNic":{
-            "type":"string",
-            "pattern":"^.*0/(0|1)$"
+        "fmcOutsideNic": {
+            "type": "string",
+            "pattern": "^.*0/(0|1)$"
         },
-        "fmcOutsideZone":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcOutsideZone": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcInsideZone":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcInsideZone": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "fmcVNIZone":{
-            "type":"string",
-            "pattern":"^...*$"
+        "fmcVNIZone": {
+            "type": "string",
+            "pattern": "^...*$"
         },
-        "interfaceConfig":{
-            "type":"array",
-            "items":{
-                "type":"object",
-                "properties":{
+        "interfaceConfig": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
                     "managementOnly": {
-                        "type":"string",
-                        "pattern":"^...*$"
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "MTU":{
-                        "type":"string",
-                        "pattern":"^[1-9][0-9][0-9][0-9]$"
+                    "MTU": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9][0-9][0-9]$"
                     },
-                    "securityZone":{
-                        "type":"object",
-                        "properties":{
-                            "name":{
-                                "type":"string",
-                                "pattern":"^...*$"
+                    "securityZone": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "pattern": "^...*$"
                             }
                         },
-                        "required":[
+                        "required": [
                             "name"
                         ]
                     },
-                    "mode":{
-                        "type":"string",
-                        "pattern":"^...*$"
+                    "mode": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "ifname":{
-                        "type":"string",
-                        "pattern":"^...*$"
+                    "ifname": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "name":{
-                        "type":"string",
-                        "pattern":"^.*0/(0|1)$"
+                    "name": {
+                        "type": "string",
+                        "pattern": "^.*0/(0|1)$"
                     }
                 },
-                "required":[
+                "required": [
                     "managementOnly",
                     "MTU",
                     "securityZone",
@@ -112,32 +122,36 @@
                 ]
             }
         },
-        "DualArmTrafficRoutes":{
-            "type":"array",
-            "items":{
-                "type":"object",
-                "properties":{
-                    "interface":{
-                        "type":"string",
-                        "pattern":"^...*$"
+        "DualArmTrafficRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "interface": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "network":{
-                        "type":"string",
-                        "pattern":"^...*$"
+                    "network": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "gateway":{
-                        "type":"string",
+                    "gateway": {
+                        "type": "string",
                         "anyOf": [
-                          {"pattern": "^$"},
-                          {"format": "ipv4"}
-                      ]
+                            {
+                                "pattern": "^$"
+                            },
+                            {
+                                "format": "ipv4"
+                            }
+                        ]
                     },
-                    "metric":{
-                        "type":"string",
-                        "pattern":"^[1-9]\\d*$"
+                    "metric": {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d*$"
                     }
                 },
-                "required":[
+                "required": [
                     "interface",
                     "network",
                     "gateway",
@@ -145,32 +159,36 @@
                 ]
             }
         },
-        "DualArmTrafficRoutesIPv6":{
-            "type":"array",
-            "items":{
-                "type":"object",
-                "properties":{
-                    "interface":{
-                        "type":"string",
-                        "pattern":"^...*$"
+        "DualArmTrafficRoutesIPv6": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "interface": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "network":{
-                        "type":"string",
-                        "pattern":"^...*$"
+                    "network": {
+                        "type": "string",
+                        "pattern": "^...*$"
                     },
-                    "gateway":{
-                        "type":"string",
-                      "anyOf": [
-                          {"pattern": "^$"},
-                          {"format": "ipv6"}
-                      ]
+                    "gateway": {
+                        "type": "string",
+                        "anyOf": [
+                            {
+                                "pattern": "^$"
+                            },
+                            {
+                                "format": "ipv6"
+                            }
+                        ]
                     },
-                    "metric":{
-                        "type":"string",
-                        "pattern":"^[1-9]\\d*$"
+                    "metric": {
+                        "type": "string",
+                        "pattern": "^[1-9]\\d*$"
                     }
                 },
-                "required":[
+                "required": [
                     "interface",
                     "network",
                     "gateway",
@@ -179,7 +197,7 @@
             }
         }
     },
-    "required":[
+    "required": [
         "licenseCaps",
         "fmcIpforDeviceReg",
         "RegistrationId",

@@ -1,0 +1,10 @@
+info:
+  title: deploy_ngfw_cluster schema file
+  description: Describes the specifications of the fields in deploy_ngfw_cluster.jinja
+  version: 1.0
+imports:
+- path: deploy_ngfw_cluster.jinja
+properties:
+  resourceNamePrefix:
+    pattern: ^[a-zA-Z0-9]+$
+    description: resourceNamePrefix restricted to single word

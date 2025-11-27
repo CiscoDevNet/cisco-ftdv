@@ -24,6 +24,11 @@ For deploying NLB single-arm topology: refer files with 'nlb' prefix. <br>
 
 *Disclaimer: It is required to have prior understanding of AWS deployments & resources*
 
+**Note: Please refer [Configuration Guide](./deploy-ftdv-auto-scale-for-aws.pdf) for detailed explanation**
+
+## Use-case
+
+Use case remains same as previous release.
 
 ## Enhancements
 

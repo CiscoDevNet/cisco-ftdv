@@ -1,0 +1,311 @@
+# Copyright (c) 2021 Cisco Systems Inc or its affiliates.
+#
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Deploys resources required to integrate the Amazon GuardDuty findings with Cisco NGFWv using AWS Lambda function.
+  This will allow the malicious IPs reported by the GD findings to be updated on the NGFWv by:
+  - using the S3 report file as the Security Intelligence feed URL (on FMCv)
+  - updating network object groups (on FDM, FMCv)
+
+Parameters:
+  DeploymentName:
+    Description: >-
+      This will be used as prefix for all the resources created by this cloud formation template.
+    Type: String
+    Default: cisco-ngfwv-gd
+    AllowedPattern : ".+"
+    MaxLength: 18
+    ConstraintDescription: Please enter the deployment name.
+  MinGDFindingsSeverity:
+    Description: >-
+      Minimum GuardDuty findings severity level to be considered for processing. (1.0 to 8.9)
+      Any GuardDuty finding reported with lesser severity than this will be ignored.
+      Severity classification, Low: 1.0 to 3.9, Medium: 4.0 to 6.9, High: 7.0 to 8.9.
+    Type: Number
+    Default: 4.0
+    MinValue: 1.0
+    MaxValue: 8.9
+    ConstraintDescription: Please enter a valid severity level for GuardDuty findings (1.0 to 8.9).
+  AdminEmailID:
+    Description: >-
+      Administrator email address to receive notifications regarding NGFWv manager updates done by lambda function.
+    Type: String
+    AllowedPattern: ^(?:[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])$
+    ConstraintDescription: Please enter a valid email ID.
+  S3BucketName:
+    Description: >-
+      S3 Bucket name containing the files (lambda function zip,  lambda layer zip and/or NGFWv managers details file).
+    Type: String
+    AllowedPattern: '(?=^.{3,63}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+    ConstraintDescription: Please enter a valid S3 bucket name.
+  S3BucketPathPrefix:
+    Description: >-
+      S3 Bucket path/folder containing the config files, leave empty if there is no folder. (e.g. "", "cisco/ngfwv-gd/")
+    Type: String
+    Default: ""
+    AllowedPattern: ^[0-9a-zA-Z-/]*$
+    ConstraintDescription: Please enter a valid path. (can include numbers, lowercase letters, uppercase letters, hyphens & forward slash)
+  LambdaLayerZipName:
+    Description: >-
+      Lambda layer zip file name.
+    Type: String
+    AllowedPattern : ".+"
+    ConstraintDescription: Please enter the Lambda layer zip file name.
+  LambdaFunctionZipName:
+    Description: >-
+      Lambda function zip file name.
+    Type: String
+    AllowedPattern : ".+"
+    ConstraintDescription: Please enter the Lambda function zip file name.
+  NGFWvDetailsFileName:
+    Description: >-
+      '*.ini' file containing NGFWv managers configuration details. (Public IP, device-type, username, password, network object group names, etc.)
+      Leave empty(skip this file) in case all the NGFWv managers are expected to use the Security Intelligence Feed based solution.
+    Type: String
+    Default: ""
+  KmsArn:
+    Description: >-
+      [Conditional] ARN of an existing KMS (AWS KMS key used for password encryption).
+      Leave empty in case plain text passwords are provided in the NGFWv manager configuration input file.
+      If specified, all the passwords and enable passwords mentioned in the NGFWv manager configuration input file must be encrypted.
+      The Passwords must be encrypted only using the specified ARN.
+      Generating Encrypted Password: " aws kms encrypt --key-id <KMS ARN> --plaintext <password> ".
+      Only Symmetric Keys are supported for encryption.
+    Type: String
+  DebugLogs:
+    Description: >-
+      Enable/Disable lambda function debug logs in CloudWatch.
+    Type: String
+    Default: disable
+    AllowedValues:
+      - disable
+      - enable
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Cisco NGFWv - AWS GuardDuty Integration
+      Parameters:
+      - DeploymentName
+      - MinGDFindingsSeverity
+      - AdminEmailID
+
+    - Label:
+        default: Artifacts configuration
+      Parameters:
+      - S3BucketName
+      - S3BucketPathPrefix
+      - LambdaLayerZipName
+      - LambdaFunctionZipName
+      - NGFWvDetailsFileName
+      - KmsArn
+      - DebugLogs
+
+    ParameterLabels:
+      DeploymentName:
+        default: Deployment name
+      MinGDFindingsSeverity:
+        default: Minimum severity level of GD finding
+      AdminEmailID:
+        default: Administrator email ID
+      S3BucketName:
+        default: S3 Bucket name
+      S3BucketPathPrefix:
+        default: S3 Bucket folder/path prefix
+      LambdaLayerZipName:
+        default: Lambda layer zip file name
+      LambdaFunctionZipName:
+        default: Lambda function zip file name
+      NGFWvDetailsFileName:
+        default: NGFWv managers configuration input file name
+      KmsArn:
+        default: ARN of KMS key used for password encryption
+      DebugLogs:
+        default: Enable/Disable debug logs
+
+Resources:
+# ------------------------------------------------------------------------
+# Email Notification SNS
+# ------------------------------------------------------------------------
+  EmailNotifyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Join ['-', [!Ref DeploymentName, 'sns-topic']]
+      Subscription:
+        -
+          Endpoint: !Ref AdminEmailID
+          Protocol: "email"
+
+# ------------------------------------------------------------------------
+# Lambda Layer
+# ------------------------------------------------------------------------
+  GuardDutytoNGFWvLambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Join ['-', [!Ref DeploymentName, 'lambda-layer' ] ]
+      Description: Lambda Layer for Cisco NGFWv - GuardDuty integration
+      CompatibleRuntimes:
+        - python3.9
+      Content:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Sub ${S3BucketPathPrefix}${LambdaLayerZipName}
+
+# ------------------------------------------------------------------------
+# Lambda Role & Policy
+# ------------------------------------------------------------------------
+  GuardDutytoNGFWvLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [!Ref DeploymentName, 'role' ] ]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  GuardDutytoNGFWvLambdaPolicy:
+    DependsOn:
+      - GuardDutytoNGFWvLambdaRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Join ['-', [!Ref DeploymentName, 'policy' ] ]
+      Roles:
+        - !Ref GuardDutytoNGFWvLambdaRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+          -
+            Effect: Allow
+            Action:
+            - kms:Decrypt
+            Resource: '*'
+          -
+            Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:ListBucket
+            - s3:GetObjectAcl
+            - s3:PutObjectAcl
+            Resource:
+            - !Sub arn:aws:s3:::${S3BucketName}
+            - !Sub arn:aws:s3:::${S3BucketName}/*
+          -
+            Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: !Ref EmailNotifyTopic
+
+# ------------------------------------------------------------------------
+# Lambda function:  Cisco NGFWv - AWS GuardDuty Integration
+# ------------------------------------------------------------------------
+  GuardDutytoNGFWvLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join ['-', [!Ref DeploymentName, 'lambda'] ]
+      Description: "GuardDuty findings to Cisco NGFWv configuration"
+      Handler: "main.lambda_handler"
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Sub ${S3BucketPathPrefix}${LambdaFunctionZipName}
+      Layers:
+        - !Ref GuardDutytoNGFWvLambdaLayer
+      Runtime: python3.9
+      MemorySize: 128
+      Timeout: 900
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt GuardDutytoNGFWvLambdaRole.Arn
+      Environment:
+        Variables:
+          DEPLOYMENT_NAME: !Ref DeploymentName
+          S3_BUCKET: !Ref S3BucketName
+          S3_BASE_PATH: !Ref S3BucketPathPrefix
+          MANAGER_DETAILS_FILE: !Ref NGFWvDetailsFileName
+          KMS_ARN: !Ref KmsArn
+          MIN_SEVERITY: !Ref MinGDFindingsSeverity
+          SNS_TOPIC: !Ref EmailNotifyTopic
+          DEBUG_LOGS: !Ref DebugLogs
+
+# ------------------------------------------------------------------------
+# CloudWatch Event Rule to trigger lambda function based on GD findings
+# ------------------------------------------------------------------------
+  GuardDutytoLambdaEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Join ['-', [!Ref DeploymentName, 'event-rule'] ]
+      Description: "GuardDuty findings Events"
+      EventPattern:
+        source:
+        - aws.guardduty
+        detail-type:
+        - "GuardDuty Finding"
+      State: "ENABLED"
+      Targets:
+        -
+          Arn: !GetAtt GuardDutytoNGFWvLambda.Arn
+          Id: GuardDutyCloudWatchEvent
+
+  GuardDutytoLambdaInvokePermissions:
+    Type: "AWS::Lambda::Permission"
+    DependsOn: GuardDutytoLambdaEventRule
+    Properties:
+      FunctionName: !Ref GuardDutytoNGFWvLambda
+      Action: "lambda:InvokeFunction"
+      SourceArn: !GetAtt GuardDutytoLambdaEventRule.Arn
+      Principal: "events.amazonaws.com"
+
+Outputs:
+  Region:
+    Description: Region of the stack.
+    Value:
+      Ref: AWS::Region
+  S3ReportFile:
+    Description: Report file on S3 bucket containing malicious IPs found.
+    Value: !Sub
+      - "https://${bucket}.s3.amazonaws.com/${bucketKey}${reportFile}"
+      - bucket: !Ref S3BucketName
+        bucketKey: !Ref S3BucketPathPrefix
+        reportFile: !Join ["-", [!Ref DeploymentName, 'report.txt']]
+  S3ReportFileMD5:
+    Description: File on S3 bucket containing md5 checksum of the report file.
+    Value: !Sub
+      - "https://${bucket}.s3.amazonaws.com/${bucketKey}${reportFileMd5}"
+      - bucket: !Ref S3BucketName
+        bucketKey: !Ref S3BucketPathPrefix
+        reportFileMd5: !Join ["-", [!Ref DeploymentName, 'report-md5.txt']]
+  LambdaFunction:
+    Description: Lambda Function.
+    Value: !Sub https://console.aws.amazon.com/lambda/home?region=${AWS::Region}#/functions/${GuardDutytoNGFWvLambda}
+  CWEventRule:
+    Description: CloudWatch Event Rule.
+    Value: !Sub https://console.aws.amazon.com/events/home?region=${AWS::Region}#/rules/${GuardDutytoLambdaEventRule}
+  SNSTopic:
+    Description: SNS topic for email notification.
+    Value: !Sub https://console.aws.amazon.com/sns/home?region=${AWS::Region}#/topic/${EmailNotifyTopic}

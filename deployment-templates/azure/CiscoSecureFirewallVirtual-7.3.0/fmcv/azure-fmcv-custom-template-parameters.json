@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "value": "cisco-fmcv"
+    },
+    "vmImageId": {
+      "value": "/subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage"
+    },
+    "adminUsername": {
+      "value": "cisco"
+    },
+    "adminPassword": {
+      "value": "Password@2021"
+    },
+    "customData": {
+      "value": "{\"AdminPassword\": \"FmcvPass@2021\",\"Hostname\": \"cisco-fmcv\"}"
+    },
+    "availabilityZone": {
+      "value": 0
+    },
+    "vmStorageAccount": {
+      "value": "testfmcvstorage"
+    },
+    "virtualNetworkResourceGroup": {
+      "value": "test-fmcv-rg"
+    },
+    "virtualNetworkName": {
+      "value": "test-fmcv-vnet"
+    },
+    "mgmtSubnetName": {
+      "value": "mgmt"
+    },
+    "mgmtSubnetIP": {
+      "value": "10.4.0.15"
+    },
+    "VmSize": {
+      "value": "Standard_D4_v2"
+    }
+  }
+}
