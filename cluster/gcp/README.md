@@ -1,68 +1,83 @@
-# Clustering for the Threat Defense Virtual in a Public Cloud
-Clustering lets you group multiple threat defense virtuals together as a single logical device. A cluster provides
-all the convenience of a single device (management, integration into a network) while achieving the increased
-throughput and redundancy of multiple devices. You can deploy threat defense virtual clusters in a public
-cloud using Amazon Web Services (AWS) or Google Cloud Platform (GCP) or AZURE. Only routed firewall mode is
-supported. <br>
-<br>
-NOTE: From version 7.4.1 onwards, users can deploy FTDv-cluster without the Diagnostic interface (Outside, Inside, Management, CCL). <br>
-To do so, ensure that the "withDiagnostic" variable is set to False in both the infrastructure.yaml file and the respective deploy_ngfw_cluster.yaml files (either north-south/deploy_ngfw_cluster.yaml or east-west/deploy_ngfw_cluster.yaml). <br>
+# Terraform Deployment Guide
+This guide provides step-by-step instructions to deploy infrastructure using Terraform with Google Cloud Infrastructure Manager.
 
-# Cloud Formation Template Deployment
-## Prerequisites:
-Deployment can be run on any macOS/Linux/Windows machine with Google SDK installed OR using google cloud shell. <br>
+## Prerequisites
+Ensure the following are installed and configured before proceeding:
 
-## Pre-deployment Steps:
-Step-1: Edit "infrastructure.yaml" , "cluster_function_infra.yaml" and "north-south/deploy_ngfw_cluster.yaml" or "east-west/deploy_ngfw_cluster.yaml" as applicable for resourceNamePrefix and provide required user inputs.<br>
-e.g: resourceNamePrefix = ngfwvcls <br>
+1. **Google Cloud SDK**: Install and configure using: `gcloud init `
+2. **Terraform**: Install Terraform from [Terraform's official website](https://developer.hashicorp.com/terraform/downloads).
+3. **Permissions**: Ensure you have the required IAM roles: 
+   * `roles/iam.serviceAccountUser`
+   * `roles/resourcemanager.projectIamAdmin`
+   * `roles/compute.admin`
 
-Step-2: Create Bucket with name "ngfwvcls-ftdv-cluster-bucket" for uploading google function src archieve "ftdv_cluster_function.zip" file <br>
-a) Create Bucket using below CLI on Google Cloud Shell:<br>
+4. **Service Account**: Ensure that the service account is created and has necessary permissions.
 
-	'gsutil mb --pap enforced gs://ngfwvcls-ftdv-cluster-bucket/'
-<br>
-b) Create zip using below CLI for macOS/Linux user:<br>
+## Deployment Methods
+### 1. Deployment via CLI Command
+```sh
+gcloud infra-manager deployments \
+    apply "projects/YOUR_PROJECT_ID/locations/YOUR_REGION/deployments/YOUR_DEPLOYMENT_NAME" \
+    --location="YOUR_REGION" \
+    --git-source-repo="<repo name>" \
+    --git-source-directory="<infrastructure / cluster_deployment>" \
+    --git-source-ref="<branch name>" \
+    --service-account="projects/YOUR_PROJECT_ID/serviceAccounts/YOUR_SERVICE_ACCOUNT" \
+    --artifacts-gcs-bucket="gs://YOUR_BUCKET_NAME/artifacts" \
+    --inputs-file="/path/to/your/infra.tfvars"  
+```
+**Note:** A sample `tfvars` file can be found in the respective directory.
 
-	'zip -j ftdv_cluster_function.zip ./cluster-function/*'
-<br>
-	Note: if bucket name is different then edit cluster_function_infra.yaml in pre-deployment step.<br>
-c) Upload google function src archieve to bucket using below CLI on Google Cloud Shell:<br>
+### 2. Deployment via Infrastructure Manager UI
+1. Navigate to **Google Cloud Console**.
+2. Go to **Infrastructure Manager**.
+3. Click **Create Deployment**.
+4. Fill in the required details, including:
+   * Deployment name
+   * Location
+   * Source bucket (`gs://YOUR_BUCKET_NAME/gcloud-terraform/infrastructure`)
+   * Service account
+   * Input variables file
 
-	'gsutil cp ftdv_cluster_function.zip gs://ngfwvcls-ftdv-cluster-bucket'
-<br>
-	Note: if src archieve name is different then edit cluster_function_infra.yaml in pre-deployment step.<br>
+5. Click **Deploy** to start the deployment.
 
-## Deployment Steps:
-Step-3: <br>
-To deploy without the Diagnostic network interface, ensure that the "withDiagnostic" variable is set to False in the infrastructure.yaml file. <br>
-Deploy infrastructure for FTDv cluster using below CLI on Google Cloud Shell: <br>
+### 3. Deployment via Terraform Locally
+#### a) Configure Authentication
+Ensure that your credentials are set up:
 
-	'gcloud deployment-manager deployments create <name> --config infrastructure.yaml'
-<br>
-Step-4:<br>
-a) Launch and setup FMCv with FTDv management vpc if working with private IP<br>
-b) Create vpcConnector for Cloud Functions with FTDv management vpc, use it in step-5:<br>
+```sh
+gcloud auth application-default login  
+```
+Alternatively, set the service account key:
 
-	'gcloud compute networks vpc-access connectors create <name> --region us-central1 --subnet ngfwvcls-ftdv-mgmt-subnet28'
-<br>
-	Note: vpcConnector Name will be  used in cluster_function_infra.yaml as an input for vpcConnectorName.<br>
+```sh
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"  
+```
+#### b) Initialize Terraform
+```sh
+terraform init  
+```
+#### c) Apply Terraform Deployment
+```sh
+terraform apply -var-file="infra.tfvars"  
+```
+Confirm with `yes` when prompted.
 
-Step-5: <br>
- Make sure to set "deployWithExternalIP" as True in cluster_function_infra.yaml if FTDv require external IP. Deploy FTDv cluster google function using below CLI on Google Cloud Shell:<br>
+### Verify Deployment
+Check the deployment status:
 
-	'gcloud deployment-manager deployments create <name> --config cluster_function_infra.yaml'
-<br>
-Step-6: <br>
-To deploy without the Diagnostic network interface, ensure that the "withDiagnostic" variable is set to False in the deploy_ngfw_cluster.yaml file. <br>
-Make sure to set variable "deployUsingExternalIP" as 1 in deploy_ngfw_cluster.yaml if FTDv require external IP. <br>
-Deploy FTDv cluster using below CLI on Google Cloud Shell:<br>
-a) For North-South topology deployment<br>
+```sh
+gcloud infra-manager deployments describe YOUR_DEPLOYMENT_NAME --location=YOUR_REGION  
+```
+### Destroy the Deployment (If Needed)
+```sh
+gcloud infra-manager deployments delete YOUR_DEPLOYMENT_NAME --location=YOUR_REGION  
+```
+## Troubleshooting
+* **Permission Issues**: Verify the IAM roles assigned to the service account.
+* **API Enablement**: Ensure required APIs are enabled.
+* **State Lock Issues**: If using remote state, ensure the state file is not locked by another process.
 
-	'gcloud deployment-manager deployments create <name> --config north-south/deploy_ngfw_cluster.yaml'
-<br>
-
-b) For East-West topology deployment<br>
-
-	'gcloud deployment-manager deployments create <name> --config east-west/deploy_ngfw_cluster.yaml'
-<br>
-
+## Additional Resources
+* [Google Cloud Infrastructure Manager Docs](https://cloud.google.com/infrastructure-manager/docs)
+* [Terraform GCP Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
