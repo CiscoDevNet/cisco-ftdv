@@ -631,7 +631,7 @@ Resources:
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
-        - python3.9
+        - python3.13
       Content:
         S3Bucket: !Ref S3BktName
         S3Key: cluster_layer.zip
@@ -841,7 +841,7 @@ Resources:
                   responseData['ServiceName'] = service_name
                   responseStatus = cfnresponse.SUCCESS
                   cfnresponse.send(event, context, responseStatus, responseData)
-      Runtime: python3.9
+      Runtime: python3.13
       Timeout: 150
 
   RetrieveVpceServiceName:
@@ -887,7 +887,7 @@ Resources:
    Properties:
      FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'manager-lambda'] ]
      Handler: manager.lambda_handler
-     Runtime: python3.9
+     Runtime: python3.13
      ReservedConcurrentExecutions: 1
      CodeUri:
        Bucket: !Ref S3BktName
@@ -978,7 +978,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lifecycle-lambda'] ]
       Handler: lifecycle_ftdv.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.13
       CodeUri:
         Bucket: !Ref S3BktName
         Key: cluster_lifecycle.zip
@@ -1065,7 +1065,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'custom-metrics-publisher-lambda'] ]
       Handler: custom_metrics_publisher.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.13
       CodeUri:
         Bucket: !Ref S3BktName
         Key: custom_metrics_publisher.zip
