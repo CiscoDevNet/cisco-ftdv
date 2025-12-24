@@ -686,40 +686,6 @@ Resources:
       
       WebsiteConfiguration:
         IndexDocument: index.html
-  S3bucketAutoScalePolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref S3bucketAutoScale
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - "s3:GetObject"
-            Effect: "Allow"
-            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketAutoScale, "/*"] ]
-            Principal: "*"
-            Condition:
-              StringEquals:
-                aws:SourceVpce:
-                  - !Ref VpcEndpointS3
-# -------------------------------------------
-# VPC Endpoint Creation
-  VpcEndpointS3:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PolicyDocument:
-        Statement:
-          -
-            Action:
-              - "s3:GetObject"
-            Effect: "Allow"
-            Resource: !Join ['',["arn:aws:s3:::", !Ref S3bucketAutoScale, "/*"] ]
-            Principal: "*"
-      RouteTableIds:
-        - !Ref routeTable1
-        - !Ref routeTable2
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
-      VpcId: !Ref VpcAutoScale
 # -------------------------------------------
 Outputs:
   BucketName:
