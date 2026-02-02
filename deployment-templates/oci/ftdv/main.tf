@@ -70,27 +70,31 @@ variable "mgmt_nsg_ocid" {
 }
 
 variable "diag_subnet_ocid" {
-    default = "ocid1.subnet.oc1.phx.aaaaaaaap3sdmd64v7bknhl7zqq6i6tqoardhrfh5xlzf2kz5it5smcagsfq"
-  description = "OCID of the Diag subnet that is to be used."
+  type        = string
+  default     = null
+  description = "OCID of the Diag subnet that is to be used. If null, diagnostic interface will not be created."
   validation {
-        condition = (
-          length(var.diag_subnet_ocid) > 13 &&
-          can(regex("^ocid1.subnet.", var.diag_subnet_ocid ))
-        )
-        error_message = "The subnet OCID must start with <ocid1.subnet....> and must be valid. Please check the value provided."
-      }
+    condition = (
+      var.diag_subnet_ocid == null ||
+      (length(var.diag_subnet_ocid) > 13 &&
+      can(regex("^ocid1.subnet.", var.diag_subnet_ocid)))
+    )
+    error_message = "The subnet OCID must start with <ocid1.subnet....> and must be valid. Please check the value provided."
+  }
 }
 
 variable "diag_nsg_ocid" {
-    default = "ocid1.networksecuritygroup.oc1.phx.aaaaaaaa4larsbybwy7mlt56nq2l7nygdvcup4g7x2bbgitcpkxjtc7ad5xq"
-  description = "OCID of the Diag subnet network security group that is to be used."
+  type        = string
+  default     = null
+  description = "OCID of the Diag subnet network security group that is to be used. If null, diagnostic interface will not be created."
   validation {
-        condition = (
-          length(var.diag_nsg_ocid) > 27 &&
-          can(regex("^ocid1.networksecuritygroup.", var.diag_nsg_ocid ))
-        )
-        error_message = "The NSG OCID must start with <ocid1.networksecuritygroup.....> and must be valid. Please check the value provided."
-      }
+    condition = (
+      var.diag_nsg_ocid == null ||
+      (length(var.diag_nsg_ocid) > 27 &&
+      can(regex("^ocid1.networksecuritygroup.", var.diag_nsg_ocid)))
+    )
+    error_message = "The NSG OCID must start with <ocid1.networksecuritygroup.....> and must be valid. Please check the value provided."
+  }
 }
 
 variable "inside_subnet_ocid" {
@@ -241,6 +245,7 @@ resource "oci_core_instance" "test_instance" {
 }
 
 resource "oci_core_vnic_attachment" "test_vnic_attachment_diag" {
+    count = var.diag_subnet_ocid != null ? 1 : 0
     #Required
     create_vnic_details {
         #Optional
@@ -268,7 +273,6 @@ resource "oci_core_vnic_attachment" "test_vnic_attachment_in" {
     instance_id = oci_core_instance.test_instance.id
     #Optional
     display_name = "inside"
-    depends_on = [oci_core_vnic_attachment.test_vnic_attachment_diag]
 }
 
 resource "oci_core_vnic_attachment" "test_vnic_attachment_out" {
@@ -284,7 +288,7 @@ resource "oci_core_vnic_attachment" "test_vnic_attachment_out" {
     instance_id = oci_core_instance.test_instance.id
     #Optional
     display_name = "outside"
-    depends_on = [oci_core_vnic_attachment.test_vnic_attachment_diag, oci_core_vnic_attachment.test_vnic_attachment_in]
+    depends_on = [oci_core_vnic_attachment.test_vnic_attachment_in]
 }
 
 data "oci_core_vnic_attachments" "test_vnic_attachments" {
@@ -299,7 +303,8 @@ data "oci_core_vnic" "test_vnic_mgmt" {
 }
 
 data "oci_core_vnic" "test_vnic_diag" {
-    vnic_id = oci_core_vnic_attachment.test_vnic_attachment_diag.vnic_id
+    count   = var.diag_subnet_ocid != null ? 1 : 0
+    vnic_id = oci_core_vnic_attachment.test_vnic_attachment_diag[0].vnic_id
 }
 
 data "oci_core_vnic" "test_vnic_in" {
@@ -319,8 +324,9 @@ resource "oci_core_ipv6" "test_ipv6_mgmt" {
     vnic_id = local.mgmt_vnic_id[0] 
 }
 resource "oci_core_ipv6" "test_ipv6_diag" {
+    count   = var.diag_subnet_ocid != null ? 1 : 0
     #Required
-    vnic_id = oci_core_vnic_attachment.test_vnic_attachment_diag.vnic_id
+    vnic_id = oci_core_vnic_attachment.test_vnic_attachment_diag[0].vnic_id
 }
 resource "oci_core_ipv6" "test_ipv6_in" {
     #Required
@@ -354,7 +360,7 @@ output "private_ipv4_address_mgmt" {
 
 output "private_ipv4_address_diag" {
   description = "Private IPv4 address of the diagnostic interface"
-  value       = data.oci_core_vnic.test_vnic_diag.private_ip_address
+  value       = var.diag_subnet_ocid != null ? data.oci_core_vnic.test_vnic_diag[0].private_ip_address : null
 }
 
 output "private_ipv4_address_inside" {
@@ -374,7 +380,7 @@ output "ipv6_address_mgmt" {
 
 output "ipv6_address_diag" {
   description = "IPv6 address of the diagnostic interface"
-  value       = oci_core_ipv6.test_ipv6_diag.ip_address
+  value       = var.diag_subnet_ocid != null ? oci_core_ipv6.test_ipv6_diag[0].ip_address : null
 }
 
 output "ipv6_address_inside" {
