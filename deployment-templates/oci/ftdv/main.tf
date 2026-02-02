@@ -75,9 +75,7 @@ variable "diag_subnet_ocid" {
   description = "OCID of the Diag subnet that is to be used. If null, diagnostic interface will not be created."
   validation {
     condition = (
-      var.diag_subnet_ocid == null ||
-      (length(var.diag_subnet_ocid) > 13 &&
-      can(regex("^ocid1.subnet.", var.diag_subnet_ocid)))
+      var.diag_subnet_ocid == null ? true : (length(var.diag_subnet_ocid) > 13 && can(regex("^ocid1.subnet.", var.diag_subnet_ocid)))
     )
     error_message = "The subnet OCID must start with <ocid1.subnet....> and must be valid. Please check the value provided."
   }
@@ -89,9 +87,7 @@ variable "diag_nsg_ocid" {
   description = "OCID of the Diag subnet network security group that is to be used. If null, diagnostic interface will not be created."
   validation {
     condition = (
-      var.diag_nsg_ocid == null ||
-      (length(var.diag_nsg_ocid) > 27 &&
-      can(regex("^ocid1.networksecuritygroup.", var.diag_nsg_ocid)))
+      var.diag_nsg_ocid == null ? true : (length(var.diag_nsg_ocid) > 27 && can(regex("^ocid1.networksecuritygroup.", var.diag_nsg_ocid)))
     )
     error_message = "The NSG OCID must start with <ocid1.networksecuritygroup.....> and must be valid. Please check the value provided."
   }
