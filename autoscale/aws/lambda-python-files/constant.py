@@ -25,10 +25,10 @@ Purpose:    This is python file for Constant variables
 ENCODING = "utf-8"
 
 
-# NIC Configuration method for IPv4 and IPv6  (IPv4 is always DHCP, IPv6 is STATIC)
-# ------------------------------------------------------------------------------
+# NIC Configuration method, DHCP/STATIC
+# NIC_CONFIGURE = "STATIC"  # Related to CSCvs17405
 NIC_CONFIGURE = "DHCP"
-NIC_CONFIGURE_IPV6 = "STATIC"
+
 
 # Lifecycle hook constants
 # ------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ DISABLE_VM_DEPLOY_FUNC = False
 DISABLE_VM_DELETE_FUNC = False
 
 #Retries counts for to_function : [vm_ready,vm_register,vm_configure,vm_deploy,vm_delete]
-TO_FUN_RETRY_COUNT = [3, 5, 3, 5, 5]
+TO_FUN_RETRY_COUNT = [3, 5, 10, 5, 5]
 
 # Configuration File Name Constants
 JSON_LOCAL_FILENAME = 'Configuration.json'

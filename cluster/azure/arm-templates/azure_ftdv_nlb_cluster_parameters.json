@@ -59,11 +59,14 @@
     "softwareVersion": {
       "value": "77089.0.0"
     },
+    "enableSecureBoot": {
+      "value": "false"
+    },
     "vmSize": {
       "value": "Standard_D4_v2"
     },
     "ftdLicensingSku": {
-      "value": "ftdv-azure-payg"
+      "value": "payg"
     },
     "ftdVmManagementUserName": {
       "value": "cisco"
@@ -100,6 +103,9 @@
     },
     "ftdvNodeCount": {
       "value": 4
+    },
+    "autoscaling": {
+      "value": "Enable"
     },
     "scalingMetricsList": {
       "value": "CPU"

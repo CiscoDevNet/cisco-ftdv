@@ -267,7 +267,7 @@ resource "google_pubsub_topic_iam_binding" "delete" {
 # PART 3: Create Cloud Functions
 resource "google_cloudfunctions_function" "scaleout_action" {
   name                  = "${var.resource_name_prefix}-ftdv-scaleout-action"
-  runtime               = "python39"
+  runtime               = "python312"
   entry_point           = "scale_out"
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_autoscale_scaleout_action_object.name
@@ -315,7 +315,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
 
 resource "google_cloudfunctions_function" "scalein_action" {
   name                  = "${var.resource_name_prefix}-ftdv-scalein-action"
-  runtime               = "python39"
+  runtime               = "python312"
   entry_point           = "scale_in"
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_autoscale_scalein_action_object.name

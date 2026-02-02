@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 Cisco Systems Inc or its affiliates.
+Copyright (c) 2025 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -99,16 +99,20 @@ def get_user_input_lifecycle_ftdv():
     user_input = {
         "ClusterGrpName": "",
         "fmcDeviceGroupName": "",
-        "max_number_of_interfaces": "4",
+        "max_number_of_interfaces": "5",
         "NO_OF_AZs": "",
         "SUBNET_ID_LIST_2": [],
         "SUBNET_ID_LIST_3": [],
+        "SUBNET_ID_LIST_4": [],
         "SECURITY_GRP_2": "",
         "SECURITY_GRP_3": "",
+        "SECURITY_GRP_4": "",
         "GWLB_ARN": "",
         "LB_DEREGISTRATION_DELAY": "",
         "USER_NOTIFY_TOPIC_ARN": "",
-        "FTD_LICENSE_TYPE": ""
+        "FTD_LICENSE_TYPE": "",
+        "PROXY_TYPE":"",
+        "DIAGNOSTIC_INT":""
     }
 
     try:
@@ -116,14 +120,18 @@ def get_user_input_lifecycle_ftdv():
         user_input['fmcDeviceGroupName'] = os.environ['FMC_DEVICE_GRP']
         if re.match(r'..*', user_input['fmcDeviceGroupName']) is None:
             raise ValueError("Unable to find valid FMC Device Group Name")
-        user_input['max_number_of_interfaces'] = '4'
+        user_input['max_number_of_interfaces'] = '5'
         user_input['NO_OF_AZs'] = os.environ['NO_OF_AZs']
         user_input['FTD_LICENSE_TYPE'] = os.environ['FTD_LICENSE_TYPE']
         user_input['SUBNET_ID_LIST_2'] = os.environ['INSIDE_SUBNET'].split('::')
         user_input['SECURITY_GRP_2'] = os.environ['SECURITY_GRP_2']
-        user_input['SUBNET_ID_LIST_3'] = os.environ['CCL_SUBNET'].split('::')
+        user_input['SUBNET_ID_LIST_3'] = os.environ['OUTSIDE_SUBNET'].split('::')
         user_input['SECURITY_GRP_3'] = os.environ['SECURITY_GRP_3']
+        user_input['SUBNET_ID_LIST_4'] = os.environ['CCL_SUBNET'].split('::')
+        user_input['SECURITY_GRP_4'] = os.environ['SECURITY_GRP_4']
         user_input['GWLB_ARN'] = os.environ['GWLB_ARN']
+        user_input['PROXY_TYPE'] = os.environ['PROXY_TYPE']
+        user_input['DIAGNOSTIC_INT'] = os.environ['DIAGNOSTIC_INT']
         user_input['LB_DEREGISTRATION_DELAY'] = os.environ['LB_DEREGISTRATION_DELAY']
         try:
             user_input['USER_NOTIFY_TOPIC_ARN'] = os.environ['USER_NOTIFY_TOPIC_ARN']

@@ -38,6 +38,7 @@ def main(req: func.HttpRequest):
         vmScalesetName = os.environ.get("VMSS_NAME")
         minFTDCount = int(os.environ.get("MIN_FTD_COUNT"))
         maxFTDCount = int(os.environ.get("MAX_FTD_COUNT"))
+        autoscalingEnabled = os.environ.get("AUTOSCALING", "Enable")
         sampleTimeMin = int(os.environ.get("SAMPLING_TIME_MIN"))
         scaleOutThresholdCpu = float(os.environ.get("SCALE_OUT_THRESHLD_CPU"))
         scaleInThresholdCpu = float(os.environ.get("SCALE_IN_THRESHLD_CPU"))
@@ -81,6 +82,11 @@ def main(req: func.HttpRequest):
             log.warning("AutoScaleManager:: Current VM Scale Set capacity({}) is less than minimum FTDv count({}), Scaling out".format(currentVmCapacity, minFTDCount))
             cmdStr = "{ \"COMMAND\": \"SCALEOUT\", \"COUNT\": \"1\", \"TYPE\": \"REGULAR\"}"
             return func.HttpResponse(cmdStr, status_code=200)
+
+        # Check if autoscaling is disabled
+        if autoscalingEnabled == "Disable":
+            log.warning("AutoScaleManager:: Autoscaling is disabled. Skipping metric-based scaling. Current capacity: {}".format(currentVmCapacity))
+            return func.HttpResponse("NOACTION", status_code=200)
 
         log.info("CPU Scale Out threshold: {}, Scale In threshold: {}".format(scaleOutThresholdCpu, scaleInThresholdCpu))
         # Checking if scale in threshold is less than scale out threshold

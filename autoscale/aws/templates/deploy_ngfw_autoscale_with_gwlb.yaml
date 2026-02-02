@@ -37,19 +37,10 @@ Parameters:
     Description: >-
       Email address to which AutoScale Events Email needs to be sent.
     Type: String
-  DualStack:
-    Description: >-
-      **SET THIS TO "TRUE" IF YOU WANT DUAL-STACK FTDs AND GWLB. VPC SPECIFIED IN "VpcId" SHOULD BE DUAL-STACK ENABLED.**
-      ***This template DOES NOT ADD IPv6 support to existing VPC. It creates IPv6-enabled resources in existing IPv6-enabled VPC and Subnets.***
-    Type: String
-    Default: "False"
-    AllowedValues:
-      - "True"
-      - "False"  
   VpcId:
     Description: >-
-      Select VPC for AutoScale FTDs. If DualStack is set to "True", then VPC should be dual stack enabled.
-    Type: AWS::EC2::VPC::Id    
+      Select vpc for AutoScale group
+    Type: AWS::EC2::VPC::Id
   LambdaSubnets:
     Description: >-
       Please provide at least 2 subnet for Lambda functions. Note that these 2 subnet should have NAT GW,
@@ -90,7 +81,7 @@ Parameters:
     Default: 7575
   AssignPublicIP:
     Description: >-
-      Set to "True" if NGFWv needs public IP address. In case NGFWv needs public IP, management
+      Please select true if  needs to have public IP address. In case NGFWv needs to have public IP then management
       subnet should have AWS IGW as route to internet.
     Type: String
     AllowedValues:
@@ -181,13 +172,12 @@ Parameters:
     Type: String
     ConstraintDescription: password must be of minimum 8 characters
   fmcServer:
-    Description: >-
-      This can be external IP or private IP within the NGFWv Mgmt subnet in VPC.Must be a valid IPv4 or IPv6 address (no brackets).
-      ***Specify IPv6 address ONLY if Dual Stack is enabled.***
+    Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
     Type: String
-    MinLength: 3
-    MaxLength: 39
-    ConstraintDescription: Must be a valid IPv4 or IPv6 address (no brackets).
+    MinLength: 7
+    MaxLength: 15
+    AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
+    ConstraintDescription: must be a valid IP address
   fmcOperationsUsername:
     Description: >-
       Unique Internal user for AutoScale Manager automation tasks on FMC,
@@ -246,21 +236,145 @@ Parameters:
   CpuThresholds:
     Description: >-
       [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
-      ** IF 0,0 IS SELECTED, NO CPU SCALING ALARM OR POLICIES WILL BE CREATED. **
+      If 0,0 is selected, no cpu scaling alarm or policies will be created.
       Evaluation points & Data points are kept default/recommended values
     Type: CommaDelimitedList
     Default: 10,70
+    AllowedValues:
+      - 0,0
+      - 0,90
+      - 0,80
+      - 0,70
+      - 0,60
+      - 0,50
+      - 0,40
+      - 0,30
+      - 0,20
+      - 0,10
+      - 5,90
+      - 5,70
+      - 5,50
+      - 5,30
+      - 5,15
+      - 10,90
+      - 10,80
+      - 10,70
+      - 10,60
+      - 10,50
+      - 10,40
+      - 10,30
+      - 10,20
+      - 10,0
+      - 20,90
+      - 20,80
+      - 20,70
+      - 20,60
+      - 20,50
+      - 20,30
+      - 20,0
+      - 30,90
+      - 30,80
+      - 30,70
+      - 30,60
+      - 30,50
+      - 30,40
+      - 30,0
+      - 40,90
+      - 40,80
+      - 40,70
+      - 40,60
+      - 40,50
+      - 40,0
+      - 50,90
+      - 50,80
+      - 50,70
+      - 50,60
+      - 50,0
+      - 60,90
+      - 60,80
+      - 60,70
+      - 60,0
+      - 70,90
+      - 70,80
+      - 70,0
+      - 80,95
+      - 80,90
+      - 80,0
+      - 90,95
+      - 90,0
   MemoryThresholds:
     Description: >-
       [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
-      ** IF 0,0 IS SELECTED, NO MEMORY SCALING ALARM OR POLICIES WILL BE CREATED. **
-      Note, if Metric publish Lambda is not created then this input will be ignored irrespective of chosen values.
+      If 0,0 is selected, no memory scaling alarm or policies will be created. Note, if Metric publish Lambda is not
+      created then this input will be ignored irrespective of chosen values.
     Type: CommaDelimitedList
     Default: 40,70
+    AllowedValues:
+      - 0,0
+      - 0,90
+      - 0,80
+      - 0,70
+      - 0,60
+      - 0,50
+      - 0,40
+      - 0,30
+      - 0,20
+      - 0,10
+      - 5,90
+      - 5,70
+      - 5,50
+      - 5,30
+      - 5,15
+      - 10,90
+      - 10,80
+      - 10,70
+      - 10,60
+      - 10,50
+      - 10,40
+      - 10,30
+      - 10,20
+      - 10,0
+      - 20,90
+      - 20,80
+      - 20,70
+      - 20,60
+      - 20,50
+      - 20,30
+      - 20,0
+      - 30,90
+      - 30,80
+      - 30,70
+      - 30,60
+      - 30,50
+      - 30,40
+      - 30,0
+      - 40,90
+      - 40,80
+      - 40,70
+      - 40,60
+      - 40,50
+      - 40,0
+      - 50,90
+      - 50,80
+      - 50,70
+      - 50,60
+      - 50,0
+      - 60,90
+      - 60,80
+      - 60,70
+      - 60,0
+      - 70,90
+      - 70,80
+      - 70,0
+      - 80,95
+      - 80,90
+      - 80,0
+      - 90,95
+      - 90,0
   DeploymentType:
     Description: >-
       Specify whether single-arm or dual-arm deployment required. Choose "SINGLE_ARM" or "DUAL_ARM" from drop-down
-      NOTE : Dual-arm supported on versions 7.6.0 and above ONLY
+      NOTE : Dual-arm supported for versions 7.6.0 and above ONLY
     Type: String
     Default: "SINGLE_ARM"
     AllowedValues:
@@ -312,9 +426,6 @@ Conditions:
     Fn::Equals:
       - !Ref InstanceMetadataServiceVersion
       - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
-  EnableIPv6: !Equals
-    - !Ref DualStack
-    - "True"
 Metadata:
   'AWS::CloudFormation::Interface':
     ParameterGroups:
@@ -328,7 +439,6 @@ Metadata:
           default: Infrastructure Details
         Parameters:
           - VpcId
-          - DualStack
           - S3BktName
           - LambdaSubnets
           - LambdaSG
@@ -380,16 +490,14 @@ Metadata:
         default: Autoscale Email Notification
       PodNumber:
         default: Pod Number
-      DualStack:
-        default: Dual Stack (IPv6 Support)  
       VpcId:
-        default: VPC ID 
+        default: VPC ID
       LambdaSubnets:
         default: Subnets for Lambda Functions
       LambdaSG:
         default: Security Groups for Lambda Functions
       NoOfAZs:
-        default: Number of Availability Zones
+        default: Number of Availibility Zones
       ListOfAZs:
         default: Availability Zones
       S3BktName:
@@ -523,10 +631,6 @@ Resources:
     Properties:
       Name: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'gwlb' ] ]
       Type: gateway
-      IpAddressType: !If 
-        - EnableIPv6
-        - dualstack
-        - ipv4
       LoadBalancerAttributes: 
         - Key: load_balancing.cross_zone.enabled
           Value: true
@@ -585,10 +689,6 @@ Resources:
      VpcConfig:
        SecurityGroupIds: !Ref LambdaSG
        SubnetIds: !Ref LambdaSubnets
-       Ipv6AllowedForDualStack: !If
-         - EnableIPv6
-         - true
-         - false
      KmsKeyArn: !Ref KmsArn
      Environment:
        Variables:
@@ -611,10 +711,6 @@ Resources:
          PROXY_TYPE: !Ref DeploymentType
          TG_HEALTH_PORT: !Ref TgHealthPort
          AS_MANAGER_TOPIC: !Ref ASmanagerTopic
-         IPV6_SUPPORT: !If
-           - EnableIPv6
-           - 'enable'
-           - 'disable'
          USER_NOTIFY_TOPIC_ARN: !If
            - UserNotifyEmail
            - !Ref UserNotifyTopic
@@ -708,10 +804,6 @@ Resources:
       VpcConfig:
         SecurityGroupIds: !Ref LambdaSG
         SubnetIds: !Ref LambdaSubnets
-        Ipv6AllowedForDualStack: !If
-         - EnableIPv6
-         - true
-         - false  
       Layers:
         - !Ref LambdaLayer
       Environment:
@@ -742,10 +834,6 @@ Resources:
           SECURITY_GRP_3: !Ref OutsideInterfaceSG
           LB_ARN: !Ref lbInside
           LB_DEREGISTRATION_DELAY: 180
-          IPV6_SUPPORT: !If
-           - EnableIPv6
-           - 'enable'
-           - 'disable'
           CONFIGURE_ASAV_TOPIC_ARN: !Ref ASmanagerTopic
           USER_NOTIFY_TOPIC_ARN: !If
             - UserNotifyEmail
@@ -806,10 +894,6 @@ Resources:
       VpcConfig:
         SecurityGroupIds: !Ref LambdaSG
         SubnetIds: !Ref LambdaSubnets
-        Ipv6AllowedForDualStack: !If
-         - EnableIPv6
-         - true
-         - false
       KmsKeyArn: !Ref KmsArn
       Layers:
         - !Ref LambdaLayer
@@ -838,6 +922,8 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Join ['-', [!Ref AutoscaleGrpNamePrefix, !Ref PodNumber, 'metric-pub-cron' ] ]
+      #ScheduleExpression: !Join ['rate','(',[!Ref Rate],' minutes)'  ]    ]
+      #ScheduleExpression: !Ref Rate
       ScheduleExpression: !Sub
         - rate(${Time} minutes)
         - Time: 2
@@ -1092,6 +1178,7 @@ Resources:
               HttpProtocolIpv6: "disabled"  # Disable IPv6 for metadata service
               HttpPutResponseHopLimit: 1  # Set hop limit to 1
               HttpTokens: "required"  # Require IMDSv2 for metadata requests
+              # InstanceMetadataTags: "enabled"  # Include custom instance metadata tags
             - !Ref "AWS::NoValue"
         EbsOptimized: false
         ImageId: !Ref AmiID
@@ -1108,9 +1195,6 @@ Resources:
         Monitoring:
           Enabled: true
         UserData:
-          Fn::Base64: !If
-                        - EnableIPv6
-                        - '{ "AdminPassword": "FtDv_AuT0Scale", "IPv4Mode": "DHCP", "IPv6Mode": "DHCP"}'
-                        - '{ "AdminPassword": "FtDv_AuT0Scale"}'
-
+          Fn::Base64: !Sub |
+            { "AdminPassword": "FtDv_AuT0Scale"}
 

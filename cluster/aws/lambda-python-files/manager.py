@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 Cisco Systems Inc or its affiliates.
+Copyright (c) 2025 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -404,6 +404,8 @@ def handle_ec2_launch_event(instance_id):
     sns = SimpleNotificationService()
     if instance_id is not None:
         logger.info("Received EC2 launch notification for instance-id: " + str(instance_id))
+        logger.info("Waiting for lifecycle action to complete")
+        time.sleep(40)
         # Initialize DerivedFMC & ClusterGroup
         fmc = fmc_cls_init()
         # FTD class initialization

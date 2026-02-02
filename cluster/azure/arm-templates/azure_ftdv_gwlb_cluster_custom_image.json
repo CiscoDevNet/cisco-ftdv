@@ -122,11 +122,23 @@
       },
       "vmSize" : {
         "type" : "string",
-        "defaultValue" : "Standard_D3_v2",
+        "defaultValue" : "Standard_F16s_v2",
         "allowedValues" : [
             "Standard_D3_v2",
             "Standard_D4_v2",
-            "Standard_D5_v2"
+            "Standard_D5_v2",
+            "Standard_D8s_v3",
+            "Standard_D16s_v3",
+            "Standard_F8s_v2",
+            "Standard_F16s_v2",
+            "Standard_D8_v4",
+            "Standard_D16_v4",
+            "Standard_D8s_v4",
+            "Standard_D16s_v4",
+            "Standard_D8_v5",
+            "Standard_D16_v5",
+            "Standard_D8s_v5",
+            "Standard_D16s_v5"
         ],
         "metadata" : {
             "description" : "Size of the Virtual Machine"
@@ -202,6 +214,17 @@
             "description": "Comma separated License Capability list (Valid values : BASE, MALWARE, URLFilter, THREAT)"
         }
       },
+      "autoscaling": {
+        "type": "string",
+        "defaultValue": "Enable",
+        "allowedValues": [
+            "Enable",
+            "Disable"
+        ],
+        "metadata": {
+            "description": "Enable or Disable autoscaling functionality"
+        }
+      },
       "scalingMetricsList": {
         "type": "string",
         "defaultValue": "CPU",
@@ -210,35 +233,35 @@
             "CPU,MEMORY"
         ],
         "metadata": {
-            "description": "Metrics used in taking scaling decision"
+            "description": "[Only used when Autoscaling is Enabled] Metrics used in taking scaling decision"
         }
       },
       "cpuScaleInThreshold": {
         "type": "string",
         "defaultValue": "10",
         "metadata": {
-            "description": "Scale-IN threshold in % for CPU Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-IN threshold in % for CPU Metrics"
         }
       },
       "cpuScaleOutThreshold": {
         "type": "string",
         "defaultValue": "80",
         "metadata": {
-            "description": "Scale-OUT threshold in % for CPU Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-OUT threshold in % for CPU Metrics"
         }
       },
       "memoryScaleInThreshold": {
         "type": "string",
         "defaultValue": "0",
         "metadata": {
-            "description": "Scale-IN threshold in % for Memory Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-IN threshold in % for Memory Metrics"
         }
       },
       "memoryScaleOutThreshold": {
         "type": "string",
         "defaultValue": "0",
         "metadata": {
-            "description": "Scale-OUT threshold in % for Memory Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-OUT threshold in % for Memory Metrics"
         }
       },
       "ftdvPerformanceTier": {
@@ -274,7 +297,7 @@
             "30"
         ],
         "metadata": {
-            "description": "Duration in minutes for which metrics samples are collected and averaged"
+            "description": "[Only used when Autoscaling is Enabled] Duration in minutes for which metrics samples are collected and averaged"
         }
       },
       "initDeploymentMode": {
@@ -508,6 +531,9 @@
         "location": "[resourceGroup().location]",
         "sku": {
             "name": "Standard_LRS"
+        },
+        "properties": {
+            "minimumTlsVersion": "TLS1_2"
         }
       },
         {
@@ -641,7 +667,7 @@
           "virtualNetworkSubnetId": "[if(equals(variables('functionHostingPlanType'), 'premium'), variables('functionAppSubnetId'), json('null'))]",
           "vnetRouteAllEnabled": true,
           "siteConfig": {
-            "linuxFxVersion": "Python|3.9",
+            "linuxFxVersion": "Python|3.11",
             "appSettings": [
               {
                 "name": "AzureWebJobsDashboard",
@@ -730,6 +756,10 @@
               {
                 "name": "OUTSIDE_NIC_INTERFACE",
                 "value": "GigabitEthernet0/0"
+              },
+              {
+                "name": "CCL_NIC_INTERFACE",
+                "value": "GigabitEthernet 0/1"
               },
               {
                 "name": "OUTSIDE_NIC_NAME",
@@ -995,8 +1025,8 @@
             "[concat('Microsoft.Network/loadBalancers/', variables('gwlbName'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataSecGrp'))]",
-            "[concat('Microsoft.Network/networkSecurityGroups/',variables('blockAllSecGrp'))]"
-
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('blockAllSecGrp'))]",
+            "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
         ],
         "sku": {
           "name": "[parameters('vmSize')]",
@@ -1111,11 +1141,13 @@
         "apiVersion": "2022-04-01",
         "name": "[variables('role1')]",
         "dependsOn": [
-            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]",
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
         ],
         "properties": {
             "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
-            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]"
+            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+            "principalType": "ServicePrincipal"
         }
       },
       {
@@ -1123,11 +1155,13 @@
         "apiVersion": "2022-04-01",
         "name": "[variables('role2')]",
         "dependsOn": [
-            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]",
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
         ],
         "properties": {
             "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '974c5e8b-45b9-4653-ba55-5f855dd0fb88')]",
-            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]"
+            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+            "principalType": "ServicePrincipal"
         }
       }
     ]

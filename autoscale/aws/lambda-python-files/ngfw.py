@@ -97,7 +97,7 @@ class NgfwInstance (CiscoEc2Instance):
         if status == self.SUCCESS:
             return self.COMMAND_RAN, output, error
         else:
-            logger.warning("Unable to run command output: %s error: %s" % (output, error))
+            logger.warn("Unable to run command output: %s error: %s" % (output, error))
             return self.FAIL, output, error
 
     # Checks FTDv if SSH possible AND can execute 'show managers' command
@@ -147,9 +147,6 @@ class NgfwInstance (CiscoEc2Instance):
         elif len(re.findall('local', output)) == 1:
             logger.debug("Instance " + self.vm_name + ", SSH is up but configured locally")
             return "TROUBLESHOOT"
-        elif len(re.findall('In progress', output)) == 1:
-            logger.debug("Instance " + self.vm_name + ", is Registering to FMC...")
-            return "IN_PROGRESS"  
         else:
             return 'FAILURE'
 
@@ -278,7 +275,6 @@ class ManagedDevice(NgfwInstance):
         self.platform_policy_name = ''
         self.dual_arm_nat_policy_name = ''
         self.traffic_routes = []
-        self.traffic_routes_ipv6 = []
         self.interface_config = []
         self.proxy_type = ''
         self.in_nic = ''
@@ -287,7 +283,6 @@ class ManagedDevice(NgfwInstance):
         self.out_nic_name = ''
         self.vni_nic_name = ''
         self.vni_nic_zone = ''
-        self.ipv6_support = ''
 
         # Will be instantiated during run-time
         self.fmc = fmc
@@ -295,7 +290,6 @@ class ManagedDevice(NgfwInstance):
         # Will be fetched by a method
         self.device_id = ''
         self.mgmt_ip = ''
-        self.mgmt_ipv6 = ''
         self.in_nic_id = ''
         self.out_nic_id = ''
         self.in_nic_zone = ''
@@ -305,17 +299,13 @@ class ManagedDevice(NgfwInstance):
         self.vni_nic_zone_id = ''
         self.platform_policy_id = ''
         self.dual_arm_nat_policy_id = ''
-        # Only if IPv4 STATIC or IPv6 STATIC
+        # Only if STATIC
         self.in_nic_ip = ''
-        self.in_nic_ipv6 = ''
         self.in_nic_subnet_id = ''
         self.in_nic_netmask = ''
-        self.in_nic_netmask_ipv6 = ''
         self.out_nic_ip = ''
-        self.out_nic_ipv6 = ''
         self.out_nic_subnet_id = ''
         self.out_nic_netmask = ''
-        self.out_nic_netmask_ipv6 = ''
 
         # status of the device
         # [ PENDING, ON-GOING, COMPLETED, FAILED ]
@@ -356,10 +346,10 @@ class ManagedDevice(NgfwInstance):
                 self.in_nic_id = self.fmc.get_nic_id_by_name(self.device_id, self.in_nic)
                 self.out_nic_id = self.fmc.get_nic_id_by_name(self.device_id, self.out_nic)
                 if self.in_nic_id is None:
-                    logger.error("unable to get Nic ID for " + self.in_nic)
+                    logger.info("unable to get Nic ID for " + self.in_nic)
                     self.in_nic_id = ''
                 if self.out_nic_id is None:
-                    logger.error("unable to get Nic ID for " + self.out_nic)
+                    logger.info("unable to get Nic ID for " + self.out_nic)
                     self.out_nic_id = ''
                 for interface in self.interface_config:
                     if interface['ifname'] == self.in_nic_name:
@@ -411,14 +401,7 @@ class ManagedDevice(NgfwInstance):
         Returns:    SUCCESS, FAIL
         Raises:
         """
-        ## Register FTDv to FMCv based on FMCv IP version
-        ftd_ip = self.mgmt_ipv6 if self.fmc.ip_version == 6 and self.ipv6_support == 'enable' else self.mgmt_ip
-        ## Handle FMC IPv6 + FTDv IPv4 case
-        if self.fmc.ip_version == 6 and self.ipv6_support == 'disable':
-            logger.warning('Registering to FMCv IPv6 with FTDv IPv4 address: ' + ftd_ip)
-            logger.warning('Ensure FMCv has IPv4 address as well!!!')
-    
-        reg_task_id = self.fmc.register_ftdv(self.vm_name, ftd_ip, self.reg_id, self.nat_id, self.l_caps, self.performance_tier)
+        reg_task_id = self.fmc.register_ftdv(self.vm_name, self.mgmt_ip, self.reg_id, self.nat_id, self.l_caps, self.performance_tier)
         if reg_task_id is not None:
             self.ftdv_reg_polling(4)  # 4 minutes polling
             if self.reg_sts == 'ONGOING':
@@ -471,18 +454,21 @@ class ManagedDevice(NgfwInstance):
             self.dual_arm_nat_policy_id = self.fmc.check_and_create_nat_policy(self.dual_arm_nat_policy_name)
             if self.dual_arm_nat_policy_id == '':
                 raise Exception("Error fetching NAT Policy UUID from FMC")
-
-            if self.ipv6_support == 'enable':
-                ipv6 = True
-            else:
-                ipv6 = False    
             
-            logger.info('Checking and associating NAT Policy to FTD Device Group')
+            logger.info('Checking and associating NAT Policy to FTD Device Group ')
             if self.fmc.check_and_associate_policy_to_device_group('FTDNatPolicy', self.dual_arm_nat_policy_name, self.dual_arm_nat_policy_id) == 'SUCCESS':
-                if self.fmc.check_and_create_nat_rules(self.dual_arm_nat_policy_id, self.vni_nic_zone, self.vni_nic_zone_id, self.out_nic_zone, self.out_nic_zone_id, ipv6) == 'SUCCESS':
+                #Check if NAT rule within NAT policy is configured as expected : else create and configure
+                r = self.fmc.check_nat_rule_within_nat_policy(self.dual_arm_nat_policy_id, self.vni_nic_zone_id, self.out_nic_zone_id)
+                if r == 'CONFIGURED':
+                    return 'SUCCESS'
+                elif r == 'UN-CONFIGURED':
+                    r = self.fmc.create_nat_rule_within_nat_policy(self.dual_arm_nat_policy_id, self.vni_nic_zone, self.vni_nic_zone_id, self.out_nic_zone, self.out_nic_zone_id)
+                    logger.info(r)
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("NAT Rule creation failed!!")
                     return 'SUCCESS'
                 else:
-                    return 'FAIL'
+                    raise Exception("Error checking / creating NAT Rule within NAT Policy")
             else:
                 raise Exception("Error associating NAT Policy to FTD Device Group")
         except Exception as e:
@@ -500,45 +486,32 @@ class ManagedDevice(NgfwInstance):
         """
         try:
             #Update required gateway for device as per AZ
-            logger.info('Checking and Configuring Static Routes...')
             self.update_gw_stat_route()
             for static_route in self.traffic_routes:
                 check_s_route_ = self.fmc.check_static_route(self.device_id, static_route['interface'],
                                                              static_route['network'], static_route['gateway'])
-                logger.debug("IPv4 Route status: " + check_s_route_)
+                logger.debug("Route status: " + check_s_route_)
                 if check_s_route_ == 'UN-CONFIGURED':
                     # Configure Static Route
-                    logger.info("Configuring IPv4 Route: " + json.dumps(static_route, separators=(',', ':')))
+                    logger.info("Configuring Route: " + json.dumps(static_route, separators=(',', ':')))
+                    if self.fmc.get_host_objectid_by_name(static_route['network']) != '':
+                        rt_type = 'Host'
+                    elif self.fmc.get_network_objectid_by_name(static_route['network']) != '':
+                        rt_type = 'Network'
+                    elif self.fmc.get_group_objectid_by_name(static_route['network']) != '':
+                        rt_type = 'Group'
+                    else:
+                        logger.error("trafficRoutes.network value in Configuration json is not correct")
+                        return 'FAIL'
                     r = self.fmc.conf_static_rt(self.device_id, static_route['interface'],
-                                                static_route['network'],
+                                                rt_type, static_route['network'],
                                                 static_route['gateway'], static_route['metric'])
                     if r.status_code != 200 and r.status_code != 201:
-                        logger.error("IPv4 Route configuration failed: " + str(r.status_code))
+                        logger.error("Route configuration failed: " + str(r.status_code))
                         logger.error("response: " + str(r.json()))
                         return 'FAIL'
                     else:
-                        logger.info("Static IPv4 route configuration REST response {}".format(r.status_code))
-
-            ##Ipv6 Routes
-            if self.ipv6_support == 'enable':
-                self.update_gw_stat_route_ipv6()
-                for static_route in self.traffic_routes_ipv6:
-                    check_s_route_ = self.fmc.check_static_route_ipv6(self.device_id, static_route['interface'],
-                                                             static_route['network'], static_route['gateway'])
-                    logger.debug("IPv6 Route status: " + check_s_route_)
-                    if check_s_route_ == 'UN-CONFIGURED':
-                        # Configure Static Route
-                        logger.info("Configuring IPv6 Route: " + json.dumps(static_route, separators=(',', ':')))
-                        r = self.fmc.conf_static_rt(self.device_id, static_route['interface'],
-                                                static_route['network'],
-                                                static_route['gateway'], static_route['metric'], is_ipv6=True)
-                    if r.status_code != 200 and r.status_code != 201:
-                        logger.error("IPv6 Route configuration failed: " + str(r.status_code))
-                        logger.error("response: " + str(r.json()))
-                        return 'FAIL'
-                    else:
-                        logger.info("Static IPv6 route configuration REST response {}".format(r.status_code))
-
+                        logger.info("Static Host route configuration REST response {}".format(r.status_code))
         except KeyError as e:
             logger.exception(e)
             logger.error("Looks like Configuration.json file Key error")
@@ -566,20 +539,51 @@ class ManagedDevice(NgfwInstance):
         Raises:
         """
         check_if_configured = 'UN-CONFIGURED'
-        
-        if interface['name'] == self.in_nic:
-            check_if_configured = self.fmc.get_nic_status(self.device_id, self.in_nic, self.in_nic_id,
-                                                            self.in_nic_name, self.in_nic_zone_id, self.in_nic_ip, self.in_nic_ipv6)
-        elif interface['name'] == self.out_nic:
-            check_if_configured = self.fmc.get_nic_status(self.device_id, self.out_nic, self.out_nic_id,
-                                                            self.out_nic_name, self.out_nic_zone_id, self.out_nic_ip, self.out_nic_ipv6)
+        if const.NIC_CONFIGURE == "STATIC":
+            nic_suffix = None
+            if interface['name'] == self.in_nic:
+                nic_suffix = const.ENI_NAME_OF_INTERFACE_2
+                self.in_nic_ip = self.get_private_ip_of_interface(nic_suffix)
+                self.in_nic_subnet_id = self.get_subnet_id_of_interface(nic_suffix)
+                self.in_nic_netmask = self.get_subnet_mask_from_subnet_id(self.in_nic_subnet_id)
+                # Check if configured when Static
+                check_if_configured = self.fmc.get_nic_status(self.device_id, self.in_nic, self.in_nic_id,
+                                                              self.in_nic_name, self.in_nic_zone_id,
+                                                              self.in_nic_ip)
+            elif interface['name'] == self.out_nic:
+                nic_suffix = const.ENI_NAME_OF_INTERFACE_3
+                self.out_nic_ip = self.get_private_ip_of_interface(nic_suffix)
+                self.out_nic_subnet_id = self.get_subnet_id_of_interface(nic_suffix)
+                self.out_nic_netmask = self.get_subnet_mask_from_subnet_id(self.out_nic_subnet_id)
+                # Check if configured when Static
+                check_if_configured = self.fmc.get_nic_status(self.device_id, self.out_nic, self.out_nic_id,
+                                                              self.out_nic_name, self.out_nic_zone_id,
+                                                              self.out_nic_ip)
+            if nic_suffix is None:
+                logger.error("Unable to get nic_suffix from Interface Config")
+                return 'FAIL'
 
-        ## Check if IPv4 and IPv6 (if enabled) are configured    
-        if check_if_configured == 'CONFIGURED':
-            logger.info(" %s is configured !!" % interface['ifname'])
-        else:
-            logger.error(" %s is not configured !!" % interface['ifname'])
-            return 'FAIL'
+            if check_if_configured == 'CONFIGURED':
+                logger.info(" %s is configured" % interface['ifname'])
+                pass
+            else:
+                logger.info(" %s is not configured" % interface['ifname'])
+                return 'FAIL'
+
+        elif const.NIC_CONFIGURE == "DHCP":
+            # Check if configured when DHCP
+            if interface['name'] == self.in_nic:
+                check_if_configured = self.fmc.get_nic_status(self.device_id, self.in_nic, self.in_nic_id,
+                                                              self.in_nic_name, self.in_nic_zone_id)
+            elif interface['name'] == self.out_nic:
+                check_if_configured = self.fmc.get_nic_status(self.device_id, self.out_nic, self.out_nic_id,
+                                                              self.out_nic_name, self.out_nic_zone_id)
+            if check_if_configured == 'CONFIGURED':
+                logger.info(" %s is configured" % interface['ifname'])
+                pass
+            else:
+                logger.info(" %s is not configured" % interface['ifname'])
+                return 'FAIL'
 
         return 'SUCCESS'
 
@@ -590,43 +594,9 @@ class ManagedDevice(NgfwInstance):
         Returns:    Success or Fail
         Raises:
         """
-
-        self.in_nic_subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-        self.out_nic_subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-        
-        config_method_ipv4 = const.NIC_CONFIGURE
-        logger.info("IPv4 Config Method: %s" % config_method_ipv4) 
-
-        ## IPv6 variables needed only if IPv6 is enabled (IPv6 STATIC CONFIG ONLY)
-        if self.ipv6_support == 'enable':
-            config_method_ipv6 = const.NIC_CONFIGURE_IPV6
-            self.in_nic_ipv6 = self.get_ipv6_address_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-            self.out_nic_ipv6 = self.get_ipv6_address_of_interface(const.ENI_NAME_OF_INTERFACE_3) 
-            self.in_nic_netmask_ipv6 = self.get_subnet_mask_from_subnet_id(self.in_nic_subnet_id, ipv6=True)
-            self.out_nic_netmask_ipv6 = self.get_subnet_mask_from_subnet_id(self.out_nic_subnet_id, ipv6=True)
-            logger.info("IPv6 Config Method: %s" % config_method_ipv6)
-        else: 
-            config_method_ipv6 = None
-            self.in_nic_ipv6 = None
-            self.out_nic_ipv6 = None 
-            self.in_nic_netmask_ipv6 = None
-            self.out_nic_netmask_ipv6 = None
-        
-        ## IPv4 netmask, IPs not needed for DHCP method
-        if config_method_ipv4 == "DHCP": 
-            self.in_nic_ip = None
-            self.out_nic_ip = None  
-            self.in_nic_netmask = None
-            self.out_nic_netmask = None  
-        elif config_method_ipv4 == "STATIC":
-            self.in_nic_ip = self.get_private_ip_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-            self.out_nic_ip = self.get_private_ip_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-            self.in_nic_netmask = self.get_subnet_mask_from_subnet_id(self.in_nic_subnet_id)
-            self.out_nic_netmask  = self.get_subnet_mask_from_subnet_id(self.out_nic_subnet_id)
-
         for interface in self.interface_config:
 
-            #Skip out_nic's interface configuration and checking in single-arm mode : as out_nic NOT NEEDED
+            #Skip out_nic's interface configuration in single-arm mode : as out_nic NOT NEEDED
             if interface['name'] == self.out_nic and self.proxy_type == 'SINGLE_ARM':
                 logger.info('Outside interface configuration not needed in single-arm mode , SKIPPING ...')
                 continue
@@ -635,20 +605,27 @@ class ManagedDevice(NgfwInstance):
                 try:
                     logger.info("Configuring Nic %s ..." % (interface['name']))
                     r = None
-
-                    if interface['name'] == self.in_nic:
-                        r = self.fmc.configure_nic(device_id=self.device_id, nic_id=self.in_nic_id, nic=self.in_nic,
-                                                            nic_name=self.in_nic_name, mgmt_only=interface['managementOnly'],
-                                                            mode=interface['mode'], zone_id=self.in_nic_zone_id,
-                                                            mtu=interface['MTU'], ip=self.in_nic_ip, netmask=self.in_nic_netmask, ipv6=self.in_nic_ipv6, netmask_ipv6=self.in_nic_netmask_ipv6, config_method_ipv4=config_method_ipv4, config_method_ipv6=config_method_ipv6)
-
-                    elif interface['name'] == self.out_nic:
-                        r = self.fmc.configure_nic(device_id=self.device_id, nic_id=self.out_nic_id, nic=self.out_nic,
-                                                            nic_name=self.out_nic_name, mgmt_only=interface['managementOnly'],
-                                                            mode=interface['mode'], zone_id=self.out_nic_zone_id,
-                                                            mtu=interface['MTU'], ip=self.out_nic_ip, netmask=self.out_nic_netmask, ipv6=self.out_nic_ipv6, netmask_ipv6=self.out_nic_netmask_ipv6, config_method_ipv4=config_method_ipv4, config_method_ipv6=config_method_ipv6)
-
-                    logger.info("Response: ")
+                    if const.NIC_CONFIGURE == "STATIC":
+                        if interface['name'] == self.in_nic:
+                            r = self.fmc.configure_nic_static(self.device_id, self.in_nic_id, self.in_nic,
+                                                              self.in_nic_name, interface['managementOnly'],
+                                                              interface['mode'], self.in_nic_zone_id,
+                                                              interface['MTU'], self.in_nic_ip, self.in_nic_netmask)
+                        elif interface['name'] == self.out_nic:
+                            r = self.fmc.configure_nic_static(self.device_id, self.out_nic_id, self.out_nic,
+                                                                self.out_nic_name, interface['managementOnly'],
+                                                                interface['mode'], self.out_nic_zone_id,
+                                                                interface['MTU'], self.out_nic_ip, self.out_nic_netmask)
+                    elif const.NIC_CONFIGURE == "DHCP":
+                        if interface['name'] == self.in_nic:
+                            r = self.fmc.configure_nic_dhcp(self.device_id, self.in_nic_id, self.in_nic,
+                                                            self.in_nic_name, interface['managementOnly'],
+                                                            interface['mode'], self.in_nic_zone_id, interface['MTU'])
+                        elif interface['name'] == self.out_nic:
+                            r = self.fmc.configure_nic_dhcp(self.device_id, self.out_nic_id, self.out_nic,
+                                                                self.out_nic_name, interface['managementOnly'],
+                                                                interface['mode'], self.out_nic_zone_id, interface['MTU'])
+                        logger.info("Response: ")
                     logger.info(r)
                 except Exception as e:
                     logger.exception(e)
@@ -664,9 +641,9 @@ class ManagedDevice(NgfwInstance):
                 return status
         return status
 
-    def check_and_configure_geneve(self):
+    def configure_geneve(self):
         """
-        Purpose:    Check and configure Geneve (Enable VTEP & add VNI )
+        Purpose:    configure Geneve (Enable VTEP & add VNI )
         Parameters: fmc object from caller function
         Returns:    Success or Fail
         Raises:
@@ -674,33 +651,26 @@ class ManagedDevice(NgfwInstance):
         for interface in self.interface_config:
             try:                
                 r = None
-                #Configure VTEP and VNI on inside interface (if not configured)
+                #Configure VTEP and VNI on inside interface
                 if interface['name'] == self.in_nic:
-                    logger.info("Checking if vtep configured for %s" % (interface['name']))
-                    r = self.fmc.check_vtep_enabled(self.device_id, self.in_nic_id)
-                    if r != 'CONFIGURED':
-                        logger.warning("VTEP is not configured!!")
-                        logger.info("Configuring vtep for %s ..." % (interface['name']))				
-                        r = self.fmc.enable_vtep(self.device_id, self.in_nic_name, self.in_nic_id)
-                        logger.info("Response: ")
-                        logger.info(r)
-                        if r.status_code != 200 and r.status_code != 201:
-                            raise Exception("Configuring VTEP failed!!")
-                    logger.info("Checking if VNI Interface is added ") 
+                    logger.info("Configuring vtep for %s ..." % (interface['name']))				
+                    r = self.fmc.enable_vtep(self.device_id, self.in_nic_name, self.in_nic_id)
+                    logger.info("Response: ")
+                    logger.info(r)
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("Configuring VTEP failed!!")
+                    logger.info("Adding VNI")
                     if self.proxy_type == 'DUAL_ARM':
                         vni_nic_name = self.vni_nic_name
                         vni_seczone_id = self.vni_nic_zone_id
                     elif self.proxy_type == 'SINGLE_ARM':
                         vni_nic_name = 'vni1'
                         vni_seczone_id = self.in_nic_zone_id
-                    r = self.fmc.check_vni_added(self.device_id, vni_nic_name, vni_seczone_id, self.ipv6_support)
-                    if r != 'CONFIGURED':
-                        logger.info("Adding VNI interface")
-                        r = self.fmc.add_vni(self.device_id, self.proxy_type, vni_nic_name, vni_seczone_id, self.ipv6_support) 
-                        logger.info("Response: ")
-                        logger.info(r)	
-                        if r.status_code != 200 and r.status_code != 201:
-                            raise Exception("Configuring VTEP failed!!")				
+                    r = self.fmc.add_vni(self.device_id, self.proxy_type, vni_nic_name, vni_seczone_id) 
+                    logger.info("Response: ")
+                    logger.info(r)	
+                    if r.status_code != 200 and r.status_code != 201:
+                        raise Exception("Configuring VTEP failed!!")				
             except Exception as e:
                 logger.exception(e)
                 logger.error("Configuring VNI / VTEP failed!") 
@@ -720,7 +690,7 @@ class ManagedDevice(NgfwInstance):
         for i in range(1, 2*minutes):
             if i != ((2*minutes)-1):
                 status_in_fmc = self.fmc.check_reg_status_from_fmc(self.vm_name)
-                if status_in_fmc != 'SUCCESS':
+                if status_in_fmc == 'FAILED':
                     return "SUCCESS"
                 else:
                     logging.debug("De-registration polling, Sleeping for 30 seconds")
@@ -739,12 +709,12 @@ class ManagedDevice(NgfwInstance):
         """
         if minutes <= 1:
             minutes = 2
-        for i in range(1, 2*minutes):
-            if i != ((2*minutes)-1):
+        for i in range(1, 4*minutes):
+            if i != ((4*minutes)-1):
                 status = self.fmc.check_deploy_status(self.vm_name)
                 if status != "DEPLOYED":
-                    logging.debug(str(i) + " Sleeping for 30 seconds")
-                    time.sleep(1*30)
+                    logging.debug(str(i) + " Sleeping for 15 seconds")
+                    time.sleep(1*15)
                 else:
                     return "SUCCESS"
             else:
@@ -765,7 +735,7 @@ class ManagedDevice(NgfwInstance):
             logger.info("Instance de-registration received an error")
             logger.debug(str(e))
         pass
-        r = self.ftdv_dereg_polling(2)
+        r = self.ftdv_dereg_polling(5)
         if r == "FAILED":
             return "FAILED"
         else:
@@ -784,48 +754,21 @@ class ManagedDevice(NgfwInstance):
 			## Needed for NLB as well
             if static_route['interface'] == self.in_nic_name:
                 subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                subnet_cidr = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=False)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
                 static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)   
             ## Outside Route : Dual-Arm only,N-S traffic
             elif static_route['interface'] == self.out_nic_name:
                 subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-                subnet_cidr = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=False)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
                 static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)
             ## VNI Route : Dual-Arm only,E-W traffic     
             elif static_route['interface'] == self.vni_nic_name:
                 subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                subnet_cidr = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=False)
+                subnet_cidr = self.get_cidr_describe_subnet(subnet_id)
                 static_route['gateway'] = utl.get_gateway_from_cidr(subnet_cidr)  
             logger.debug(json.dumps(static_route, separators=(',', ':')))
         return
 
-    def update_gw_stat_route_ipv6(self): 
-        """
-        Purpose:    To update Gateway in IPv6 static routes
-        Parameters:
-        Returns:
-        Raises:
-        """
-        #Gateway needs to be configured for every device individually as per AZ
-        for static_route in self.traffic_routes_ipv6:
-            ## Inside Route : Single-arm,Dual-arm both.Needed for cross-zone routing 
-			## Needed for NLB as well
-            if static_route['interface'] == self.in_nic_name:
-                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                subnet_cidr_ipv6 = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=True)
-                static_route['gateway'] = utl.get_gateway_from_ipv6_cidr(subnet_cidr_ipv6)   
-            ## Outside Route : Dual-Arm only,N-S traffic
-            elif static_route['interface'] == self.out_nic_name:
-                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_3)
-                subnet_cidr_ipv6 = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=True)
-                static_route['gateway'] = utl.get_gateway_from_ipv6_cidr(subnet_cidr_ipv6)
-            ## VNI Route : Dual-Arm only,E-W traffic     
-            elif static_route['interface'] == self.vni_nic_name:
-                subnet_id = self.get_subnet_id_of_interface(const.ENI_NAME_OF_INTERFACE_2)
-                subnet_cidr_ipv6 = self.get_cidr_describe_subnet(subnet_id=subnet_id, ipv6=True)
-                static_route['gateway'] = utl.get_gateway_from_ipv6_cidr(subnet_cidr_ipv6)  
-            logger.debug(json.dumps(static_route, separators=(',', ':')))
-        return    
 
 class ParamikoSSH:
     """
@@ -848,7 +791,7 @@ class ParamikoSSH:
     def close(self):
         self.ssh.close()
 
-    def verify_server_ip(self): ## CHECK FOR IPV6 SUPPORT
+    def verify_server_ip(self):
         try:
             socket.inet_aton(self.server)
             return self.SUCCESS

@@ -120,6 +120,7 @@ def create_interface_and_attach(ec2_instance):
     instance_az = ec2_instance.get_instance_az()
     logger.info("EC2 instance has been launched in AZ: " + instance_az)
     subnets_list_in_az = ec2_instance.get_subnet_list_in_az(instance_az)
+    logger.debug("List of subnets in %s is: %s" % (instance_az, subnets_list_in_az))
 
     # Get the security group ID of this instance
     sec_grp_id = ec2_instance.get_security_group_id()
@@ -130,7 +131,7 @@ def create_interface_and_attach(ec2_instance):
 
     # Attach Diag interface
     eni_name = ec2_instance.instance_id + const.ENI_NAME_OF_DIAG_INTERFACE + str(1)
-    interface_id = ec2_instance.create_interface(ec2_instance.get_mgmt_subnet_id(), sec_grp_id, eni_name, user_input['PROXY_TYPE'], user_input['IPV6_SUPPORT'])
+    interface_id = ec2_instance.create_interface(ec2_instance.get_mgmt_subnet_id(), sec_grp_id, eni_name)
     if interface_id:
         # Attach interface to instance with device index
         attachment, err = ec2_instance.attach_interface(interface_id, 1)
@@ -164,7 +165,7 @@ def create_interface_and_attach(ec2_instance):
 
         # Create interface in the subnet with its respective security group
         logger.info("sec_grp_id is: %s" % (sec_grp_id))
-        interface_id = ec2_instance.create_interface(str(subnet_id[0]), sec_grp_id, eni_name, user_input['PROXY_TYPE'], user_input['IPV6_SUPPORT'])
+        interface_id = ec2_instance.create_interface(str(subnet_id[0]), sec_grp_id, eni_name)
 
         if interface_id:
             # Attach interface to instance with device index
@@ -201,11 +202,9 @@ def register_instance(ec2_instance):
     
     utl.put_line_in_log('Registering %s interface to Target Group' %interface_name, 'dot')
     eni_name = ec2_instance.instance_id + const.ENI_NAME_PREFIX + str(interface_index)
-    
     if ec2_instance.register_instance_to_lb(user_input['LB_ARN'], eni_name) == 'FAIL':
-        utl.put_line_in_log('Registering %s interface with IPv4 Address to Target Group: FAIL' %interface_name, 'dot')
+        utl.put_line_in_log('Registering %s interface to Target Group: FAILED' %interface_name, 'dot')
         return 'FAIL'
-    
     utl.put_line_in_log('Registering %s interface to Target Group: SUCCESS' %interface_name, 'dot')
     return 'SUCCESS'
 
@@ -233,7 +232,6 @@ def deregister_instance(ec2_instance):
     if ec2_instance.deregister_instance_from_lb(user_input['LB_ARN'], eni_name) == 'FAIL':
         utl.put_line_in_log('De-registering %s interface from Target Group finished: FAIL' %interface_name, 'dot')
         return 'FAIL'
-    
     utl.put_line_in_log('De-registering %s interface from Target Group finished: SUCCESS' %interface_name, 'dot')
     return 'SUCCESS'
 
@@ -265,9 +263,6 @@ def create_tags_with_default_values(ec2_instance):
     ec2_instance.create_instance_tags('NGFWvRegistrationStatus', 'PENDING')
     ec2_instance.create_instance_tags('NGFWvConnectionStatus', 'UN-AVAILABLE')
     ec2_instance.create_instance_tags('NGFWvFMCDeviceGrp', user_input['fmcDeviceGroupName'])
-    ec2_instance.create_instance_tags('GeneveSupport', user_input['GENEVE_SUPPORT'])
-    ec2_instance.create_instance_tags('ProxyType', user_input['PROXY_TYPE'])
-    ec2_instance.create_instance_tags('IPv6Support', user_input['IPV6_SUPPORT'])
 
     if user_input['FTD_LICENSE_TYPE'] == 'PAYG':
         ec2_instance.create_instance_tags('NGFWvLicenseType', 'PAYG')

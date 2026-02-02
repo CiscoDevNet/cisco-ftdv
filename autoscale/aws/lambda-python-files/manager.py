@@ -273,7 +273,7 @@ def handle_sns_event(sns_data):
         if _m_attr['category'] == 'FIRST':
             if execute_vm_ready_first(ftd) == 'SUCCESS':
                 ftd.create_instance_tags('NGFWvConnectionStatus', 'AVAILABLE')
-                logger.info("SSH to NGFWv %s successful, Next action: Registration" % _m_attr['instance_id'])
+                logger.info("SSH to NGFWv with instance_id is successful, Next action: Registration")
                 if not const.DISABLE_VM_REGISTER_FUNC:
                     message_subject = 'Event: ' + e_var['AutoScaleGrpName'] + ' ' + 'instance register' + ' ' + \
                                       _m_attr['instance_id']
@@ -407,17 +407,8 @@ def handle_ec2_launch_event(instance_id):
 
         instance_state = instance.get_instance_state()
         interfaces_ip = instance.get_instance_interfaces_ip()
-        
-        # Log IPv6 addresses if available in dual-stack mode
-        if e_var['IPV6_SUPPORT'] == 'enable' and interfaces_ip is not None:
-            ipv6_addresses = {k: v for k, v in interfaces_ip.items() if k.startswith('ipv6_')}
-            if ipv6_addresses:
-                logger.info(f"IPv6 addresses for instance {instance_id}: {ipv6_addresses}")
-        
-        # In dual-stack mode, we need at least one IP version (IPv4 or IPv6) for each interface
-        # The get_instance_interfaces_ip method now handles this check internally
         if interfaces_ip is None:
-            logger.warning(f"Unable to get required IPs of the instance {instance_id} in {'dual-stack' if e_var['IPV6_SUPPORT'] == 'enable' else 'IPv4-only'} mode")
+            logger.warn("Unable to get IPs of the instance" + instance_id)
             message_subject = 'Event: ' + e_var['AutoScaleGrpName'] + ' ' + 'instance poll' + ' ' + instance_id
             msg_body = utl.sns_msg_body_configure_ftdv_topic('vm_ready', 'FIRST', instance_id)
             sns.publish_to_topic(e_var['AutoScaleManagerTopic'], message_subject, msg_body)
@@ -579,7 +570,7 @@ def execute_vm_register_first(ftd):
     try:
         reg_status = ftd.check_ftdv_reg_status()  # Check Device Registration state
         if reg_status == "COMPLETED":
-            logger.info("Device registered  successfully to FMC!!")
+            logger.info("Device is in registration successful ")
             return 'SUCCESS'
         elif reg_status == "PENDING":
             logger.info("Device is in registration pending status ")
@@ -627,16 +618,11 @@ def execute_vm_configure_first(ftd, fmc):
             ## Add polling for [SINGLE_ARM] as well, observing vm_deploy failing due to system deployment not finished
             if ftd.proxy_type == 'DUAL_ARM' or 'SINGLE_ARM':
                 logger.info('Checking that system deployment after registration is done.')
-                if fmc.check_deploy_status(ftd.vm_name) != 'DEPLOYED':
+                deploy_status = fmc.check_deploy_status(ftd.vm_name)
+                if deploy_status != 'DEPLOYED':
                     deploy_status = ftd.ftdv_deploy_polling(5)
-                    ## If deployment not complete after 5min, it is outstanding deployment from previous re-try
-                    ## Needs to be force-deployed
-                    if deploy_status != "SUCCESS": 
-                        if fmc.start_deployment(ftd.vm_name) is None:
-                            raise ValueError("Outstanding deployment REST POST failing!!!")
-                        deploy_status = ftd.ftdv_deploy_polling(5)
-                        if deploy_status != "SUCCESS":
-                            raise ValueError("Outstanding deployment failed")        
+                    if deploy_status != "SUCCESS":
+                        raise ValueError("System Configuration deployment failed")
                     logger.info("System deployment finished, proceeding to configure device ....")
             # Configure interfaces from FMC
             nic_status = ftd.check_and_configure_interface()
@@ -649,7 +635,7 @@ def execute_vm_configure_first(ftd, fmc):
                     raise ValueError("Platform Policy configuration failed!!")
                 # Add Geneve support : VTEP and VNI interface creation
                 logger.info("Adding Geneve configuration")			
-                geneve_status = ftd.check_and_configure_geneve()
+                geneve_status = ftd.configure_geneve()
                 if geneve_status != 'SUCCESS':
                     raise ValueError("Geneve configuration failed")
             if ftd.proxy_type == 'SINGLE_ARM' or '': 
@@ -734,7 +720,7 @@ def execute_vm_delete_first(ftd, fmc):
         result = 'FAIL'
     try:
         status_in_fmc = fmc.check_reg_status_from_fmc(ftd.vm_name)
-        if status_in_fmc != 'SUCCESS':
+        if status_in_fmc == 'FAILED':
             ftd.create_instance_tags('NGFWvRegistrationStatus', 'FAIL')
         else:
             fmc_removal_status = ftd.remove_from_fmc()
@@ -851,7 +837,6 @@ def aws_asg_cls_init():
     # AWS AutoScale Class initialization
     aws_grp = AutoScaleGroup(e_var['AutoScaleGrpName'])
     aws_grp.create_or_update_tags('FmcDeviceGroup', e_var['fmcDeviceGroupName'])
-    aws_grp.create_or_update_tags('IPv6Support', e_var['IPV6_SUPPORT'])
     return aws_grp
 
 
@@ -916,11 +901,6 @@ def ftd_cls_init(instance_id, fmc):
     ftd.out_nic = j_var['fmcOutsideNic']
     ftd.in_nic_name = j_var['fmcInsideNicName']
     ftd.out_nic_name = j_var['fmcOutsideNicName']
-    
-    ##IPv6 Support     
-    ftd.ipv6_support = e_var['IPV6_SUPPORT']  
-    if ftd.ipv6_support == 'enable':
-        ftd.mgmt_ipv6 = ftd.get_mgmt_ipv6() 
 
     if e_var['GENEVE_SUPPORT'] == 'enable':
         ftd.health_check_port = e_var['TargetGrpHealthPort']
@@ -931,19 +911,13 @@ def ftd_cls_init(instance_id, fmc):
             ftd.vni_nic_zone = j_var['fmcVNIZone']
             ftd.dual_arm_nat_policy_name = j_var['fmcNatPolicyName']
             ftd.traffic_routes = j_var['DualArmTrafficRoutes']
-            if ftd.ipv6_support == 'enable':
-                ftd.traffic_routes_ipv6 = j_var['DualArmTrafficRoutesIPv6']
         elif ftd.proxy_type == 'SINGLE_ARM':
             ftd.traffic_routes = j_var['SingleArmTrafficRoutes'] 
-            if ftd.ipv6_support == 'enable':
-                ftd.traffic_routes_ipv6 = j_var['SingleArmTrafficRoutesIPv6']
     ##NLB Case        
     else:
         ftd.proxy_type = '' 
-        ftd.traffic_routes = j_var['NLBTrafficRoutes'] 
-        if ftd.ipv6_support == 'enable':
-            ftd.traffic_routes_ipv6 = j_var['NLBTrafficRoutesIPv6']    
-             
+        ftd.traffic_routes = j_var['NLBTrafficRoutes']    
+           
     # Updating device configuration
     ftd.update_device_configuration()
 

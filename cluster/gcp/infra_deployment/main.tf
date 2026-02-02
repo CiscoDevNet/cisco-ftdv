@@ -1,7 +1,9 @@
-##################################################
+provider "google" {
+  project     = var.project_id
+  region      = var.region
+}
+
 # Variables
-##################################################
-# Variables with Validation
 variable "project_id" {}
 variable "resource_name_prefix" {}
 variable "region" {}
@@ -11,19 +13,17 @@ variable "with_diagnostic" {}
 variable "diag_ip_cidr_range" {
   default = ""
   nullable = false
-
 }
 variable "inside_ip_cidr_range" {}
 variable "outside_ip_cidr_range" {}
 variable "ccl_ip_cidr_range" {}
-##################################################
-# VPC and Subnet Resources
-
-provider "google" {
-  project     = var.project_id
-  region      = var.region
+variable "ftd_reg_via_public_ip" {
+  description = "Whether to register FTDv using it's public IP or not."
+  type        = bool
 }
 
+
+# VPC and Subnet Resources
 resource "google_compute_network" "mgmt_vpc" {
   name                    = "${var.resource_name_prefix}-ftdv-mgmt-vpc"
   auto_create_subnetworks = false
@@ -146,7 +146,7 @@ resource "google_compute_firewall" "inside_firewall" {
     protocol = "icmp"
   }
 
-  source_ranges = [var.inside_ip_cidr_range, "130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
+  source_ranges = [var.inside_ip_cidr_range]
 }
 
 resource "google_compute_firewall" "outside_firewall" {
@@ -161,7 +161,7 @@ resource "google_compute_firewall" "outside_firewall" {
     protocol = "icmp"
   }
 
-  source_ranges = [var.outside_ip_cidr_range, "130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
+  source_ranges = [var.outside_ip_cidr_range]
 }
 
 resource "google_compute_firewall" "ccl_firewall" {
@@ -173,6 +173,28 @@ resource "google_compute_firewall" "ccl_firewall" {
   }
 
   source_ranges = [var.ccl_ip_cidr_range]
+}
+
+resource "google_compute_firewall" "inside_hc_firewall" {
+  name    = "${var.resource_name_prefix}-ftdv-in-hc-firewall-rule"
+  network = google_compute_network.inside_vpc.self_link
+
+  allow {
+    protocol = "tcp"
+  }
+  disabled = true
+  source_ranges = ["130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
+}
+
+resource "google_compute_firewall" "outside_hc_firewall" {
+  name    = "${var.resource_name_prefix}-ftdv-out-hc-firewall-rule"
+  network = google_compute_network.outside_vpc.self_link
+
+  allow {
+    protocol = "tcp"
+  }
+  disabled = true
+  source_ranges = ["130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
 }
 
 resource "google_compute_firewall" "vpc_connector_ingress" {
@@ -195,3 +217,73 @@ resource "google_vpc_access_connector" "connector" {
   min_instances = 2
 }
 
+# If FTDv registration is via Public IP, Google Function needs to access FMCv over public IP.
+# We need static IP to allow Google Function access in FMCv ingress security group.
+# So when "ftd_reg_via_public_ip" is set to true, Google Function traffic will go via NAT GW's Public IP.
+
+# Create a static Public Address to assign to NAT GW
+resource "google_compute_address" "mgmtgw_public_ip" {
+  count  = var.ftd_reg_via_public_ip ? 1 : 0
+  name   = "${var.resource_name_prefix}-mgmtgw-public-ip"
+  region = var.region
+}
+
+# Management NAT Router
+resource "google_compute_router" "mgmt_nat_router" {
+  count   = var.ftd_reg_via_public_ip ? 1 : 0
+  name    = "${var.resource_name_prefix}-mgmt-nat-router"
+  network = google_compute_network.mgmt_vpc.self_link
+  region  = var.region
+}
+
+# Management NAT Gateway configuration
+resource "google_compute_router_nat" "mgmt_nat" {
+  count                              = var.ftd_reg_via_public_ip ? 1 : 0
+  name                               = "${var.resource_name_prefix}-cloud-nat"
+  router                             = google_compute_router.mgmt_nat_router[0].name
+  region                             = var.region
+  nat_ip_allocate_option             = "MANUAL_ONLY"
+  nat_ips                            = [google_compute_address.mgmtgw_public_ip[0].self_link]
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+
+output "mgmt_vpc_self_link" {
+  value = google_compute_network.mgmt_vpc.self_link
+}
+
+output "mgmt_subnet_self_link" {
+  value = google_compute_subnetwork.mgmt_subnet.self_link
+}
+
+output "inside_vpc_self_link" {
+  value = google_compute_network.inside_vpc.self_link
+}
+
+output "inside_subnet_self_link" {
+  value = google_compute_subnetwork.inside_subnet.self_link
+}
+
+output "outside_vpc_self_link" {
+  value = google_compute_network.outside_vpc.self_link
+}
+
+output "outside_subnet_self_link" {
+  value = google_compute_subnetwork.outside_subnet.self_link
+}
+
+output "ccl_vpc_self_link" {
+  value = google_compute_network.ccl_vpc.self_link
+}
+
+output "ccl_subnet_self_link" {
+  value = google_compute_subnetwork.ccl_subnet.self_link
+}
+
+output "vpc_connector_name" {
+  value = google_vpc_access_connector.connector.name
+}
+
+output "mgmt_nat_ip" {
+  value = var.ftd_reg_via_public_ip && length(google_compute_address.mgmtgw_public_ip) > 0 ? google_compute_address.mgmtgw_public_ip[0].address : null
+}

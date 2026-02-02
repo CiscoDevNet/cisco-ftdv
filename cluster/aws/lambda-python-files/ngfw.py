@@ -1,5 +1,5 @@
 """
-Copyright (c) 2023 Cisco Systems Inc or its affiliates.
+Copyright (c) 2025 Cisco Systems Inc or its affiliates.
 
 All Rights Reserved.
 
@@ -112,6 +112,7 @@ class NgfwInstance (CiscoEc2Instance):
             seconds=0
             while seconds<10:
                 resp1 += chan.recv(9999).decode('utf-8')
+                logger.debug('Initial response on login : {}'.format(resp1))
                 if resp1.endswith('> '):
                     break
                 else:
@@ -251,9 +252,8 @@ class NgfwInstance (CiscoEc2Instance):
          cmd = 'show version'
          r, output, error = self.run_ftdv_command(cmd)
          pos = output.find("Version ")
-         version = output[pos+len("Version "):pos+len("Version ")+len("a.b.c")] #format of version
-         logger.debug("FTDv Version: " +version.replace('.',''))
-         return version.replace('.','')
+         version = output[pos + len("Version "):].split()[0]  # Get the full version string
+         return version.replace('.', '')
      
     # Function to configure manager
     def configure_manager(self):

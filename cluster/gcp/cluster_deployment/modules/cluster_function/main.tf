@@ -1,22 +1,23 @@
+# Input variables for the FTDv cluster function module
 variable "project_id" {}
-variable "resource_name_prefix" {}
 variable "region" {}
-variable "service_account_email" {}
-variable "deploy_with_external_ip" {}
-variable "retry_count" {}
-variable "reg_id" {}
-variable "nat_id" {}
-variable "cls_grp_name" {}
-variable "policy_id" {}
-variable "fmc_ip" {}
-variable "fmc_password" {}
-variable "fmc_username" {}
-variable "ftdv_password" {}
-variable "license_caps" {}
-variable "performance_tier" {}
+variable "resource_name_prefix" {}
 variable "vpc_connector_name" {}
 
-# Create a GCS bucket to store the Cloud Function ZIP archive
+variable "fmc_ip" {}
+variable "fmc_password_secret_name" {}
+variable "fmc_username" {}
+variable "reg_id" {}
+variable "nat_id" {}
+variable "policy_id" {}
+variable "perf_tier" {}
+
+variable "cluster_grp_name" {}
+variable "ftd_reg_via_public_ip" {}
+variable "license_caps" {}
+variable "ftd_password_secret_name" {}
+
+# Create storage bucket for storing Cloud Functions code
 resource "google_storage_bucket" "ftdv_bucket" {
   name          = "${var.resource_name_prefix}-ftdv-cluster-bucket"
   location      = var.region
@@ -26,80 +27,169 @@ resource "google_storage_bucket" "ftdv_bucket" {
   uniform_bucket_level_access = true
 }
 
-# Create a ZIP archive of all files in ./src directory
-data "archive_file" "ftdv_cluster_zip" {
+# Create zip archive of scale-in function code
+data "archive_file" "ftdv_cluster_scalein_action_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/src"
-  output_path = "${path.module}/src/ftdv_cluster_function.zip"
+  source_dir  = "${path.module}/scalein-action"
+  output_path = "${path.module}/scalein-action/ftdv_scalein.zip"
 }
 
-# Upload the ZIP archive to the created bucket
-resource "google_storage_bucket_object" "ftdv_cluster_function" {
-  name   = "ftdv_cluster_function.zip"
-  bucket = google_storage_bucket.ftdv_bucket.name
-  source = data.archive_file.ftdv_cluster_zip.output_path
+# Create zip archive of scale-out function code
+data "archive_file" "ftdv_cluster_scaleout_action_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/scaleout-action"
+  output_path = "${path.module}/scaleout-action/ftdv_scaleout.zip"
 }
 
-resource "google_logging_project_sink" "ftdv_insert_sink" {
-  name        = "${var.resource_name_prefix}-ftdv-insert-sink"
-  destination = "pubsub.googleapis.com/${google_pubsub_topic.ftdv_pubsub_topic_insert.id}"
+# Upload scale-in function zip to storage bucket
+resource "google_storage_bucket_object" "ftdv_cluster_scalein_action_object" {
+  name   = "ftdv_scalein.zip"
+  bucket = google_storage_bucket.ftdv_bucket.id
+  source = data.archive_file.ftdv_cluster_scalein_action_zip.output_path
 
-  filter                 = "(resource.type = \"gce_instance_group_manager\" AND resource.labels.instance_group_manager_name = \"${var.resource_name_prefix}-ftdv-instance-group\" AND protoPayload.methodName = \"v1.compute.regionInstanceGroupManagers.insert\" AND operation.last = true) OR (resource.type = \"cloud_function\" AND resource.labels.function_name = \"${var.resource_name_prefix}-ftdv-cluster-action\" AND textPayload:\"Reattempt\")"
+  depends_on = [ google_storage_bucket.ftdv_bucket ]
+}
+
+# Upload scale-out function zip to storage bucket
+resource "google_storage_bucket_object" "ftdv_cluster_scaleout_action_object" {
+  name   = "ftdv_scaleout.zip"
+  bucket = google_storage_bucket.ftdv_bucket.id
+  source = data.archive_file.ftdv_cluster_scaleout_action_zip.output_path
+
+  depends_on = [ google_storage_bucket.ftdv_bucket ]
+}
+
+# Delete local zip files after uploading to bucket
+resource "null_resource" "delete_zip_files" {
+  depends_on = [
+    google_storage_bucket_object.ftdv_cluster_scalein_action_object,
+    google_storage_bucket_object.ftdv_cluster_scaleout_action_object
+  ]
+  provisioner "local-exec" {
+    command = "rm -f ${data.archive_file.ftdv_cluster_scalein_action_zip.output_path} ${data.archive_file.ftdv_cluster_scaleout_action_zip.output_path}"
+  }
+}
+
+# Create Pub/Sub topic for instance insertion events
+resource "google_pubsub_topic" "insert" {
+  name = "${var.resource_name_prefix}-ftdv-pubsub-topic-insert"
+}
+
+# Create Pub/Sub topic for instance deletion events
+resource "google_pubsub_topic" "delete" {
+  name = "${var.resource_name_prefix}-ftdv-pubsub-topic-delete"
+}
+
+# Create log sink to capture instance creation events
+resource "google_logging_project_sink" "insert_sink" {
+  name                   = "${var.resource_name_prefix}-ftdv-insert-sink"
+  destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.insert.name}"
+  filter                 = "(resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.insert\" AND operation.last = true AND protoPayload.resourceName:\"${var.resource_name_prefix}\")"
   unique_writer_identity = false
 }
 
-
-# Pub/Sub Topic for Cluster Deployment
-resource "google_pubsub_topic" "ftdv_pubsub_topic_insert" {
-  name = "${var.resource_name_prefix}-ftdv-pubsub-topic-insert"
-
+# Create log sink to capture instance deletion events
+resource "google_logging_project_sink" "delete_sink" {
+  name                   = "${var.resource_name_prefix}-ftdv-delete-sink"
+  destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.delete.name}"
+  filter                 = "resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.delete\" AND protoPayload.resourceName:\"${var.resource_name_prefix}\" AND operation.first=true"
+  unique_writer_identity = false
 }
 
-# IAM Binding for Pub/Sub
-resource "google_pubsub_topic_iam_binding" "ftdv_pubsub_binding" {
-  topic = google_pubsub_topic.ftdv_pubsub_topic_insert.name
-  role  = "roles/pubsub.publisher"
+# Grant publisher permissions for the insert topic
+resource "google_pubsub_topic_iam_binding" "insert" {
+  topic = google_pubsub_topic.insert.id
+
+  role = "roles/pubsub.publisher"
+
   members = [
-    # google_logging_project_sink.ftdv_insert_sink.writer_identity,
     "serviceAccount:cloud-logs@system.gserviceaccount.com"
-    
   ]
 }
 
-# Cloud Function to Handle Cluster Actions
-resource "google_cloudfunctions_function" "ftdv_cluster_action" {
-  name                  = "${var.resource_name_prefix}-ftdv-cluster-action"
-  region                = var.region
-  runtime               = "python39"
+# Grant publisher permissions for the delete topic
+resource "google_pubsub_topic_iam_binding" "delete" {
+  topic = google_pubsub_topic.delete.id
+
+  role = "roles/pubsub.publisher"
+
+  members = [
+    "serviceAccount:cloud-logs@system.gserviceaccount.com"
+  ]
+}
+
+# Create Cloud Function for handling scale-out operations
+resource "google_cloudfunctions_function" "scaleout_action" {
+  name                  = "${var.resource_name_prefix}-ftdv-scaleout-action"
+  runtime               = "python312"
+  entry_point           = "scale_out"
+  source_archive_bucket = google_storage_bucket.ftdv_bucket.id
+  source_archive_object = google_storage_bucket_object.ftdv_cluster_scaleout_action_object.name
   timeout               = 540
-  entry_point           = "cluster_handler"
-  available_memory_mb   = 256
-  source_archive_bucket = google_storage_bucket.ftdv_bucket.name
-  source_archive_object = google_storage_bucket_object.ftdv_cluster_function.name
-  max_instances         = 1
+  max_instances         = 16
+  ingress_settings      = "ALLOW_ALL"
 
   environment_variables = {
-    EXTERNAL_IP_ENABLE = var.deploy_with_external_ip
-    RETRY_COUNT        = var.retry_count
-    REG_ID             = var.reg_id
-    NAT_ID             = var.nat_id
-    CLS_GRP_NAME       = var.cls_grp_name
-    POLICY_ID          = var.policy_id
-    FMC_IP             = var.fmc_ip
-    FMC_PASSWORD       = var.fmc_password
-    FMC_USERNAME       = var.fmc_username
-    FTDV_PASSWORD      = var.ftdv_password
-    LICENSE_CAPS       = var.license_caps
-    PERF_TIER          = var.performance_tier
-    RESOURCE_PREFIX    = var.resource_name_prefix
+    RESOURCE_NAME_PREFIX   = var.resource_name_prefix
+    FTD_REG_VIA_PUBLIC_IP  = var.ftd_reg_via_public_ip
+    CLS_GRP_NAME           = var.cluster_grp_name
+    FMC_IP                 = var.fmc_ip
+    FMC_USERNAME           = var.fmc_username
+    REG_ID                 = var.reg_id
+    NAT_ID                 = var.nat_id
+    POLICY_ID              = var.policy_id
+    LICENSE_CAPS           = var.license_caps
+    PERF_TIER              = var.perf_tier
+    FORCE_STOP             = "false"
+  }
+
+  secret_environment_variables {
+    key     = "FMCV_PASSWORD"
+    secret  = var.fmc_password_secret_name
+    version = "latest"
+  }
+
+  secret_environment_variables {
+    key     = "FTDV_PASSWORD"
+    secret  = var.ftd_password_secret_name
+    version = "latest"
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
-  ingress_settings              = "ALLOW_ALL"
-
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ?  "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
-    resource   = google_pubsub_topic.ftdv_pubsub_topic_insert.name
+    resource   = google_pubsub_topic.insert.id
+  }
+}
+
+# Create Cloud Function for handling scale-in operations
+resource "google_cloudfunctions_function" "scalein_action" {
+  name                  = "${var.resource_name_prefix}-ftdv-scalein-action"
+  runtime               = "python312"
+  entry_point           = "scale_in"
+  source_archive_bucket = google_storage_bucket.ftdv_bucket.id
+  source_archive_object = google_storage_bucket_object.ftdv_cluster_scalein_action_object.name
+  timeout               = 540
+  max_instances         = 1
+  ingress_settings      = "ALLOW_ALL"
+
+  environment_variables = {
+    FMC_IP              = var.fmc_ip
+    FMC_USERNAME        = var.fmc_username
+    CLS_GRP_NAME        = var.cluster_grp_name
+  }
+
+  secret_environment_variables {
+    key     = "FMCV_PASSWORD"
+    secret  = var.fmc_password_secret_name
+    version = "latest"
+  }
+
+  vpc_connector                 = var.vpc_connector_name
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ?  "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
+  event_trigger {
+    event_type = "google.pubsub.topic.publish"
+    resource   = google_pubsub_topic.delete.id
   }
 }

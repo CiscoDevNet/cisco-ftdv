@@ -50,11 +50,14 @@
       "softwareVersion": {
         "value": "77089.0.0"
       },
+      "enableSecureBoot": {
+        "value": "false"
+      },
       "vmSize": {
         "value": "Standard_D3_v2"
       },
       "ftdLicensingSku": {
-        "value": "ftdv-azure-payg"
+        "value": "payg"
       },
       "ftdVmManagementUserName": {
         "value": "cisco"
@@ -85,6 +88,9 @@
       },
       "licenseCapability": {
         "value": "BASE, MALWARE, THREAT"
+      },
+      "autoscaling": {
+        "value": "Enable"
       },
       "scalingMetricsList": {
         "value": "CPU"

@@ -1,83 +1,103 @@
-# Terraform Deployment Guide
-This guide provides step-by-step instructions to deploy infrastructure using Terraform with Google Cloud Infrastructure Manager.
+# Clustering Autoscale for the Threat Defense Virtual in GCP Cloud
 
-## Prerequisites
-Ensure the following are installed and configured before proceeding:
+Clustering enables you to group multiple Threat Defense Virtual (FTDv) devices into a single logical unit. This provides the convenience of managing a single device while achieving increased throughput and redundancy from multiple devices. Our updated solution now supports autoscaling, which ensures optimal performance and resource utilization based on demand fluctuations.
 
-1. **Google Cloud SDK**: Install and configure using: `gcloud init `
-2. **Terraform**: Install Terraform from [Terraform's official website](https://developer.hashicorp.com/terraform/downloads).
-3. **Permissions**: Ensure you have the required IAM roles: 
-   * `roles/iam.serviceAccountUser`
-   * `roles/resourcemanager.projectIamAdmin`
-   * `roles/compute.admin`
+> **NOTE:** Starting with version 7.4.1, you can deploy FTDv clusters without the Diagnostic interface (Outside, Inside, Management, CCL).  
+> To use this capability, set the `with_diagnostic` variable to `False` in your cluster deployment parameters.
 
-4. **Service Account**: Ensure that the service account is created and has necessary permissions.
+## Deployment Flow
 
-## Deployment Methods
-### 1. Deployment via CLI Command
+### Prerequisites
+- Terraform (version 1.7.0 or newer)
+- Google Cloud SDK installed locally or access to GCP Cloud Shell
+- Service account with appropriate permissions for resource creation
+
+### Deployment Option 1: Using GCP Infrastructure Manager
+
+Execute the following CLI command to deploy using GCP Infrastructure Manager:
+
 ```sh
 gcloud infra-manager deployments \
-    apply "projects/YOUR_PROJECT_ID/locations/YOUR_REGION/deployments/YOUR_DEPLOYMENT_NAME" \
-    --location="YOUR_REGION" \
-    --git-source-repo="<repo name>" \
-    --git-source-directory="<infrastructure / cluster_deployment>" \
-    --git-source-ref="<branch name>" \
-    --service-account="projects/YOUR_PROJECT_ID/serviceAccounts/YOUR_SERVICE_ACCOUNT" \
-    --artifacts-gcs-bucket="gs://YOUR_BUCKET_NAME/artifacts" \
-    --inputs-file="/path/to/your/infra.tfvars"  
+	apply "projects/YOUR_PROJECT_ID/locations/YOUR_REGION/deployments/YOUR_DEPLOYMENT_NAME" \
+	--location="YOUR_REGION" \
+	--git-source-repo="<repo name>" \
+	--git-source-directory="<infrastructure / cluster_deployment>" \
+	--git-source-ref="<branch name>" \
+	--service-account="projects/YOUR_PROJECT_ID/serviceAccounts/YOUR_SERVICE_ACCOUNT" \
+	--artifacts-gcs-bucket="gs://YOUR_BUCKET_NAME/artifacts" \
+	--inputs-file="/path/to/your/infra.tfvars"  
 ```
-**Note:** A sample `tfvars` file can be found in the respective directory.
 
-### 2. Deployment via Infrastructure Manager UI
-1. Navigate to **Google Cloud Console**.
-2. Go to **Infrastructure Manager**.
-3. Click **Create Deployment**.
-4. Fill in the required details, including:
-   * Deployment name
-   * Location
-   * Source bucket (`gs://YOUR_BUCKET_NAME/gcloud-terraform/infrastructure`)
-   * Service account
-   * Input variables file
+**Note:** Sample `tfvars` files are available in each respective directory for reference.
 
-5. Click **Deploy** to start the deployment.
+### Deployment Option 2: Using Local Terraform
 
-### 3. Deployment via Terraform Locally
-#### a) Configure Authentication
-Ensure that your credentials are set up:
+#### Step 1: Configure Authentication
+
+Set up your credentials using one of these methods:
 
 ```sh
+# Option A: Login with your user account
 gcloud auth application-default login  
-```
-Alternatively, set the service account key:
 
-```sh
+# Option B: Use a service account key
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"  
 ```
-#### b) Initialize Terraform
-```sh
-terraform init  
-```
-#### c) Apply Terraform Deployment
-```sh
-terraform apply -var-file="infra.tfvars"  
-```
-Confirm with `yes` when prompted.
 
-### Verify Deployment
-Check the deployment status:
+#### Step 2: Deploy Infrastructure
 
-```sh
-gcloud infra-manager deployments describe YOUR_DEPLOYMENT_NAME --location=YOUR_REGION  
-```
-### Destroy the Deployment (If Needed)
-```sh
-gcloud infra-manager deployments delete YOUR_DEPLOYMENT_NAME --location=YOUR_REGION  
-```
-## Troubleshooting
-* **Permission Issues**: Verify the IAM roles assigned to the service account.
-* **API Enablement**: Ensure required APIs are enabled.
-* **State Lock Issues**: If using remote state, ensure the state file is not locked by another process.
+**Note:** You can either use our infrastructure template to create VPC, subnets, and firewall rules, or provide your existing resource names directly in the cluster deployment.
 
-## Additional Resources
-* [Google Cloud Infrastructure Manager Docs](https://cloud.google.com/infrastructure-manager/docs)
-* [Terraform GCP Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
+Configure and deploy the infrastructure:
+
+```bash
+# 1. Edit infrastructure parameters
+cd FTDV/infrastructure
+# Modify infrastructure_params.tfvars with your settings
+
+# 2. Deploy infrastructure
+terraform init
+terraform apply -var-file=infrastructure_params.tfvars
+```
+
+#### Step 3: Create Required Secrets
+
+For FTDv deployments, create Secret Manager secrets for your passwords:
+
+```bash
+# Create FTDv password secret
+gcloud secrets create ftdv-password --replication-policy="automatic"
+echo -n "your-ftdv-password" | gcloud secrets versions add ftdv-password --data-file=-
+
+# Create FMC password secret
+gcloud secrets create fmc-password --replication-policy="automatic"
+echo -n "your-fmc-password" | gcloud secrets versions add fmc-password --data-file=-
+```
+
+#### Step 4: Deploy the Cluster
+
+Configure and deploy your cluster:
+
+```bash
+cd FTDV/cluster_deployment
+# Modify cluster_params.tfvars with your settings
+
+terraform init
+terraform apply -var-file=cluster_params.tfvars
+```
+
+### Cleaning Up Resources
+
+To remove all deployed resources:
+
+```bash
+# 1. First remove the cluster
+cd FTDV/cluster_deployment
+terraform destroy -var-file=cluster_params.tfvars
+
+# 2. Then remove the infrastructure
+cd FTDV/infrastructure
+terraform destroy -var-file=infrastructure_params.tfvars
+```
+
+**Note:** Deployments performed via GCP Infrastructure Manager are visible in the GCP console, allowing you to easily list and verify all deployed resources. These can be cleaned up directly from the GCP UI. In contrast, local Terraform deployments must be managed through Terraform state files and will not appear in the Infrastructure Manager section of the GCP console.

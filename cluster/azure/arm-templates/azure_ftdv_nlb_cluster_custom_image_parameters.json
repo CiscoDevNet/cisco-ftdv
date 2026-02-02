@@ -98,6 +98,9 @@
     "ftdvNodeCount": {
       "value": 4
     },
+    "autoscaling": {
+      "value": "Enable"
+    },
     "scalingMetricsList": {
       "value": "CPU"
     },

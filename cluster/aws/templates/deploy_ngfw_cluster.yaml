@@ -1,4 +1,4 @@
-#  Copyright (c) 2023 Cisco Systems Inc or its affiliates.
+#  Copyright (c) 2025 Cisco Systems Inc or its affiliates.
 #
 #  All Rights Reserved.
 #
@@ -18,12 +18,15 @@ AWSTemplateFormatVersion: 2010-09-09
 Transform: 'AWS::Serverless-2016-10-31'
 Description: >-
   Deploys MultiAZ, Autoscaling-enabled Cluster solution for Cisco NGFWv instances
+
 Parameters:
+  # Cluster Configuration Parameters - Basic settings for cluster setup
   ClusterGrpNamePrefix:
-    Description: >-
-      This will be Cluster Group Name prefix with suffix as Cluster Number
+    Description: Prefix for the Cluster Group Name (max 18 chars)
     Type: String
     MaxLength: 18
+    MinLength: 3
+    AllowedPattern: '[a-zA-Z0-9-]+'
     Default: Multi-AzCluster
   ClusterNumber:
     Description: >-
@@ -33,6 +36,26 @@ Parameters:
     Default: 1
     AllowedPattern: '^\d{1,3}$'
     ConstraintDescription: must be a numerical string matching '^\d{1,3}$'
+  DeploymentType:
+    Description: >-
+      Specify whether "single-arm" or "dual-arm" deployment required. 
+      NOTE : dual-arm supported for versions 10.0.0 and above.
+    Type: String
+    Default: "single-arm"
+    AllowedValues:
+      - "single-arm"
+      - "dual-arm"
+  DiagnosticInterface:
+    Description: >-
+      Specify whether Diagnostic interface required.
+      "ON" - Diagnostic interface will be attached.
+      "OFF" - Diagnostic interface will not be attached.
+      NOTE : "OFF" supported for versions 10.0.0 and above.
+    Type: String
+    Default: "ON"
+    AllowedValues:
+      - "ON"
+      - "OFF"
   ClusterSize:
     Description: >-
       Total Number of FTDv Nodes in the Cluster (Min 1 and Max 16).
@@ -83,8 +106,8 @@ Parameters:
     Type: List<AWS::EC2::SecurityGroup::Id>
   NoOfAZs:
     Description: >-
-      Total Number of Availability Zones into which NGFWv will be deployed (Min 1 and Max 3 depends on Region).
-      PLEASE SELECT NoOfAZs = 2 OR 3 ONLY FOR RELEASES 7.6.0 AND ABOVE. FOR LOWER RELEASES, SELECT 1.
+      Total number of Availability Zones for NGFWv deployment (minimum 1, maximum 3, depending on the region).
+      For releases 7.6.0 and above, select NoOfAZs = 2 or 3. - For earlier releases, select 1
     Type: Number
     AllowedValues:
       - 1
@@ -113,7 +136,7 @@ Parameters:
     AllowedValues:
      - "rebalance"
      - "no_rebalance"
-    Default: "no_rebalance"
+    Default: "rebalance"
   S3BktName:
     Description: The S3 Bucket which contains uploaded Lambda zip files. Please specify correct bucket name
     Type: String
@@ -157,17 +180,44 @@ Parameters:
   InsideInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances inside interface
-    Type: AWS::EC2::SecurityGroup::Id
+    Type: List<AWS::EC2::SecurityGroup::Id>
   InsideSubnetIds:
     Description: >-
       Select only one subnet per AZ. If multiple subnets from same AZ are chosen,
       wrong Subnet selection will cause problems while deploying the NGFWv instances.
       Make sure of adding Subnet from AZ provided.
     Type: List<AWS::EC2::Subnet::Id>
+  OutsideInterfaceSG:
+    Description: >-
+      (dual-arm mode only)
+      Please provide security group ID for NGFWv instances outside interface.
+      Format: sg-12345678
+      Do NOT remove default value, if you are using single-arm deployment.
+    Type: String
+    Default: sg-12345678
+  OutsideSubnetIds:
+    Description: >-
+      (dual-arm mode only)
+      Provide only one subnet per AZ. If multiple subnets from same AZ are chosen,
+      wrong Subnet selection will cause problems while deploying the NGFWv instances.
+      Make sure of adding Subnet from AZ provided.
+      Format: subnet-12345678, subnet-12345679, subnet-12345670
+      Do NOT remove default values, if you are using single-arm deployment.
+    Type: CommaDelimitedList
+    Default: subnet-12345678, subnet-12345679, subnet-12345670
+  DualArmAppCidrList:
+    Description: >-
+      (dual-arm mode only)
+      Enter dual-arm application CIDRs for East-West traffic.
+      Format: x.x.x.x/x, x.x.x.x/x, x.x.x.x/x ...
+      Do NOT remove default values, if you are using single-arm deployment.
+    Type: CommaDelimitedList
+    ConstraintDescription: must be a valid IP CIDRs
+    Default: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
   CCLInterfaceSG:
     Description: >-
       Please select security group ID for NGFWv instances CCL interface
-    Type: AWS::EC2::SecurityGroup::Id
+    Type: List<AWS::EC2::SecurityGroup::Id>
   CCLSubnetIds:
     Description: >-
       Select only one subnet per AZ. If multiple subnet from same AZ are chosen,
@@ -187,6 +237,7 @@ Parameters:
     Description: >-
       Cisco NGFWv EC2 instance type.
       Make sure that AWS Region supports selected instance type.
+      Dual-arm deployment supports only _.4xlarge when Diagnostic Interface is "ON".
     Type: String
     AllowedValues:
       - m5n.xlarge
@@ -221,7 +272,9 @@ Parameters:
   AmiID:
     Description: >-
       Please choose correct AMI ID as per the region, desired version and license type(BYOL/PAYG).
-      NGFWv version 7.2 onwards support clustering, version 7.6 onwards supports the multi-AZ enhancements 
+      NOTE: NGFWv version 7.2 onwards supports clustering -
+            NGFWv version 7.6 onwards supports Multi-AZ deployment -
+            NGFWv version 7.8 onwards supports dual-arm deployment
     Type: AWS::EC2::Image::Id
     Default: ami-09963e452646cef87
   InstanceMetadataServiceVersion:
@@ -231,8 +284,9 @@ Parameters:
     AllowedValues:
       - "V1 and V2 (token optional)"
       - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
+  # Security Configuration - KMS and password settings
   KmsArn:
-    Description: >-
+    Description: >- 
       [Conditional] ARN of an existing KMS (AWS KMS key to encrypt at rest), If specified, NGFWv 'admin' Password below should be encrypted
       Password. The Password encryption should be done only using the specified ARN.
       Generating Encrypted Password Ex: " aws kms encrypt --key-id <KMS ARN> --plaintext <password> ", Please use such generated password in below fields.
@@ -243,10 +297,10 @@ Parameters:
       Password will be changed to given(below) password once NGFWv is accessible.
       Since this can be a plain text password or KMS encrypted password, minimum length should be 8 characters.
     NoEcho: true
-    MinLength: 8
     Type: String
+    MinLength: 8
     ConstraintDescription: password must be of minimum 8 characters
-    Default: c0mpleX@1209
+    Default: YoUrPaSsWoRd@123
   fmcServer:
     Description: This IP can be external IP or IP reachable in NGFWv mgmt subnet in the VPC
     Type: String
@@ -254,7 +308,7 @@ Parameters:
     MaxLength: 15
     AllowedPattern: '^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
     ConstraintDescription: must be a valid IP address
-    Default: 44.195.48.182
+    Default: 72.163.4.161
   fmcOperationsUsername:
     Description: >-
       Unique Internal user for Cluster Manager automation tasks on FMC,
@@ -268,7 +322,7 @@ Parameters:
       If KMS ARN is specified above, please provide encrypted password.
     NoEcho: true
     Type: String
-    Default: c0mpleX@1209
+    Default: YoUrPaSsWoRd@123
   fmcDeviceGrpName:
     Description: >-
       Enter unique name for Cluster Group in FMC
@@ -296,7 +350,7 @@ Parameters:
       If KMS ARN is specified above, please provide encrypted password.
     NoEcho: true
     Type: String
-    Default: c0mpleX@1209
+    Default: YoUrPaSsWoRd@123
   CpuThresholds:
     Description: >-
       [Optional] Specifying non-zero lower and upper threshold will create respective Scale policies.
@@ -485,6 +539,9 @@ Conditions:
       - !Equals
         - 0
         - !Select ['0', !Ref MemoryThresholds ]
+  dualarm: !Equals [ !Ref DeploymentType, "dual-arm" ]
+  dualarmSupport2Zone: !And [ !Condition "dualarm", !Condition "support2zone" ]
+  dualarmSupport3Zone: !And [ !Condition "dualarm", !Condition "support3zone" ]
 
 Metadata:
   'AWS::CloudFormation::Interface':
@@ -495,6 +552,8 @@ Metadata:
           - ClusterGrpNamePrefix
           - ClusterNumber
           - ClusterSize
+          - DeploymentType
+          - DiagnosticInterface
       - Label:
           default: Infrastructure Details
         Parameters:
@@ -503,15 +562,18 @@ Metadata:
           - NotifyEmailID
           - S3BktName
           - VpcId
+          - DualArmAppCidrList
           - MgmtSubnetIds
           - InsideSubnetIds
-          - LambdaSubnets
+          - OutsideSubnetIds
           - CCLSubnetIds
+          - LambdaSubnets
           - CCLSubnetRanges
           - MgmtInterfaceSG
           - InsideInterfaceSG
-          - LambdaSG
+          - OutsideInterfaceSG
           - CCLInterfaceSG
+          - LambdaSG
       - Label:
           default: GWLB Configuration
         Parameters:
@@ -555,6 +617,10 @@ Metadata:
         default: Cluster Email Notification
       ClusterNumber:
         default: Cluster Number
+      DeploymentType:
+        default: Deployment Type
+      DiagnosticInterface:
+        default: Diagnostic Interface
       ClusterSize:
         default: Cluster Size
       VpcId:
@@ -595,6 +661,12 @@ Metadata:
         default: Security Group for NGFWv Instance inside
       InsideSubnetIds:
         default: Subnet for NGFWv Inside Interface of different AZs
+      OutsideInterfaceSG:
+        default: Security Group for NGFWv Instance outside
+      OutsideSubnetIds:
+        default: Subnet for NGFWv Outside Interface of different AZs
+      DualArmAppCidrList:
+        default: Dual-Arm Application CIDRs
       CCLInterfaceSG:
         default: Security Group for NGFWv CCL
       CCLSubnetIds:
@@ -626,20 +698,18 @@ Metadata:
       InstanceMetadataServiceVersion:
         default: Instance Metadata Service Version  
 Resources:
-# Lambda Layer ---------------------------------------------------------
+  # Lambda Layer for shared code
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
-        - python3.9
+        - python3.13
       Content:
         S3Bucket: !Ref S3BktName
         S3Key: cluster_layer.zip
       Description: Lambda Layer for Cisco NGFWv Cluster Solution
       LayerName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lambda-layer' ] ]
-# ------------------------------------------------------------------------
-# Lambda Role & Policy
-# ------------------------------------------------------------------------
+  # IAM Roles and Policies
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -679,11 +749,13 @@ Resources:
               - ssm:*
               - lambda:*
               - kms:Decrypt
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:UpdateItem
             Effect: Allow
             Resource: '*'
-# ------------------------------------------------------------------------
-# User Notification SNS
-# ------------------------------------------------------------------------
+  # SNS Topics for notifications
   UserNotifyTopic:
     Condition: UserNotifyEmail
     Type: AWS::SNS::Topic
@@ -698,9 +770,21 @@ Resources:
       Endpoint: !Ref NotifyEmailID
       Protocol: email
       TopicArn: !Ref UserNotifyTopic
-# ------------------------------------------------------------------------
-# GW Load Balancer & Target groups
-# ------------------------------------------------------------------------
+  LambdaLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lock'] ]
+      AttributeDefinitions:
+        - AttributeName: lock_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lock_id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Name
+          Value: LambdaLock
+  # Load Balancer Configuration
   gwlb:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -739,9 +823,7 @@ Resources:
           TargetGroupArn: !Ref tg
       LoadBalancerArn: !Ref gwlb
 
-# ------------------------------------------------------------------------
-# Create Lambda Custom Resource to retrieve VPC Endpoint Service Name:
-# ------------------------------------------------------------------------
+  # Create Lambda Custom Resource to retrieve VPC Endpoint Service Name:
   VpceServiceLambdaExecutionRole:
     Condition: addGWLBE
     Type: AWS::IAM::Role
@@ -841,7 +923,7 @@ Resources:
                   responseData['ServiceName'] = service_name
                   responseStatus = cfnresponse.SUCCESS
                   cfnresponse.send(event, context, responseStatus, responseData)
-      Runtime: python3.9
+      Runtime: python3.13
       Timeout: 150
 
   RetrieveVpceServiceName:
@@ -851,9 +933,7 @@ Resources:
       ServiceToken: !GetAtt VpceServiceName.Arn
       VpceServiceId: !Ref VpcEndpointService
 
-# ------------------------------------------------------------------------
-# Create VPC Endpoint Service
-# ------------------------------------------------------------------------
+  # Create VPC Endpoint Service
   VpcEndpointService:
     Condition: addGWLBE
     Type: AWS::EC2::VPCEndpointService
@@ -862,9 +942,7 @@ Resources:
         - !Ref gwlb
       AcceptanceRequired: false
 
-# ------------------------------------------------------------------------
-# Create Gateway Load Balancer Endpoint
-# ------------------------------------------------------------------------
+  # Create Gateway Load Balancer Endpoint
   GwlbEndpoint:
     Condition: addGWLBE
     Type: AWS::EC2::VPCEndpoint
@@ -874,9 +952,7 @@ Resources:
       VpcEndpointType: GatewayLoadBalancer
       SubnetIds:
         - !Ref GWLBESubnetId
-# ------------------------------------------------------------------------
-# Cluster Manager Lambda
-# ------------------------------------------------------------------------
+  # Cluster Manager Lambda
   ClusterManager:
    Type: AWS::Serverless::Function
    DependsOn:
@@ -887,7 +963,7 @@ Resources:
    Properties:
      FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'manager-lambda'] ]
      Handler: manager.lambda_handler
-     Runtime: python3.9
+     Runtime: python3.13
      ReservedConcurrentExecutions: 1
      CodeUri:
        Bucket: !Ref S3BktName
@@ -965,9 +1041,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber , 'cluster-manager-topic'] ]
-# ------------------------------------------------------------------------
-# Lifecycle Action Lambda
-# ------------------------------------------------------------------------
+  # Lifecycle Action Lambda
   LifeCycleLambda:
     Type: AWS::Serverless::Function
     DependsOn:
@@ -978,7 +1052,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'lifecycle-lambda'] ]
       Handler: lifecycle_ftdv.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.13
       CodeUri:
         Bucket: !Ref S3BktName
         Key: cluster_lifecycle.zip
@@ -999,6 +1073,8 @@ Resources:
           FMC_DEVICE_GRP: !Ref fmcDeviceGrpName
           NO_OF_AZs: !Ref NoOfAZs
           FTD_LICENSE_TYPE: !Ref LicenseType
+          PROXY_TYPE: !Ref DeploymentType
+          DIAGNOSTIC_INT: !Ref DiagnosticInterface
           INSIDE_SUBNET: !If
               - support2zone
               - !Join ['::', [ !Select ['0', !Ref InsideSubnetIds ], !Select ['1', !Ref InsideSubnetIds ] ] ]
@@ -1006,7 +1082,18 @@ Resources:
                 - support3zone
                 - !Join ['::', [ !Select ['0', !Ref InsideSubnetIds ], !Select ['1', !Ref InsideSubnetIds ], !Select ['2', !Ref InsideSubnetIds ] ] ]
                 - !Select ['0', !Ref InsideSubnetIds ]
-          SECURITY_GRP_2: !Ref InsideInterfaceSG
+          SECURITY_GRP_2: !Select [0, !Ref InsideInterfaceSG]
+          OUTSIDE_SUBNET: !If
+              - dualarm
+              - !If
+                - dualarmSupport2Zone
+                - !Join ['::', [ !Select ['0', !Ref OutsideSubnetIds ], !Select ['1', !Ref OutsideSubnetIds ] ] ]
+                - !If
+                  - dualarmSupport3Zone
+                  - !Join ['::', [ !Select ['0', !Ref OutsideSubnetIds ], !Select ['1', !Ref OutsideSubnetIds ], !Select ['2', !Ref OutsideSubnetIds ] ] ]
+                  - !Select ['0', !Ref OutsideSubnetIds ]
+              - "NA"
+          SECURITY_GRP_3: !If [dualarm, !Ref OutsideInterfaceSG, "NA"]
           CCL_SUBNET: !If
               - support2zone
               - !Join ['::', [ !Select ['0', !Ref CCLSubnetIds ], !Select ['1', !Ref CCLSubnetIds ] ] ]
@@ -1014,7 +1101,7 @@ Resources:
                 - support3zone
                 - !Join ['::', [ !Select ['0', !Ref CCLSubnetIds ], !Select ['1', !Ref CCLSubnetIds ], !Select ['2', !Ref CCLSubnetIds ] ] ]
                 - !Select ['0', !Ref CCLSubnetIds ]
-          SECURITY_GRP_3: !Ref CCLInterfaceSG      
+          SECURITY_GRP_4: !Select [0, !Ref CCLInterfaceSG]
           GWLB_ARN: !Ref gwlb
           LB_DEREGISTRATION_DELAY: 180
           USER_NOTIFY_TOPIC_ARN: !If
@@ -1052,9 +1139,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceArn: !GetAtt LifeCycleEvent.Arn
 
-# ------------------------------------------------------------------------
-# Custom Metric Publishing
-# ------------------------------------------------------------------------
+  # Custom Metric Publishing
   CustomMetricsPublisher:
     Type: AWS::Serverless::Function
     Condition: PublishMetrics
@@ -1065,7 +1150,7 @@ Resources:
     Properties:
       FunctionName: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'custom-metrics-publisher-lambda'] ]
       Handler: custom_metrics_publisher.lambda_handler
-      Runtime: python3.9
+      Runtime: python3.13
       CodeUri:
         Bucket: !Ref S3BktName
         Key: custom_metrics_publisher.zip
@@ -1105,8 +1190,6 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Join ['-', [!Ref ClusterGrpNamePrefix, !Ref ClusterNumber, 'metric-pub-cron' ] ]
-      #ScheduleExpression: !Join ['rate','(',[!Ref Rate],' minutes)'  ]    ]
-      #ScheduleExpression: !Ref Rate
       ScheduleExpression: !Sub
         - rate(${Time} minutes)
         - Time: 2
@@ -1149,9 +1232,7 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: events.amazonaws.com
       SourceArn: !GetAtt InstanceLaunchEvent.Arn
-# ------------------------------------------------------------------------
-# AWS provided Dynamic Scaling
-# ------------------------------------------------------------------------
+  # AWS provided Dynamic Scaling
   ScaleOutCPUpolicy:
     Condition: DoCpuUpPolcy
     DependsOn:
@@ -1192,9 +1273,7 @@ Resources:
       AutoScalingGroupName: !Ref FTDvGroup
       PolicyType: SimpleScaling
       ScalingAdjustment: -1
-# ------------------------------------------------------------------------
-# Scaling Alarm & Notification
-# ------------------------------------------------------------------------
+  # Scaling Alarm & Notification
   CPUUpperboundAlarm1:
     Condition: DoCpuUpPolcy
     DependsOn:
@@ -1297,9 +1376,7 @@ Resources:
       Statistic: Average
       Unit: Percent
       TreatMissingData: notBreaching
-# ------------------------------------------------------------------------
-# Cluster Group & Launch Template
-# ------------------------------------------------------------------------
+  # Cluster Group & Launch Template
   FTDvGroup:
     DependsOn:
       - LifeCycleEvent
@@ -1362,8 +1439,8 @@ Resources:
               HttpProtocolIpv6: "disabled"  # Disable IPv6 for metadata service
               HttpPutResponseHopLimit: 1  # Set hop limit to 1
               HttpTokens: "required"  # Require IMDSv2 for metadata requests
-              # InstanceMetadataTags: "enabled"  # Include custom instance metadata tags
-            - !Ref "AWS::NoValue"
+              InstanceMetadataTags: "enabled"
+            - InstanceMetadataTags: "enabled"
         EbsOptimized: false
         ImageId: !Ref AmiID
         InstanceType: !Ref InstanceType
@@ -1380,19 +1457,129 @@ Resources:
           Enabled: true
         UserData:
           Fn::Base64: !If
-                        - support2zone
-                        - !Sub
-                          - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}"], "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
-                          - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
-                            CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges ]
-                        - !If
-                          - support3zone
-                          - !Sub
-                            - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}","${CCLSubnet2}"], "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
-                            - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
-                              CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges ]
-                              CCLSubnet2: !Select ['2', !Ref CCLSubnetRanges ]
-                          - !Sub
-                            - '{ "AdminPassword": "FtDv_ClU3TeR44", "Hostname": "ftdvcluster", "FirewallMode": "routed", "ManageLocally": "No", "Cluster": { "CclSubnetRange": "${CCLSubnet0}", "Geneve": "Yes", "HealthProbePort": "${TgHealthPort}", "ClusterGroupName":"${fmcDeviceGrpName}"}}'
-                            - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges ]
-                            
+            - dualarm
+            - !If
+                - support2zone
+                - !Sub
+                  - |
+                    {
+                      "AdminPassword": "FtDv_ClU3TeR44",
+                      "Hostname": "ftdvcluster",
+                      "FirewallMode": "routed",
+                      "ManageLocally": "No",
+                      "Diagnostic": "${DiagnosticInterface}",
+                      "Cluster": {
+                        "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}"],
+                        "ProxyType": "${DeploymentType}",
+                        "DualArmAppCidrList": ["${QuotedCidrs}"],
+                        "Geneve": "Yes",
+                        "HealthProbePort": "${TgHealthPort}",
+                        "ClusterGroupName":"${fmcDeviceGrpName}"
+                      }
+                    }
+                  - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]
+                    CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges]
+                    QuotedCidrs: !Join
+                      - '","'
+                      - !Ref DualArmAppCidrList
+                - !If
+                    - support3zone
+                    - !Sub
+                      - |
+                        {
+                          "AdminPassword": "FtDv_ClU3TeR44",
+                          "Hostname": "ftdvcluster",
+                          "FirewallMode": "routed",
+                          "ManageLocally": "No",
+                          "Diagnostic": "${DiagnosticInterface}",
+                          "Cluster": {
+                            "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}","${CCLSubnet2}"],
+                            "ProxyType": "${DeploymentType}",
+                            "DualArmAppCidrList": ["${QuotedCidrs}"],
+                            "Geneve": "Yes",
+                            "HealthProbePort": "${TgHealthPort}",
+                            "ClusterGroupName":"${fmcDeviceGrpName}"
+                          }
+                        }
+                      - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]
+                        CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges]
+                        CCLSubnet2: !Select ['2', !Ref CCLSubnetRanges]
+                        QuotedCidrs: !Join
+                          - '","'
+                          - !Ref DualArmAppCidrList
+                    - !Sub
+                      - |
+                        {
+                          "AdminPassword": "FtDv_ClU3TeR44",
+                          "Hostname": "ftdvcluster",
+                          "FirewallMode": "routed",
+                          "ManageLocally": "No",
+                          "Diagnostic": "${DiagnosticInterface}",
+                          "Cluster": {
+                            "CclSubnetRange": "${CCLSubnet0}",
+                            "ProxyType": "${DeploymentType}",
+                            "DualArmAppCidrList": ["${QuotedCidrs}"],
+                            "Geneve": "Yes",
+                            "HealthProbePort": "${TgHealthPort}",
+                            "ClusterGroupName":"${fmcDeviceGrpName}"
+                          }
+                        }
+                      - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]
+                        QuotedCidrs: !Join
+                          - '","'
+                          - !Ref DualArmAppCidrList
+            - !If
+                - support2zone
+                - !Sub
+                  - |
+                    {
+                      "AdminPassword": "FtDv_ClU3TeR44",
+                      "Hostname": "ftdvcluster",
+                      "FirewallMode": "routed",
+                      "ManageLocally": "No",
+                      "Diagnostic": "${DiagnosticInterface}",
+                      "Cluster": {
+                        "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}"],
+                        "Geneve": "Yes",
+                        "HealthProbePort": "${TgHealthPort}",
+                        "ClusterGroupName":"${fmcDeviceGrpName}"
+                      }
+                    }
+                  - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]
+                    CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges]
+                - !If
+                    - support3zone
+                    - !Sub
+                      - |
+                        {
+                          "AdminPassword": "FtDv_ClU3TeR44",
+                          "Hostname": "ftdvcluster",
+                          "FirewallMode": "routed",
+                          "ManageLocally": "No",
+                          "Diagnostic": "${DiagnosticInterface}",
+                          "Cluster": {
+                            "CclSubnetRange": ["${CCLSubnet0}","${CCLSubnet1}","${CCLSubnet2}"],
+                            "Geneve": "Yes",
+                            "HealthProbePort": "${TgHealthPort}",
+                            "ClusterGroupName":"${fmcDeviceGrpName}"
+                          }
+                        }
+                      - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]
+                        CCLSubnet1: !Select ['1', !Ref CCLSubnetRanges]
+                        CCLSubnet2: !Select ['2', !Ref CCLSubnetRanges]
+                    - !Sub
+                      - |
+                        {
+                          "AdminPassword": "FtDv_ClU3TeR44",
+                          "Hostname": "ftdvcluster",
+                          "FirewallMode": "routed",
+                          "ManageLocally": "No",
+                          "Diagnostic": "${DiagnosticInterface}",
+                          "Cluster": {
+                            "CclSubnetRange": "${CCLSubnet0}",
+                            "Geneve": "Yes",
+                            "HealthProbePort": "${TgHealthPort}",
+                            "ClusterGroupName":"${fmcDeviceGrpName}"
+                          }
+                        }
+                      - CCLSubnet0: !Select ['0', !Ref CCLSubnetRanges]

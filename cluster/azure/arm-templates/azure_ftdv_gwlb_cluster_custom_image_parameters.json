@@ -83,6 +83,9 @@
     "licenseCapability": {
       "value": "BASE, MALWARE, THREAT"
     },
+    "autoscaling": {
+      "value": "Enable"
+    },
     "scalingMetricsList": {
       "value": "CPU"
     },

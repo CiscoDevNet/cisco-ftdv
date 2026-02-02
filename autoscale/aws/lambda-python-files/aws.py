@@ -30,6 +30,9 @@ import constant as const
 import utility as utl
 
 logger = utl.setup_logging()
+# Get User input
+user_input = utl.get_user_input_lifecycle_ftdv()
+
 
 class SimpleNotificationService:
     """
@@ -535,21 +538,6 @@ class EC2Instance:
             return ''
         return r
 
-    def get_mgmt_ipv6(self):
-        """
-        Purpose:        To get mgmt ipv6 of the instance
-        Parameters:
-        Returns:        Mgmt IPv6 or None
-        Raises:
-        """
-        response = self.__get_describe_instance()
-        try:
-            r = response['Reservations'][0]['Instances'][0]['NetworkInterfaces'][0]['Ipv6Addresses'][0]['Ipv6Address']
-        except Exception as e:
-            logger.debug(str(e))
-            return ''
-        return r
-
     def get_instance_state(self):
         """
         Purpose:        To get instance state
@@ -633,11 +621,11 @@ class EC2Instance:
             logger.exception(e)
         return sec_grp_id
 
-    def get_cidr_describe_subnet(self, subnet_id, ipv6=False):
+    def get_cidr_describe_subnet(self, subnet_id):
         """
-        Purpose:        To get IPv4 cidr OR IPv6 cidr from described subnet
-        Parameters:     subnet id, ipv6 (True or False)
-        Returns:        cidr 
+        Purpose:        To get cidr from describe subnet
+        Parameters:     subnet id
+        Returns:        cidr or None
         Raises:
         """
         try:
@@ -656,34 +644,27 @@ class EC2Instance:
             logger.info("Unable find describe-subnets for subnet with filter subnet-id: " + subnet_id)
             return None
         else:
-            
-            if ipv6:
-                cidr = response['Subnets'][0]['Ipv6CidrBlockAssociationSet'][0]['Ipv6CidrBlock']
-            else:
-                cidr = response['Subnets'][0]['CidrBlock']
+            cidr = response['Subnets'][0]['CidrBlock']
             return cidr
 
-    def get_subnet_mask_from_subnet_id(self, subnet_id, ipv6=False):
+    def get_subnet_mask_from_subnet_id(self, subnet_id):
         """
-        Purpose:        To get subnet mask from describe subnet 
+        Purpose:        To get subnet mask from describe subnet  # Related to CSCvs17405
         Parameters:     subnet id
-        Returns:        subnet mask ipv4 OR subnet mask ipv6 (if ipv6=True)
+        Returns:        subnet mask
         Raises:
         """
-        cidr = self.get_cidr_describe_subnet(subnet_id, ipv6)
-        netmask = None
-        
+        cidr = self.get_cidr_describe_subnet(subnet_id)
         try:
             if cidr is not None:
-                logger.debug("Received  cidr %s from subnet id: %s" % (cidr, subnet_id))
+                logger.debug("Received: cidr %s from subnet id: %s" % (cidr, subnet_id))
                 split_cidr = cidr.split("/")
                 logger.debug("Found subnet mask: %s for subnet: %s with cidr block: %s" % (split_cidr[1],
                                                                                            subnet_id, cidr))
-                netmask =  str(split_cidr[1])
-            return netmask
+                return str(split_cidr[1])
         except Exception as e:
             logger.debug("{}".format(e))
-            logger.error("Unable to split CIDR block(s) to get subnet mask")
+            logger.error("Unable to split CIDR block to get subnet mask")
             return None
 
     def get_instance_az(self):
@@ -765,35 +746,6 @@ class EC2Instance:
                 logger.error(str(e))
                 return None
 
-    def get_ipv6_address_of_interface(self, interface_suffix):
-        """
-        Purpose:        To get IPv6 address of a specified interface
-        Parameters:     Interface suffix
-        Returns:        IPv6 Address or None
-        Raises:
-        """
-        eni_name = self.instance_id + interface_suffix
-        try:
-            result = self.ec2.describe_network_interfaces(Filters=[{'Name': 'tag:Name', 'Values': [eni_name]}])
-        except Exception as e:
-            logger.error("Unable find describe_network_interfaces for instance %s" % self.instance_id)
-            logger.error(str(e))
-            return
-        else:
-            try:
-                ipv6_list = result['NetworkInterfaces'][0].get('Ipv6Addresses', [])
-                if ipv6_list:
-                    ip6 = ipv6_list[0]['Ipv6Address']
-                    logger.debug("IPv6 address of " + eni_name + " interface is {}".format(ip6))
-                    return ip6
-                else:
-                    logger.info("No IPv6 address found for interface %s" % eni_name)
-                    return None
-            except Exception as e:
-                logger.error("Unable to get IPv6 address from describe_network_interfaces response for interface %s" % eni_name)
-                logger.error(str(e))
-                return None
-
     def get_subnet_id_of_interface(self, interface_suffix):
         """
         Purpose:        To get subnet id of interface whose suffix is given
@@ -820,7 +772,7 @@ class EC2Instance:
                 logger.error(str(e))
                 return None
 
-    def create_interface(self, subnet_id, sec_grp_id, eni_name, proxy_type, ipv6_support):
+    def create_interface(self, subnet_id, sec_grp_id, eni_name):
         """
         Purpose:        To create interface in a specified subnet id
         Parameters:     Subnet Id, Security Group, ENI name
@@ -830,27 +782,13 @@ class EC2Instance:
         network_interface_id = None
         if subnet_id:
             try:
-                # Create network interface with IPv6 support if enabled
-                logger.info("Creating network interface")
-                network_interface = self.ec2.create_network_interface(
-                    SubnetId=subnet_id, 
-                    Groups=[sec_grp_id],
-                    Ipv6AddressCount=1 if ipv6_support == 'enable' else 0  # Request one IPv6 address
-                )
-                    
+                network_interface = self.ec2.create_network_interface(SubnetId=subnet_id, Groups=[sec_grp_id])
                 network_interface_id = network_interface['NetworkInterface']['NetworkInterfaceId']
                 logger.info("Created network interface: {}".format(network_interface_id))
-                
-                # If IPv6 is enabled, log the IPv6 address
-                if 'Ipv6Addresses' in network_interface['NetworkInterface'] and network_interface['NetworkInterface']['Ipv6Addresses']:
-                    ipv6_address = network_interface['NetworkInterface']['Ipv6Addresses'][0]['Ipv6Address']
-                    logger.info("IPv6 address assigned to interface: {}".format(ipv6_address))
-                
                 self.ec2.create_tags(Resources=[network_interface_id], Tags=[{'Key': 'Name', 'Value': eni_name}])
                 logger.info("Added tag {} to network interface".format(eni_name))
-                
                 #FOR DUAL-ARM DEPLOYMENTS ONLY: Create and attach Elastic IP to outside interface
-                if proxy_type == 'DUAL_ARM' and const.ENI_NAME_OF_INTERFACE_3 in eni_name:
+                if user_input['PROXY_TYPE'] == 'DUAL_ARM' and const.ENI_NAME_OF_INTERFACE_3 in eni_name:
                     logger.info('Creating and attaching Elastic IP to outside interface ..')
                     elastic_ip_response = self.ec2.allocate_address(Domain='vpc')
                     public_ip = elastic_ip_response['PublicIp']
@@ -944,31 +882,6 @@ class EC2Instance:
             return None
         else:
             return private_ip
-            
-    def get_ipv6_address_of_specific_interface(self, eni_name):
-        """
-        Purpose:        To get IPv6 address for a given interface name
-        Parameters:     Interface name
-        Returns:        IPv6 address or None
-        Raises:
-        """
-        try:
-            result = self.ec2.describe_network_interfaces(Filters=[{'Name': 'tag:Name', 'Values': [eni_name]}])
-            logger.debug(result)
-            if 'Ipv6Addresses' in result['NetworkInterfaces'][0] and result['NetworkInterfaces'][0]['Ipv6Addresses']:
-                ipv6_address = result['NetworkInterfaces'][0]['Ipv6Addresses'][0]['Ipv6Address']
-                logger.info("IPv6 address for interface {}: {}".format(eni_name, ipv6_address))
-                return ipv6_address
-            else:
-                logger.info("No IPv6 address found for interface: {}".format(eni_name))
-                return None
-        except ClientError as e:
-            logger.info("Unable find IPv6 address for eni: %s " % eni_name)
-            logger.debug(str(e))
-            return None
-        except Exception as e:
-            logger.debug("Exception when getting IPv6 address: {}".format(repr(e)))
-            return None
 
     def create_instance_tags(self, tag_name, tag_value):
         """
@@ -1279,4 +1192,6 @@ class CiscoEc2Instance(EC2Instance):
         except botocore.exceptions.ClientError as e:
             logger.error("Unable to dissociate / release Elastic IP from outside interface : {}".format(e.response['Error']))
             logger.debug(str(e))
-            return self.FAIL    
+            return self.FAIL 
+        else:
+            return self.SUCCESS        

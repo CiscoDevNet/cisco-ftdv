@@ -1,9 +1,5 @@
 {
-  "licenseCaps": [
-    "BASE",
-    "MALWARE",
-    "THREAT"
-  ],
+  "licenseCaps": ["BASE", "MALWARE", "THREAT"],
   "fmcIpforDeviceReg": "DONTRESOLVE",
   "RegistrationId": "cisco",
   "NatId": "cisco",
@@ -39,14 +35,6 @@
     }
   ],
   "NLBTrafficRoutes": [
-    {
-      "interface": "inside",
-      "network": "aws-metadata-server",
-      "gateway": "",
-      "metric": "1"
-    }
-  ],
-  "NLBTrafficRoutesIPv6": [
     {
       "interface": "inside",
       "network": "aws-metadata-server",

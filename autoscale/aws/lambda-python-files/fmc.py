@@ -24,11 +24,10 @@ import time
 import requests
 import logging
 import json
-import ipaddress
 import utility as utl
-import ast
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 logger = utl.setup_logging()
 
 
@@ -37,18 +36,7 @@ class FirepowerManagementCenter:
         FirepowerManagementCenter class has REST methods for FMC connections
     """
     def __init__(self, fmc_server, username, password, accesspolicy=None):
-        # Normalize FMC server to a proper URL, supporting IPv4, IPv6
-        try:
-            ip = ipaddress.ip_address(fmc_server)
-            self.ip_version = ip.version
-            if self.ip_version == 6:
-                self.server = 'https://' + '[' + fmc_server + ']' 
-            else:
-                self.server = 'https://' + fmc_server
-        except ValueError:
-            # Not an IP literal; leave hostname as-is
-            self.server = 'https://' + fmc_server
-        
+        self.server = 'https://' + fmc_server
         self.username = username
         self.password = password
         self.headers = []
@@ -56,455 +44,150 @@ class FirepowerManagementCenter:
         self.authTokenTimestamp = 0
         self.authTokenMaxAge = 15*60  # seconds - 30 minutes is the max without using refresh
         self.accessPolicyName = accesspolicy
-        
 
     def rest_get(self, url):
         """
-        Purpose:    Issue REST get to the specified URL with retry logic
-        Parameters: url, max_retries (default 5), retry_delay (default 2 seconds), timeout (default 30 seconds)
+        Purpose:    Issue REST get to the specified URL
+        Parameters: url
         Returns:    r.text is the text response (r.json() is a python dict version of the json response)
                     r.status_code = 2xx on success
         Raises:
         """
-        max_retries = 5
-        retry_delay = 30
-        timeout = 15
         # if the token is too old then get another
         if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
-            
-        last_exception = None
-        
-        for attempt in range(1, max_retries+1):
-            try:
-                r = None
-                if attempt > 1:
-                    logging.warning(f"Attempt number {attempt}/{max_retries} for URL: {url}")
-                    time.sleep(retry_delay)
-                # REST call with SSL verification turned off:
-                logging.debug("Request: " + url)
-                r = requests.get(url, headers=self.headers, verify=False, timeout=timeout)
-                
-                # Check if we got a valid response
-                if r is None:
-                    raise Exception("Received None response from requests.get")
-                    
-                status_code = r.status_code
-                resp = r.text
-                logging.debug("Response status_code: " + str(status_code))
-                logging.debug("Response body: " + str(resp))
-                
-                if 200 <= status_code <= 300:
-                    # Success - return the response
-                    return r
-                else:
-                    # Non-success status code
-                    if attempt < max_retries:
-                        logging.warning(f"HTTP {status_code} error on attempt {attempt}, will retry")
-                        if r:
-                            r.close()
-                        continue
-                    else:
-                        # Last attempt failed
-                        r.raise_for_status()
-                        raise Exception("Error occurred in GET -->"+resp)
-                        
-            except requests.exceptions.ConnectTimeout as e:
-                last_exception = e
-                logging.warning(f"Connection timeout on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ReadTimeout as e:
-                last_exception = e
-                logging.warning(f"Read timeout on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Read timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ConnectionError as e:
-                last_exception = e
-                logging.warning(f"Connection error on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.HTTPError as e:
-                last_exception = e
-                logging.warning(f"HTTP error on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"HTTP error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                logging.warning(f"Request exception on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Request exception after {max_retries} attempts")
-                    break
-                    
-            except Exception as e:
-                last_exception = e
-                logging.warning(f"Unexpected error on attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Unexpected error after {max_retries} attempts")
-                    break
-        
-        # All retries failed
-        logging.error(f"REST GET failed after {max_retries} attempts. Last error: {str(last_exception)}")
-        return r
+        try:
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
+            r = requests.get(url, headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.get(url, headers=headers, verify='/path/to/ssl_certificate')
+            status_code = r.status_code
+            resp = r.text
+            logging.debug("Response status_code: " + str(status_code))
+            logging.debug("Response body: " + str(resp))
+            if 200 <= status_code <= 300:
+                # logging.debug("GET successful. Response data --> ")
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
+                pass
+            else:
+                r.raise_for_status()
+                raise Exception("Error occurred in Get -->"+resp)
+        except requests.exceptions.HTTPError as err:
+            raise Exception("Error in connection --> "+str(err))
+        finally:
+            if r: r.close()
+            return r
 
     def rest_post(self, url, post_data):
         """
-        Purpose:    Issue REST post to the specified url with the post_data provided with retry logic
+        Purpose:    Issue REST post to the specified url with the post_data provided
         Parameters: url, post data
         Returns:    This function will return 'r' which is the response from the post:
                     r.text is the text response (r.json() is a python dict version of the json response)
                     r.status_code = 2xx on success
         Raises:     Error occurred in post
         """
-        max_retries = 5
-        retry_delay = 30
-        timeout = 15
-        
         if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
-            
-        last_exception = None
-        
-        for attempt in range(1, max_retries+1):
-            try:
-                r = None
-                if attempt > 1:
-                    logging.warning(f"Attempt number {attempt}/{max_retries} for POST URL: {url}")
-                    time.sleep(retry_delay)
-                    
-                # REST call with SSL verification turned off:
-                logging.debug("Request: " + url)
-                logging.debug("Post_data " + str(post_data))
-                r = requests.post(url, data=json.dumps(post_data), headers=self.headers, verify=False, timeout=timeout)
-                
-                # Check if we got a valid response
-                if r is None:
-                    raise Exception("Received None response from requests.post")
-                    
-                status_code = r.status_code
-                resp = r.text
-                logging.info("Response status_code: " + str(status_code))
-                logging.info("Response body: " + str(resp))
-                
-                if 200 <= status_code <= 202:
-                    # Success - return the response
-                    return r
-                else:
-                    # Non-success status code
-                    if attempt < max_retries:
-                        logging.warning(f"HTTP {status_code} error on attempt {attempt}, will retry")
-                        if r:
-                            r.close()
-                        continue
-                    else:
-                        # Last attempt failed
-                        r.raise_for_status()
-                        raise Exception("Error occurred in POST --> "+resp)
-                        
-            except requests.exceptions.ConnectTimeout as e:
-                last_exception = e
-                logging.warning(f"Connection timeout on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ReadTimeout as e:
-                last_exception = e
-                logging.warning(f"Read timeout on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Read timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ConnectionError as e:
-                last_exception = e
-                logging.warning(f"Connection error on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.HTTPError as e:
-                last_exception = e
-                logging.warning(f"HTTP error on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"HTTP error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                logging.warning(f"Request exception on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Request exception after {max_retries} attempts")
-                    break
-                    
-            except Exception as e:
-                last_exception = e
-                logging.warning(f"Unexpected error on POST attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Unexpected error after {max_retries} attempts")
-                    break
-        
-        # All retries failed
-        logging.error(f"REST POST failed after {max_retries} attempts. Last error: {str(last_exception)}")
-        return r
+        try:
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
+            logging.debug("Post_data " + str(post_data))
+            r = requests.post(url, data=json.dumps(post_data), headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.post(url,data=json.dumps(post_data), headers=self.headers, verify='/path/to/ssl_certificate')
+            status_code = r.status_code
+            resp = r.text
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
+            # logging.debug("Status code is: "+str(status_code))
+            if 201 <= status_code <= 202:
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
+                pass
+            else:
+                r.raise_for_status()
+                raise Exception("Error occurred in POST --> "+resp)
+        except requests.exceptions.HTTPError as err:
+            raise Exception("Error in connection --> "+str(err))
+        finally:
+            if r: r.close()
+            return r
 
     def rest_put(self, url, put_data):
         """
-        Purpose:    Issue REST put to specific url with the put_data provided with retry logic
+        Purpose:    Issue REST put to specific url with the put_data provided
         Parameters: url, put data
         Returns:    This function will return 'r' which is the response from the put:
                     r.text is the text response (r.json() is a python dict version of the json response)
                     r.status_code = 2xx on success
         Raises:
         """
-        max_retries = 5
-        retry_delay = 30
-        timeout = 15
-        
         if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
-            
-        last_exception = None
-        
-        for attempt in range(1, max_retries+1):
-            try:
-                r = None
-                if attempt > 1:
-                    logging.warning(f"Attempt number {attempt}/{max_retries} for PUT URL: {url}")
-                    time.sleep(retry_delay)
-                    
-                # REST call with SSL verification turned off:
-                logging.info("Request: " + url)
-                logging.info("Put_data: " + str(put_data))
-                r = requests.put(url, data=json.dumps(put_data), headers=self.headers, verify=False, timeout=timeout)
-                
-                # Check if we got a valid response
-                if r is None:
-                    raise Exception("Received None response from requests.put")
-                    
-                status_code = r.status_code
-                resp = r.text
-                logging.info("Response status_code: " + str(status_code))
-                logging.info("Response body: " + str(resp))
-                
-                if 200 <= status_code <= 204:
-                    # Success - return the response
-                    return r
-                else:
-                    # Non-success status code
-                    if attempt < max_retries:
-                        logging.warning(f"HTTP {status_code} error on attempt {attempt}, will retry")
-                        if r:
-                            r.close()
-                        continue
-                    else:
-                        # Last attempt failed
-                        r.raise_for_status()
-                        raise Exception("Error occurred in PUT --> "+resp)
-                        
-            except requests.exceptions.ConnectTimeout as e:
-                last_exception = e
-                logging.warning(f"Connection timeout on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ReadTimeout as e:
-                last_exception = e
-                logging.warning(f"Read timeout on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Read timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ConnectionError as e:
-                last_exception = e
-                logging.warning(f"Connection error on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.HTTPError as e:
-                last_exception = e
-                logging.warning(f"HTTP error on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"HTTP error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                logging.warning(f"Request exception on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Request exception after {max_retries} attempts")
-                    break
-                    
-            except Exception as e:
-                last_exception = e
-                logging.warning(f"Unexpected error on PUT attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Unexpected error after {max_retries} attempts")
-                    break
-        
-        # All retries failed
-        logging.error(f"REST PUT failed after {max_retries} attempts. Last error: {str(last_exception)}")
-        return r
+        try:
+            # REST call with SSL verification turned off:
+            logging.info("Request: " + url)
+            logging.info("Put_data: " + str(put_data))
+            r = requests.put(url, data=json.dumps(put_data), headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.put(url, data=json.dumps(put_data), headers=headers, verify='/path/to/ssl_certificate')
+            status_code = r.status_code
+            resp = r.text
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
+            if status_code == 200:
+                pass
+            else:
+                r.raise_for_status()
+                raise Exception("Error occurred in put -->" + resp)
+        except requests.exceptions.HTTPError as err:
+            raise Exception("Error in connection --> "+str(err))
+        finally:
+            if r: r.close()
+            return r
 
     def rest_delete(self, url):
         """
-        Purpose:    Issue REST delete to the specified URL with retry logic
+        Purpose:    Issue REST delete to the specified URL
         Parameters: url
         Returns:    This function will return 'r' which is the response to the request:
                     r.text is the text response (r.json() is a python dict version of the json response)
                     r.status_code = 2xx on success
         Raises:
         """
-        max_retries = 5
-        retry_delay = 30
-        timeout = 15
-        
         if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
-            
-        last_exception = None
-        
-        for attempt in range(1, max_retries+1):
-            try:
-                r = None
-                if attempt > 1:
-                    logging.warning(f"Attempt number {attempt}/{max_retries} for DELETE URL: {url}")
-                    time.sleep(retry_delay)
-                    
-                # REST call with SSL verification turned off:
-                logging.debug("Request: " + url)
-                r = requests.delete(url, headers=self.headers, verify=False, timeout=timeout)
-                
-                # Check if we got a valid response
-                if r is None:
-                    raise Exception("Received None response from requests.delete")
-                    
-                status_code = r.status_code
-                resp = r.text
-                logging.info("Response status_code: " + str(status_code))
-                logging.info("Response body: " + str(resp))
-                
-                if 200 <= status_code <= 300:
-                    # Success - return the response
-                    return r
-                else:
-                    # Non-success status code
-                    if attempt < max_retries:
-                        logging.warning(f"HTTP {status_code} error on attempt {attempt}, will retry")
-                        if r:
-                            r.close()
-                        continue
-                    else:
-                        # Last attempt failed
-                        r.raise_for_status()
-                        raise Exception("Error occurred in DELETE --> "+resp)
-                        
-            except requests.exceptions.ConnectTimeout as e:
-                last_exception = e
-                logging.warning(f"Connection timeout on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ReadTimeout as e:
-                last_exception = e
-                logging.warning(f"Read timeout on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Read timeout after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.ConnectionError as e:
-                last_exception = e
-                logging.warning(f"Connection error on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Connection error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.HTTPError as e:
-                last_exception = e
-                logging.warning(f"HTTP error on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"HTTP error after {max_retries} attempts")
-                    break
-                    
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                logging.warning(f"Request exception on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Request exception after {max_retries} attempts")
-                    break
-                    
-            except Exception as e:
-                last_exception = e
-                logging.warning(f"Unexpected error on DELETE attempt {attempt}: {str(e)}")
-                if r:
-                    r.close()
-                if attempt >= max_retries:
-                    logging.error(f"Unexpected error after {max_retries} attempts")
-                    break
-        
-        # All retries failed
-        logging.error(f"REST DELETE failed after {max_retries} attempts. Last error: {str(last_exception)}")
-        return r
+
+        try:
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
+            r = requests.delete(url, headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.delete(url, headers=headers, verify='/path/to/ssl_certificate')
+            status_code = r.status_code
+            resp = r.text
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
+            if 200 <= status_code <= 300:
+                # logging.debug("GET successful. Response data --> ")
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
+                pass
+            else:
+                r.raise_for_status()
+                raise Exception("Error occurred in Delete -->"+resp)
+        except requests.exceptions.HTTPError as err:
+            raise Exception("Error in connection --> "+str(err))
+        finally:
+            if r: r.close()
+            return r
 
     def get_auth_token(self):
         """
@@ -605,6 +288,7 @@ class FirepowerManagementCenter:
         url = self.server + api_path + '?offset=0&limit=10000'
         network_obj = {}
         host_obj = {}
+        group_obj = {}
         r = self.rest_get(url)
         for item in r.json()['items']:
             if item['type'] == 'Network':
@@ -692,34 +376,6 @@ class FirepowerManagementCenter:
                 return str(item['id'])
         return ''
 
-    def create_network_object(self, name, description, value):
-        """
-        Purpose: Create a Network Object
-        Parameters: Object Name
-        Returns: Object Id
-        Raises:
-        """
-        try:
-            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/object/networks?bulk=true"
-            url = self.server + api_path
-            post_data = [
-                        {
-                            "description": description,
-                            "name": name,
-                            "overridable": "false",
-                            "type": "Network",
-                            "value": value
-                        }
-                    ]
-            r = self.rest_post(url, post_data)
-            if 'items' in r.json():
-                for item in r.json()['items']:
-                    if item['name'] == name:
-                        return str(item['id'])
-        except Exception as e:
-            logger.exception(e)
-            return None    
-
     def get_device_id_by_name(self, name):
         """
         Purpose:    Get Device Id by its name
@@ -771,55 +427,10 @@ class FirepowerManagementCenter:
                     return str(item['id'])
         return None
     
-    def check_and_create_nat_rules(self, nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id, ipv6_support=False):
-        '''
-        Purpose:    [DUAL-ARM ONLY !!] 
-                    Checks for NAT Rule(s) if present, if not then creates the NAT Rule(s).
-        Parameters: NAT Policy Id, VNI Security Zone Name, VNI Security Zone Id, Outside Security Zone Name, Outside Security Zone Id, IPv6 Support
-        Returns:    Success or Fail
-        Raises:
-        '''
-        try:
-            ret1, ret2 = '', ''
-            r = self.check_nat_rule_within_nat_policy(nat_policy_id, vni_seczone_id, outside_seczone_id)
-            if r == 'CONFIGURED':
-                ret1 = 'SUCCESS'
-            elif r == 'UN-CONFIGURED':
-                r = self.create_nat_rule_within_nat_policy(nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id)
-                logger.debug(r)
-                if r.status_code != 200 and r.status_code != 201:
-                    raise Exception("NAT Rule creation failed!!")
-                ret1 = 'SUCCESS'
-            else:
-                raise Exception("Error checking / creating NAT Rule within NAT Policy")
-        except Exception as e:
-            logger.critical(e)
-            return 'FAIL'
-
-        ## Check if IPv6 NAT rule within NAT policy is configured as expected : else create and configure       
-        if not ipv6_support:
-            ret2 = 'SUCCESS'
-        else:
-            r = self.check_nat_rule_ipv6_within_nat_policy(nat_policy_id, vni_seczone_id, outside_seczone_id)
-            if r == 'CONFIGURED':
-                ret2 = 'SUCCESS'
-            elif r == 'UN-CONFIGURED':
-                r = self.create_nat_rule_ipv6_within_nat_policy(nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id)
-                logger.debug(r)
-                if r.status_code != 200 and r.status_code != 201:
-                    raise Exception("IPv6 NAT Rule creation failed!!")
-                ret2 = 'SUCCESS'
-            else:
-                raise Exception("Error checking / creating IPv6 NAT Rule within NAT Policy")    
-        if ret1 == 'SUCCESS' and ret2 == 'SUCCESS':
-            return 'SUCCESS'
-        else:
-            return 'FAIL'
-    
     def check_nat_rule_within_nat_policy(self, nat_policy_id, vni_seczone_id, outside_seczone_id):
         """
         Purpose:    Checks if NAT Rule is configured correctly within NAT Policy
-        Parameters: NAT policy Id, VNI Security Zone Id, Outside Security Zone Id
+        Parameters: NAT policy Id
         Returns: "CONFIGURED" or "UN-CONFIGURED"
         Raises:
         """
@@ -827,7 +438,7 @@ class FirepowerManagementCenter:
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" 
             url = self.server + api_path + nat_policy_id + '/manualnatrules?offset=0&limit=25&expanded=true'
             r = self.rest_get(url)
-            any_obj_id = self.group_objects['any']
+            any_obj_id = self.get_group_objectid_by_name('any')
             if 'items' in r.json():
                 for item in r.json()['items']:
                     if item['originalSource']['id'] == any_obj_id and item['sourceInterface']['id'] == vni_seczone_id:
@@ -837,45 +448,16 @@ class FirepowerManagementCenter:
             return "UN-CONFIGURED"
         except Exception as e:
             logger.exception(e)
-
-    def check_nat_rule_ipv6_within_nat_policy(self, nat_policy_id, vni_seczone_id, outside_seczone_id):
-        """
-        Purpose:    Creates Dual-arm IPv6 Auto-NAT Rule within NAT Policy
-        Parameters: NAT policy Id, VNI Security Zone Id, Outside Security Zone Id
-        Returns:    "CONFIGURED" or "UN-CONFIGURED"
-        Raises:
-        """
-        try:
-            if 'anyipv6' not in self.network_objects:
-                logger.info("Creating Network object 'anyipv6' for IPv6 Auto-NAT Rule")
-                any_ipv6_obj_id = self.create_network_object('anyipv6', 'Anywhere-IPv6', '::/0')
-                self.network_objects['anyipv6'] = any_ipv6_obj_id
-            else:
-                any_ipv6_obj_id = self.network_objects['anyipv6']
-            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" + nat_policy_id + "/autonatrules?expanded=true"
-            url = self.server + api_path
-            r = self.rest_get(url)
-            
-            if 'items' in r.json():
-                for item in r.json()['items']:
-                    if item['originalNetwork']['id'] == any_ipv6_obj_id and item['sourceInterface']['id'] == vni_seczone_id:
-                        if item['destinationInterface']['id'] == outside_seczone_id:
-                            if item['natType'] == 'DYNAMIC' and item['interfaceIpv6'] is True and item['metadata']['section'] == 'AUTO':
-                                return "CONFIGURED"
-            return "UN-CONFIGURED"
-        except Exception as e:
-            logger.exception(e)
-
+        
     def create_nat_rule_within_nat_policy(self, nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id):
         """
-        Purpose:    Creates Dual-arm Manual NAT Rule within NAT Policy
-        Parameters: NAT policy Id, VNI Security Zone Name, VNI Security Zone Id, Outside Security Zone Name, Outside Security Zone Id
+        Purpose:    Creates Dual-arm NAT Rule within NAT Policy
+        Parameters: NAT policy Id
         Returns:    Rest response
         Raises:
         """
         try:
-            # any_obj_id = self.get_group_objectid_by_name('any')
-            any_obj_id = self.group_objects['any']
+            any_obj_id = self.get_group_objectid_by_name('any')
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" + nat_policy_id + "/manualnatrules"
             url = self.server + api_path
             post_data = {
@@ -913,52 +495,7 @@ class FirepowerManagementCenter:
         except Exception as e:
             logger.exception(e)
             return None
-    
-    def create_nat_rule_ipv6_within_nat_policy(self, nat_policy_id, vni_seczone_name, vni_seczone_id, outside_seczone_name, outside_seczone_id):
-        """
-        Purpose:    Creates Dual-arm Auto NAT Rule IPv6 within NAT Policy
-        Parameters: NAT policy Id, VNI Security Zone Name, VNI Security Zone Id, Outside Security Zone Name, Outside Security Zone Id
-        Returns:    Rest response
-        Raises:
-        """
 
-        try:
-            any_ipv6_obj_id = self.network_objects['anyipv6']
-            api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdnatpolicies/" + nat_policy_id + "/autonatrules"
-            url = self.server + api_path
-            post_data = {
-                "originalNetwork": {
-                    "type": "Network",
-                    "overridable": "false",
-                    "id": any_ipv6_obj_id,
-                    "name": "anyipv6"
-                },
-                "interfaceInTranslatedNetwork": "true",
-                "type": "FTDAutoNatRule",
-                "dns": "false",
-                "destinationInterface": {
-                    "name": outside_seczone_name,
-                    "id": outside_seczone_id,
-                    "type": "SecurityZone"
-                },
-                "interfaceIpv6": "true",
-                "fallThrough": "false",
-                "routeLookup": "false",
-                "noProxyArp": "false",
-                "netToNet": "false",
-                "sourceInterface": {
-                    "name": vni_seczone_name,
-                    "id": vni_seczone_id,
-                    "type": "SecurityZone"
-                },
-                "natType": "DYNAMIC"
-                }
-            r = self.rest_post(url, post_data)
-            return r  
-        except Exception as e:
-            logger.exception(e)
-            return None    
-        
     def check_and_create_platform_policy(self, policy_name):
         """
         Purpose:    To create platform policy in FMC if not already present
@@ -1060,11 +597,10 @@ class FirepowerManagementCenter:
                     device_list.append(item['name'])
         return device_list
 
-    def get_nic_status(self, device_id, nic, nic_id, ifname, zone_id, ip=None, ipv6 = None):
+    def get_nic_status(self, device_id, nic, nic_id, ifname, zone_id, ip=None):
         """
         Purpose:    To check whether Nic is configured or not configured
-        Description:  flag1 - ipv4 config, flag2 - Interface Name & SecurityZones, flag3 - ipv6 config (only checked if ipv6 address passed)
-        Parameters: Device Id, Nic, Nic Id, Interface Name, Zone Id, Ip, Ipv6
+        Parameters: Device Id, Nic, Nic Id, Interface Name, Zone Id, Ip
         Returns:    CONFIGURED, MIS-CONFIGURED, UN-CONFIGURED
         Raises:
         """
@@ -1072,7 +608,7 @@ class FirepowerManagementCenter:
                    device_id + "/physicalinterfaces/" + nic_id
         url = self.server + api_path
         r = self.rest_get(url)
-        flag1, flag2, flag3 = 0, 0, 0
+        flag1, flag2 = 0, 0
         try:
             if 'ipv4' in r.json():
                 item = dict.copy(r.json()['ipv4']['static'])
@@ -1084,7 +620,7 @@ class FirepowerManagementCenter:
                     item = dict.copy(r.json()['ipv4']['dhcp'])
                     flag1 = 1
             except:
-                flag1 = 0        
+                flag1 = 0
         try:
             if r.json()['name'] == nic:
                 if r.json()['ifname'] == ifname:
@@ -1094,22 +630,7 @@ class FirepowerManagementCenter:
         except:
             flag2 = 0
 
-        ## Check for IPv6 address if ipv6 is passed
-        ## if it passes, flag3 = 1
-        try:
-            if ipv6:
-                if 'ipv6' in r.json():
-                    item = dict.copy(r.json()['ipv6'])
-                    for addr in item["addresses"]:
-                        if addr['address'] == ipv6:
-                            flag3 = 1
-        except:
-            flag3 = 0
-
         if flag1 == 1 and flag2 == 1:
-            if ipv6:
-                if flag3 == 0:
-                    logger.critical("IPv6 Mis-Configured! ")
             return "CONFIGURED"
         elif (flag1 == 1 and flag2 == 0) or (flag1 == 0 and flag2 == 1):
             logger.critical("Interface Mis-Configured! ")
@@ -1150,44 +671,10 @@ class FirepowerManagementCenter:
                                 pass
         return "UN-CONFIGURED"
 
-    def check_static_route_ipv6(self, device_id, interface_name, _object_name, gate_way): 
+    def configure_nic_dhcp(self, device_id, nic_id, nic, nic_name, mgmt_only, mode, zone_id, mtu):
         """
-        Purpose:    Check if an IPv6 static route exists on a device
-        Parameters: Device, Interface name, Network, Gateway
-        Returns:    CONFIGURED, UN-CONFIGURED
-        Raises:
-        """
-        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
-                   device_id + "/routing/ipv6staticroutes"
-        url = self.server + api_path + '?offset=0&limit=10000'
-        r = self.rest_get(url)
-
-        if 'items' in r.json():
-            for key1 in r.json()['items']:
-                id = key1['id']
-                url = self.server + api_path + '/' + id
-                r = self.rest_get(url)
-                if r.json()['interfaceName'] == interface_name:
-                    for key2 in r.json()['selectedNetworks']:
-                        if key2['name'] == _object_name:
-                            try:
-                                element = dict.copy(r.json()['gateway']['object'])
-                                if element['name'] == gate_way:
-                                    return "CONFIGURED"
-                            except:
-                                pass
-                            try:
-                                element = dict.copy(r.json()['gateway']['literal'])
-                                if element['value'] == gate_way:
-                                    return "CONFIGURED"
-                            except:
-                                pass
-        return "UN-CONFIGURED"    
-
-    def configure_nic(self, device_id, nic_id, nic, nic_name, mgmt_only, mode, zone_id, mtu, ip=None, netmask=None, ipv6=None, netmask_ipv6=None, config_method_ipv4='DHCP', config_method_ipv6='STATIC'):
-        """
-        Purpose:    Configure a Nic interface with IPv4 and IPv6 (if specified)
-        Parameters: Device Name, Nic, Nic name, Zone, IP, Netmask, IPv6, Netmask IPv6, method of config (static or dhcp)
+        Purpose:    Configure an Nic interface as DHCP
+        Parameters: Device Name, Nic, Nic name, Zone, MTU
         Returns:    REST put response
         Raises:
         """
@@ -1198,6 +685,12 @@ class FirepowerManagementCenter:
                 "type": "PhysicalInterface",
                 "managementOnly": mgmt_only,
                 "MTU": int(mtu),
+                "ipv4": {
+                    "dhcp": {
+                        "enableDefaultRouteDHCP": "false",
+                        "dhcpRouteMetric": 1
+                        }
+                },
                 "securityZone": {
                     "id": zone_id,
                     "type": "SecurityZone"
@@ -1208,59 +701,42 @@ class FirepowerManagementCenter:
                 "name": nic,
                 "id": nic_id
                 }
-        if config_method_ipv4.lower() == 'dhcp':
-            put_data.update({
-                "ipv4": {
-                    "dhcp": {
-                        "enableDefaultRouteDHCP": "false",
-                        "dhcpRouteMetric": 1
-                    }
-                }
-            })
-        elif config_method_ipv4.lower() == 'static':
-            put_data.update({
+        r = self.rest_put(url, put_data)
+        return r
+
+    def configure_nic_static(self, device_id, nic_id, nic, nic_name, mgmt_only, mode, zone_id, mtu, ip, netmask):
+        """
+        Purpose:    Configure an Nic interface as Static
+        Parameters: Device Name, Nic, Nic name, Zone, IP, Netmask
+        Returns:    REST put response
+        Raises:
+        """
+        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
+                   device_id + "/physicalinterfaces/" + nic_id
+        url = self.server + api_path
+        put_data = {
+                "type": "PhysicalInterface",
+                "managementOnly": mgmt_only,
+                "MTU": mtu,
                 "ipv4": {
                     "static": {
                         "address": ip,
                         "netmask": netmask
                     }
+                },
+                "securityZone": {
+                    "id": zone_id,
+                    "type": "SecurityZone"
+                },
+                "mode": mode,
+                "ifname": nic_name,
+                "enabled": "true",
+                "name": nic,
+                "id": nic_id
                 }
-            })
-        if ipv6 and netmask_ipv6:
-            put_data.update({
-                    "ipv6": {
-                    "enableIPV6": "true",
-                    "addresses": [
-                        {
-                            "address": ipv6,
-                            "prefix": netmask_ipv6, ##64
-                            "enforceEUI64": "false"
-                        }
-                    ]
-                }
-            })   
-        
         r = self.rest_put(url, put_data)
-        return r   
-
-    def check_vtep_enabled(self, device_id, nic_id):
-        """
-        Purpose:    Check if VTEP is enabled
-        Parameters: Device ID, Nic ID
-        Returns:    "CONFIGURED" or "UN-CONFIGURED"
-        Raises:
-        """
-        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
-                   device_id + "/vteppolicies?offset=0&limit=25&expanded=true"
-        url = self.server + api_path
-        r = self.rest_get(url)
-        if 'items' in r.json():
-            for item in r.json()['items']:
-                if item['nveEnable'] is True:
-                    if item['vtepEntries'][0]['sourceInterface']['id'] == nic_id:
-                        return "CONFIGURED"
-        return "UN-CONFIGURED"
-
+        return r
+		
     def enable_vtep(self, device_id, nic_name, nic_id):
         """
         Purpose:    Enable VTEP
@@ -1292,31 +768,10 @@ class FirepowerManagementCenter:
         r = self.rest_put(url, put_data)
         return r	
 		
-    def check_vni_added(self, device_id, vni_nic_name, sec_zone_id, ipv6_support='disable'):
-        """
-        Purpose:    Check if VNI is added
-        Parameters: Device ID, VNI interface name, Security Zone ID, ipv6_support
-        Returns:    "CONFIGURED" or "UN-CONFIGURED"
-        Raises:
-        """
-        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
-                   device_id + "/vniinterfaces?offset=0&limit=25&expanded=true"
-        url = self.server + api_path
-        r = self.rest_get(url)
-        if 'items' in r.json():
-            for item in r.json()['items']:
-                if item['ifname'] == vni_nic_name and item['securityZone']['id'] == sec_zone_id:
-                    if ipv6_support == 'enable':
-                        if item['ipv6']['enableIPV6'] is True and item['ipv6']['enableAutoConfig'] is True:
-                            return "CONFIGURED"
-                    else:
-                        return "CONFIGURED"
-        return "UN-CONFIGURED"
-
-    def add_vni(self, device_id, proxy_type, vni_nic_name, sec_zone_id, ipv6_support='disable'): 
+    def add_vni(self, device_id, proxy_type, vni_nic_name, sec_zone_id): 
         """
         Purpose:    Add VNI
-        Parameters: Device ID, proxy type (single-arm / dual-arm),  VNI interface name, Security Zone ID for VNI interface, ipv6_support
+        Parameters: Device ID, proxy type (single-arm / dual-arm),  VNI interface name, Security Zone ID for VNI interface
         Returns:    REST put response
         Raises:
         """
@@ -1331,22 +786,13 @@ class FirepowerManagementCenter:
             "enabled": "true",
             "vtepID": 1,
             "enableProxy": "true",
+            "proxyType" : proxy_type,
             "ifname": vni_nic_name,
             "securityZone": {
                 "id": sec_zone_id,
                 "type": "SecurityZone"
            }
         }
-        if ipv6_support == 'enable':
-            put_data.update({
-                "ipv6": { 
-                "enableIPV6": "true",
-                "enableAutoConfig": "true"
-            }}) 
-        ## Fix backward-compatibility for <= 7.6.0
-        ## Default proxyType = SINGLE_ARM if not specified in put_data
-        if proxy_type == 'DUAL_ARM':
-            put_data.update({"proxyType": "DUAL_ARM"})
         r = self.rest_put(url, put_data)
         return r
 
@@ -1379,36 +825,7 @@ class FirepowerManagementCenter:
         r = self.rest_post(url, post_data)
         return r
 
-    def create_static_route_ipv6(self, device_id, interface_name, _type, _object_name, _object_id, gate_way, metric):
-        """
-        Purpose:    To create IPv6 static route on device
-        Parameters: Device, Interface Name, Host, Gateway, Metric
-        Returns:    REST response
-        Raises:
-        """
-
-        api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + \
-                   device_id + "/routing/ipv6staticroutes"  
-        url = self.server + api_path
-
-        post_data = {
-            "interfaceName": interface_name,
-            "selectedNetworks": [
-                {
-                    "type": _type,
-                    "id": _object_id,
-                    "name": _object_name
-                }
-            ],
-            "gateway": gate_way,
-            "metricValue": metric,
-            "type": "IPv6StaticRoute",
-            "isTunneled": False
-        }
-        r = self.rest_post(url, post_data)
-        return r
-
-    def register_device(self, name, ftd_ip, policy_id, reg_id, nat_id, license_caps, performance_tier, device_grp_id):
+    def register_device(self, name, mgmt_ip, policy_id, reg_id, nat_id, license_caps, performance_tier, device_grp_id):
         """
         Purpose:    Register the device to FMC
         Parameters: Name of device, Mgmt ip, Access Policy Id, Registration & NAT id, Licenses Caps, Group Id
@@ -1420,7 +837,7 @@ class FirepowerManagementCenter:
         url = self.server + api_path
         post_data = {
             "name": name,
-            "hostName": ftd_ip,
+            "hostName": mgmt_ip,
             "regKey": reg_id,
             "natID": nat_id,
             "type": "Device",
@@ -1495,7 +912,7 @@ class FirepowerManagementCenter:
             if device_id != '':
                 return "SUCCESS"
             else:
-                return "PENDING...."
+                return "FAILED"
 
     def check_deploy_status(self, vm_name):
         """
@@ -1514,7 +931,7 @@ class FirepowerManagementCenter:
 
     def check_object_fmc(self, obj_name):
         """
-        Purpose:    Checks for Object in FMC
+        Purpose:    Checks for Object inn FMC
         Parameters: Object name
         Returns:    Object Id
         Raises:
@@ -1536,6 +953,10 @@ class FirepowerManagementCenter:
         Raises:
         """
         try:
+            # api_path = '/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/'
+            # api_suffix = '/operational/metrics?filter=metric%3Amemory&offset=0&limit=1&expanded=true'
+            # url = self.server + api_path + device_id + api_suffix
+
             #Health Monitoring API
             api_path = f'/api/fmc_config/v1/domain/{self.domain_uuid}/health/metrics'
             # Values are fetched from last one minute at interval of 10 sec (step).
@@ -1647,7 +1068,7 @@ class FirepowerManagementCenter:
             api_path ='/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies/' 
             url = self.server + api_path + platform_policy_id  + '/httpaccesssettings?offset=0&limit=25&expanded=true'
             r = self.rest_get(url)
-            any_obj_id = self.group_objects['any']
+            any_obj_id = self.get_group_objectid_by_name('any')
             if 'items' in r.json():
                 for item in r.json()['items']:
                     if 'enableHttpServer' in item and 'port' in item:
@@ -1675,7 +1096,7 @@ class FirepowerManagementCenter:
 
         api_path ='/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/policy/ftdplatformsettingspolicies/' + platform_pol_id + '/httpaccesssettings/' + platform_pol_id
         url = self.server + api_path 
-        any_obj_id = self.group_objects['any']
+        any_obj_id = self.get_group_objectid_by_name('any')
         put_data = {
                     "type": "HttpAccessSetting",
                     "id": platform_pol_id,
@@ -1851,7 +1272,7 @@ class DerivedFMC(FirepowerManagementCenter):
         self.configuration.update({'fmc_configuration_status': self.configuration_status})
         return self.configuration_status
 
-    def register_ftdv(self, vm_name, ftd_ip, reg_id, nat_id, license_caps, performance_tier):
+    def register_ftdv(self, vm_name, mgmt_ip, reg_id, nat_id, license_caps, performance_tier):
         """
         Purpose:    Register the device to FMC
         Parameters: Device Name, Mgmgt Ip, Registration & NAT id, Licenses cap
@@ -1860,7 +1281,7 @@ class DerivedFMC(FirepowerManagementCenter):
         """
         try:
             logger.info("Registering FTDv: " + vm_name + " to FMC with policy id: " + self.a_policy_name)
-            r = self.register_device(vm_name, ftd_ip, self.a_policy_id, reg_id, nat_id, license_caps, performance_tier, self.d_grp_id)
+            r = self.register_device(vm_name, mgmt_ip, self.a_policy_id, reg_id, nat_id, license_caps, performance_tier, self.d_grp_id)
             logger.debug("Register response was: " + str(r.json()))
             if 'type' in r.json():
                 if r.json()['type'] == 'Device':
@@ -1871,35 +1292,31 @@ class DerivedFMC(FirepowerManagementCenter):
             logger.exception(e)
             return None
 
-    def conf_static_rt(self, device_id, int_name, net_name, gateway, metric, is_ipv6=False):
+    def conf_static_rt(self, device_id, int_name, rt_type, net_name, gateway, metric):
         """
         Purpose:    To configure gateway if required for static_route
-        Parameters: Device ID, Interface name, Network type, Network name, Gateway, Metric, is_ipv6:If route is IPv4 or IPv6
+        Parameters:
         Returns:    response
         Raises:
         """
         # Get the type of the net_name
         if net_name in self.host_objects:
             logger.info(net_name + " is present in host object")
-            net_id = self.host_objects[net_name]
-            rt_type = 'Host'
+            net_id = self.get_host_objectid_by_name(net_name)
         elif net_name in self.network_objects:
             logger.info(net_name + " is present in network object")
-            net_id = self.network_objects[net_name]
-            rt_type = 'Network'
+            net_id = self.get_network_objectid_by_name(net_name)
         elif net_name in self.group_objects:
             logger.info(net_name + " is present in Group Object")
             net_id = self.group_objects[net_name]
-            rt_type = 'Group'
-        else:
-            raise Exception(f"Object {net_name} specified in Configuration json is not found in FMC Host, Network or Group Objects!!!")
-        
+
+        gateway_id = self.get_host_objectid_by_name(gateway)
         # Gateway can be an object or IP literal
-        if gateway in self.host_objects:
+        if gateway_id != '':
             gate_way = {
                 "object": {
                     "type": "Host",
-                    "id": self.host_objects[gateway],
+                    "id": gateway_id,
                     "name": gateway
                 }
             }
@@ -1911,15 +1328,13 @@ class DerivedFMC(FirepowerManagementCenter):
                 }
             }
         try:
-            if is_ipv6:
-                r = self.create_static_route_ipv6(device_id, int_name, rt_type, net_name, net_id, gate_way, metric)
-            else:
-                r = self.create_static_route(device_id, int_name, rt_type, net_name, net_id, gate_way, metric)
+            r = self.create_static_route(device_id, int_name, rt_type, net_name, net_id, gate_way, metric)
             return r
         except Exception as e:
             logger.exception(e)
             return None
         
+
     def check_and_associate_policy_to_device_group(self, policy_type, policy_name, policy_id):
         """
         Purpose:    Associate policy to FTD device group (if not already associated)

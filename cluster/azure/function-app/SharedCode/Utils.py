@@ -28,6 +28,8 @@ import json
 import os
 import paramiko
 import socket
+import re
+from SharedCode.cluster_utils import ClusterUtils
 
 class FMC:
     def __init__(self):
@@ -875,6 +877,7 @@ class FtdSshClient:
         self.port = 22
         self.SUCCESS = 'SUCCESS'
         self.FAIL = 'FAILURE'
+
     def ftdSsh(self, ftdPublicIp, lookFor):
         try:
             connect = ParamikoSSH(ftdPublicIp, self.port, self.ftdUserName, self.ftdPassword)
@@ -909,3 +912,143 @@ class FtdSshClient:
             return "SUCCESS"
         except:
             return "ERROR"
+
+
+    def ftdSshPingCclFromOtherNodes(self, ftdPublicIp, interface_name):
+        """
+        Purpose:    Get CCL IP of current FTD, then login to other VMSS instances and ping this CCL IP
+        Parameters: ftdPublicIp - Public IP of current FTD device
+                    interface_name - CCL interface name (e.g., 'GigabitEthernet 0/1')
+        Returns:    Tuple (status, message) - status is SUCCESS or ERROR, message contains details
+        """
+        try:
+            from SharedCode import azure_utils as azutils
+            
+            # Step 1: Get CCL IP of current FTD
+            log.info("util:::: Step 1: Getting CCL IP of current FTD {}".format(ftdPublicIp))
+            cluster_util = ClusterUtils(ftdPublicIp, self.port, self.ftdUserName, self.ftdPassword)
+            
+            status, channel, ssh = cluster_util.establishConnection()
+            if channel is None:
+                log.error("util:::: Failed to establish SSH connection to current FTD")
+                return "ERROR", "Failed to establish SSH connection to current FTD"
+            
+            # Get CCL interface information
+            cmd = "show interface {}".format(interface_name)
+            log.info("util:::: Executing command: {}".format(cmd))
+            status, output = cluster_util.send_cmd_and_wait_for_execution(channel, cmd)
+            ssh.close()
+            
+            if status != "SUCCESS" or not output:
+                log.error("util:::: Failed to get CCL interface info. Output: {}".format(output))
+                return "ERROR", "Failed to get CCL interface info or interface not configured"
+            
+            # Parse CCL IP address from output
+            ip_pattern = r'IP address\s+(\d+\.\d+\.\d+\.\d+)'
+            ip_match = re.search(ip_pattern, output, re.IGNORECASE)
+            
+            if not ip_match:
+                log.error("util:::: Could not parse CCL IP address from interface output")
+                return "ERROR", "Could not parse CCL IP from interface"
+            
+            ccl_ip = ip_match.group(1)
+            log.info("util:::: Current FTD CCL IP: {}".format(ccl_ip))
+            
+            # Step 2: Get all VMSS instance public IPs
+            log.info("util:::: Step 2: Fetching all VMSS instance public IPs")
+            networkInterfaceName = os.environ.get("MNGT_NET_INTERFACE_NAME")
+            ipConfigurationName = os.environ.get("MNGT_IP_CONFIG_NAME")
+            publicIpAddressName = os.environ.get("MNGT_PUBLIC_IP_NAME")
+            
+            vmlist = azutils.get_vmss_vm_list()
+            other_vm_ips = []
+            
+            for v in vmlist:
+                try:
+                    publicIP = azutils.get_vmss_public_ip(v.instance_id, networkInterfaceName, ipConfigurationName, publicIpAddressName)
+                    if publicIP and publicIP != ftdPublicIp:
+                        other_vm_ips.append(publicIP)
+                        log.info("util:::: Found other VM with public IP: {}".format(publicIP))
+                except Exception as e:
+                    log.warning("util:::: Failed to get public IP for instance {}: {}".format(v.instance_id, repr(e)))
+                    continue
+            
+            if not other_vm_ips:
+                log.warning("util:::: No other VMs found in VMSS to ping from")
+                return "SUCCESS", "No other VMs found to ping from (single node deployment)"
+            
+            log.info("util:::: Found {} other VM(s) in VMSS".format(len(other_vm_ips)))
+            
+            # Step 3: Login to each other VM and ping the CCL IP
+            log.info("util:::: Step 3: Pinging CCL IP {} from other VMs".format(ccl_ip))
+            ping_results = []
+            success_count = 0
+            
+            for other_ip in other_vm_ips:
+                try:
+                    log.info("util:::: Connecting to VM {} to check if it's a control node".format(other_ip))
+                    other_cluster_util = ClusterUtils(other_ip, self.port, self.ftdUserName, self.ftdPassword)
+                    
+                    # Check if this VM is a control node
+                    cluster_info_status, cluster_info = other_cluster_util.get_cluster_info()
+                    
+                    if cluster_info_status == "SSH_FAILURE":
+                        log.warning("util:::: Failed to connect to VM {}".format(other_ip))
+                        ping_results.append({"vm_ip": other_ip, "status": "CONNECTION_FAILED"})
+                        continue
+                    
+                    if cluster_info_status != "SUCCESS":
+                        log.warning("util:::: Failed to get cluster info from VM {}. Status: {}".format(other_ip, cluster_info_status))
+                        ping_results.append({"vm_ip": other_ip, "status": "CLUSTER_INFO_FAILED"})
+                        continue
+                    
+                    # Check if this is a control node
+                    if not other_cluster_util.is_control_node(cluster_info):
+                        log.info("util:::: VM {} is a data node, skipping ping operation".format(other_ip))
+                        ping_results.append({"vm_ip": other_ip, "status": "SKIPPED_DATA_NODE"})
+                        continue
+                    
+                    log.info("util:::: VM {} is a control node, proceeding with ping".format(other_ip))
+                    
+                    # Establish connection for ping
+                    status, channel, ssh = other_cluster_util.establishConnection()
+                    if channel is None:
+                        log.warning("util:::: Failed to establish connection to control node {}".format(other_ip))
+                        ping_results.append({"vm_ip": other_ip, "status": "CONNECTION_FAILED"})
+                        continue
+                    
+                    # Ping the CCL IP
+                    ping_cmd = "ping interface ccl_link {}".format(ccl_ip)
+                    log.info("util:::: Executing on control node {}: {}".format(other_ip, ping_cmd))
+                    status, ping_output = other_cluster_util.send_cmd_and_wait_for_execution(channel, ping_cmd)
+                    ssh.close()
+                    
+                    if status == "SUCCESS" and "Success rate is 0 percent" not in ping_output and "0/5" not in ping_output:
+                        log.info("util:::: Successfully pinged CCL IP {} from control node {}".format(ccl_ip, other_ip))
+                        ping_results.append({"vm_ip": other_ip, "status": "SUCCESS", "output": ping_output})
+                        success_count += 1
+                        log.info("util:::: Ping successful, skipping remaining nodes")
+                        break  # Exit loop after successful ping from control node
+                    else:
+                        log.warning("util:::: Failed to ping CCL IP {} from VM {}. Output: {}".format(ccl_ip, other_ip, ping_output))
+                        ping_results.append({"vm_ip": other_ip, "status": "PING_FAILED", "output": ping_output})
+                    
+                    # Small delay between VMs (only if continuing to next VM)
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    log.error("util:::: Exception while pinging from VM {}: {}".format(other_ip, repr(e)))
+                    ping_results.append({"vm_ip": other_ip, "status": "EXCEPTION", "error": str(e)})
+            
+            # Summary
+            summary = "Pinged CCL IP {} from {}/{} other VMs successfully".format(ccl_ip, success_count, len(other_vm_ips))
+            log.info("util:::: {}".format(summary))
+            
+            if success_count > 0:
+                return "SUCCESS", summary + ". Results: " + str(ping_results)
+            else:
+                return "ERROR", "Failed to ping from any other VM. Results: " + str(ping_results)
+                
+        except Exception as e:
+            log.error("util:::: Exception during CCL ping from other nodes: {}".format(repr(e)))
+            return "ERROR", str(e)

@@ -72,6 +72,7 @@ def setup_logging():
         logging.disable(logging.DEBUG)
     return logger
 
+
 def put_line_in_log(var, line_type='dot'):
     """
     Purpose:    This is to help putting lines in logs
@@ -86,6 +87,7 @@ def put_line_in_log(var, line_type='dot'):
     if line_type == 'dot':
         logging.info("....................................... < " + var + " > ........................................")
     return
+
 
 def get_user_input_lifecycle_ftdv():
     """
@@ -111,7 +113,6 @@ def get_user_input_lifecycle_ftdv():
         "FTD_LICENSE_TYPE": "",
         "GENEVE_SUPPORT": "",
         "PROXY_TYPE": "",
-        "IPV6_SUPPORT": "",
     }
 
     try:
@@ -144,21 +145,14 @@ def get_user_input_lifecycle_ftdv():
             user_input['PROXY_TYPE'] = os.environ['PROXY_TYPE']  
         except KeyError as e:
             logger.debug("Exception occurred: {}".format(repr(e)))
-            user_input['PROXY_TYPE'] = None
-            
-        try:    
-            user_input['IPV6_SUPPORT'] = os.environ['IPV6_SUPPORT']  
-            logger.info("IPv6 support set to: {}".format(user_input['IPV6_SUPPORT']))
-        except KeyError as e:
-            logger.debug("Exception occurred when retrieving IPV6_SUPPORT: {}".format(repr(e)))
-            user_input['IPV6_SUPPORT'] = "disable"
-            logger.info("IPv6 dual-stack support defaulting to: False")
+            user_input['PROXY_TYPE'] = None      
     except Exception as e:
         logger.error("Exception: {}".format(e))
         logger.error("Unable to find OS environment variables")
 
     logger.debug("Environment Variables: " + json.dumps(user_input, separators=(',', ':')))
     return user_input
+
 
 def get_user_input_custom_metric():
     """
@@ -185,13 +179,10 @@ def get_user_input_custom_metric():
         if re.match(r'..*', user_input['fmcDeviceGroupName']) is None:
             raise ValueError("Unable to find FMC_DEVICE_GRP in os.env")
 
-        user_input['FmcServer'] = os.environ['FMC_SERVER'] ##MODIFIED FOR IPV6 AS WELL
-        # Validate IPv4 or IPv6 address
-        ipv4_pattern = r'^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$'
-        ipv6_pattern = r'^(?:([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|::([0-9a-fA-F]{1,4}:){1,6}[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}::([0-9a-fA-F]{1,4}:){1,5}[0-9a-fA-F]{1,4}|::)$'
-        
-        if not (re.match(ipv4_pattern, user_input['FmcServer']) or re.match(ipv6_pattern, user_input['FmcServer'])):
-            raise ValueError("Unable to find valid FMC_SERVER in os.env, should be a valid IPv4 or IPv6 address")
+        user_input['FmcServer'] = os.environ['FMC_SERVER']
+        if re.match(r'^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\.(?!$)|$)){4}$',
+                    user_input['FmcServer']) is None:
+            raise ValueError("Unable to find valid FMC_SERVER in os.env, should be a valid IP")
 
         user_input['FmcMetUserName'] = os.environ['FMC_MET_USERNAME']
         if re.match(r'..*', user_input['FmcMetUserName']) is None:
@@ -221,6 +212,7 @@ def get_user_input_custom_metric():
 
     return user_input
 
+
 def get_user_input_manager():
     """
     Purpose:    This evaluates & takes User inputs from OS env & JSON
@@ -243,8 +235,7 @@ def get_user_input_manager():
         "NgfwPassword": "",
         "TargetGrpHealthPort": "",
         "GENEVE_SUPPORT": "",
-        "PROXY_TYPE": "",
-        "IPV6_SUPPORT": ""
+        "PROXY_TYPE": ""
     }  
 
     try:
@@ -281,7 +272,7 @@ def get_user_input_manager():
                 },
                 "FmcIp": {
                     "type": "string",
-                    "anyOf": [ {"format": "ipv4"}, {"format": "ipv6"} ]
+                    "pattern": "^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$"
                 },
                 "FmcUserName": {
                     "type": "string",
@@ -310,10 +301,6 @@ def get_user_input_manager():
                 "fmcPerformanceLicenseTier": {
                     "type": "string",
                     "pattern": "^((FTDv)|(FTDv20)|(FTDv30)|(FTDv50)|(FTDv100))$"
-                },
-                "IPV6_SUPPORT": {
-                    "type": "string",
-                    "pattern": "^((enable)|(disable))$"
                 }
             },
             "required": [
@@ -330,8 +317,7 @@ def get_user_input_manager():
                 "NgfwUserName",
                 "NgfwPassword",
                 "PROXY_TYPE",
-                "TargetGrpHealthPort",
-                "IPV6_SUPPORT"
+                "TargetGrpHealthPort"
             ]
         }
             
@@ -365,7 +351,7 @@ def get_user_input_manager():
                 },
                 "FmcIp": {
                     "type": "string",
-                    "anyOf": [ {"format": "ipv4"}, {"format": "ipv6"} ]
+                    "pattern": "^(?:(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])(\\.(?!$)|$)){4}$"
                 },
                 "FmcUserName": {
                     "type": "string",
@@ -390,10 +376,6 @@ def get_user_input_manager():
                 "fmcPerformanceLicenseTier": {
                     "type": "string",
                     "pattern": "^((FTDv)|(FTDv5)|(FTDv10)|(FTDv20)|(FTDv30)|(FTDv50)|(FTDv100))$"
-                },
-                "IPV6_SUPPORT": {
-                    "type": "string",
-                    "pattern": "^((enable)|(disable))$"
                 }
             },
             "required": [
@@ -409,8 +391,7 @@ def get_user_input_manager():
                 "FmcPassword",
                 "NgfwUserName",
                 "NgfwPassword",
-                "TargetGrpHealthPort",
-                "IPV6_SUPPORT"
+                "TargetGrpHealthPort"
             ]
         }
     
@@ -456,12 +437,7 @@ def get_user_input_manager():
             env_var['PROXY_TYPE'] = os.environ['PROXY_TYPE']  
         except KeyError as e:
             logger.debug("Exception occurred: {}".format(repr(e)))
-            env_var['PROXY_TYPE'] = None 
-        try:    
-            env_var['IPV6_SUPPORT'] = os.environ['IPV6_SUPPORT']  
-        except KeyError as e:
-            logger.debug("Exception occurred: {}".format(repr(e)))
-            env_var['IPV6_SUPPORT'] = 'disable'        
+            env_var['PROXY_TYPE'] = None   
 
         env_var['TargetGrpHealthPort'] = os.environ['TG_HEALTH_PORT']
 
@@ -482,7 +458,18 @@ def get_user_input_manager():
         logger.exception(e)
         logger.error("os.env has invalid values for keys")
     except Exception as e:
-        logger.exception(e)    
+        logger.exception(e)
+
+    ##Identify Config file, schema file based on topology
+    # if geneve_support == "disable":
+    #     prefix = const.NLB_PREFIX
+    # elif geneve_support == "enable":
+    #     if env_var['PROXY_TYPE'] == "SINGLE_ARM":
+    #         prefix = const.GWLB_SINGLE_ARM_PREFIX   
+    #     elif env_var['PROXY_TYPE'] == "DUAL_ARM":
+    #         prefix = const.GWLB_DUAL_ARM_PREFIX   
+    # config_json_name = prefix + const.JSON_LOCAL_FILENAME
+    # config_json_schema_name = prefix + const.JSON_SCHEMA_LOCAL_FILENAME      
         
     try:
         with open(const.JSON_SCHEMA_LOCAL_FILENAME) as schema2_file:
@@ -505,6 +492,7 @@ def get_user_input_manager():
         env_var['GENEVE_SUPPORT'] = "disable"
 		
     return env_var, json_var
+
 
 def sns_msg_body_configure_ftdv_topic(to_function, category, instance_id, counter='-1'):
     """
@@ -537,6 +525,7 @@ def sns_msg_body_configure_ftdv_topic(to_function, category, instance_id, counte
 
     return sns_message
 
+
 def sns_msg_body_user_notify_topic(message, autoscale_group, instance_id, details=None):
     """
     Purpose:    To prepare dict with correct values for user topic
@@ -555,6 +544,7 @@ def sns_msg_body_user_notify_topic(message, autoscale_group, instance_id, detail
     logger.debug("Prepared message body: " + json.dumps(sns_message, separators=(',', ':')))
 
     return sns_message
+
 
 def get_common_member_in_list(list1, list2):
     """
@@ -576,6 +566,7 @@ def get_common_member_in_list(list1, list2):
         logger.error("No subnets from given Availability Zones")
         return []
 
+
 def get_gateway_from_cidr(cidr):
     """
     Purpose:    To get Gateway from given cidr block
@@ -593,22 +584,6 @@ def get_gateway_from_cidr(cidr):
         logger.info("Gateway for subnet cidr: %s" % str(cidr) + " is %s" % str(n[1]))
         return str(n[1])
 
-def get_gateway_from_ipv6_cidr(cidr_ipv6):
-    """
-    Purpose:    To get Gateway from given IPv6 cidr block
-    Parameters: cidr_ipv6
-    Returns:    gateway
-    Raises:
-    """
-    try:
-        n = ipaddress.IPv6Network(cidr_ipv6)
-    except ValueError as e:
-        logger.error("Exception occurred {}".format(repr(e)))
-        logger.info("Looks like CIDR fetched from describe-subnet may not be correct!")
-        exit(1)
-    else:
-        logger.info("Gateway for subnet cidr: %s" % str(cidr_ipv6) + " is %s" % str(n[1]))
-        return str(n[1])
 
 def intersection(lst1, lst2):
     """
@@ -622,6 +597,7 @@ def intersection(lst1, lst2):
     lst3 = [value for value in lst1 if value in temp]
     return lst3
 
+
 def union(lst1, lst2):
     """
     Purpose:    To get union of lists
@@ -631,6 +607,7 @@ def union(lst1, lst2):
     """
     final_list = list(set().union(lst1, lst2))
     return final_list
+
 
 def find_value_in_list(l_r, value):
     """
@@ -645,6 +622,7 @@ def find_value_in_list(l_r, value):
             result = True
             break
     return result
+
 
 # Run for this file too
 logger = setup_logging()

@@ -115,8 +115,9 @@
       },
       "softwareVersion": {
         "type": "string",
-        "defaultValue": "77089.0.0",
+        "defaultValue": "10.00.140",
         "allowedValues": [
+            "10.00.140",
             "77089.0.0",
             "760113.0.0",
             "742172.0.0",
@@ -126,13 +127,36 @@
             "description": "FTD Software version to use."
         }
       },
+      "enableSecureBoot": {
+        "type": "string",
+        "defaultValue": "false",
+        "allowedValues": [
+            "true",
+            "false"
+        ],
+        "metadata": {
+            "description": "[Only applicable for softwareVersion 1000140.0.0] Enable Secure Boot for UEFI-based deployment"
+        }
+      },
       "vmSize" : {
         "type" : "string",
-        "defaultValue" : "Standard_D3_v2",
+        "defaultValue" : "Standard_F16s_v2",
         "allowedValues" : [
             "Standard_D3_v2",
             "Standard_D4_v2",
-            "Standard_D5_v2"
+            "Standard_D5_v2",
+            "Standard_D8s_v3",
+            "Standard_D16s_v3",
+            "Standard_F8s_v2",
+            "Standard_F16s_v2",
+            "Standard_D8_v4",
+            "Standard_D16_v4",
+            "Standard_D8s_v4",
+            "Standard_D16s_v4",
+            "Standard_D8_v5",
+            "Standard_D16_v5",
+            "Standard_D8s_v5",
+            "Standard_D16s_v5"
         ],
         "metadata" : {
             "description" : "Size of the Virtual Machine"
@@ -140,10 +164,10 @@
       },
       "ftdLicensingSku" : {
         "type" : "string",
-        "defaultValue" : "ftdv-azure-payg",
+        "defaultValue" : "payg",
         "allowedValues" : [
-            "ftdv-azure-byol",
-            "ftdv-azure-payg"
+            "byol",
+            "payg"
         ],
         "metadata" : {
             "description" : "Licensing model (ftdv-azure-byol : Bring-your-own-license, ftdv-azure-payg : Pay-as-you-go)"
@@ -219,6 +243,17 @@
             "description": "Comma separated License Capability list (Valid values : BASE, MALWARE, URLFilter, THREAT)"
         }
       },
+      "autoscaling": {
+        "type": "string",
+        "defaultValue": "Enable",
+        "allowedValues": [
+            "Enable",
+            "Disable"
+        ],
+        "metadata": {
+            "description": "Enable or Disable autoscaling functionality"
+        }
+      },
       "scalingMetricsList": {
         "type": "string",
         "defaultValue": "CPU",
@@ -227,35 +262,35 @@
             "CPU,MEMORY"
         ],
         "metadata": {
-            "description": "Metrics used in taking scaling decision"
+            "description": "[Only used when Autoscaling is Enabled] Metrics used in taking scaling decision"
         }
       },
       "cpuScaleInThreshold": {
         "type": "string",
         "defaultValue": "10",
         "metadata": {
-            "description": "Scale-IN threshold in % for CPU Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-IN threshold in % for CPU Metrics"
         }
       },
       "cpuScaleOutThreshold": {
         "type": "string",
         "defaultValue": "80",
         "metadata": {
-            "description": "Scale-OUT threshold in % for CPU Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-OUT threshold in % for CPU Metrics"
         }
       },
       "memoryScaleInThreshold": {
         "type": "string",
         "defaultValue": "0",
         "metadata": {
-            "description": "Scale-IN threshold in % for Memory Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-IN threshold in % for Memory Metrics"
         }
       },
       "memoryScaleOutThreshold": {
         "type": "string",
         "defaultValue": "0",
         "metadata": {
-            "description": "Scale-OUT threshold in % for Memory Metrics"
+            "description": "[Only used when Autoscaling is Enabled] Scale-OUT threshold in % for Memory Metrics"
         }
       },
       "ftdvPerformanceTier": {
@@ -266,7 +301,8 @@
           "FTDv20",
           "FTDv30",
           "FTDv50",
-          "FTDv100"
+          "FTDv100",
+          "FTDvU"
         ],
         "metadata": {
           "description": "PerformanceTier value to be used while registering the FTDv instances to the FMCv"
@@ -291,7 +327,7 @@
             "30"
         ],
         "metadata": {
-            "description": "Duration in minutes for which metrics samples are collected and averaged"
+            "description": "[Only used when Autoscaling is Enabled] Duration in minutes for which metrics samples are collected and averaged"
         }
       },
       "initDeploymentMode": {
@@ -313,7 +349,7 @@
             "POLICY-2"
         ],
         "metadata": {
-            "description": "Scaling Policy.. Refer user guide for details"
+            "description": "[Only used when Autoscaling is Enabled] Scaling Policy.. Refer user guide for details"
         }
       }
     },
@@ -325,9 +361,18 @@
       "dataSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-dataIntfSecGrp')]",
       "blockAllSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-blockAllSecGrp')]",
       "mgmtSecGrp" :      "[concat(parameters('resourceNamePrefix'),'-mgmtIntfSecGrp')]",
-      "logicAppName" : 	  "[concat(parameters('resourceNamePrefix'),'-logic-app')]",
-  	  "functionAppName" : "[concat(parameters('resourceNamePrefix'),'-function-app')]",
-  	  "appInsightsName" : "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
+      "gen2Version": ["10.00.140"],
+      "useEthernetInterface": "[contains(variables('gen2Version'), parameters('softwareVersion'))]",
+      "outsideInterface": "[if(variables('useEthernetInterface'), 'Ethernet0/0', 'GigabitEthernet0/0')]",
+      "cclInterface": "[if(variables('useEthernetInterface'), 'Ethernet 0/1', 'GigabitEthernet 0/1')]",
+      "isUefiVersion": "[contains(variables('gen2Version'), parameters('softwareVersion'))]",
+      "securityType": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), 'TrustedLaunch', 'Standard')]",
+      "secureBoot": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), 'true', 'false')]",
+      "vTpm": "false",
+      "securityProfileBlock": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), json(concat('{','\"securityType\": \"', variables('securityType'), '\",','\"uefiSettings\": {','\"secureBootEnabled\": ', toLower(variables('secureBoot')), ',','\"vTpmEnabled\": ', toLower(variables('vTpm')),'}','}')), json('null'))]",
+      "logicAppName" : "[concat(parameters('resourceNamePrefix'),'-logic-app')]",
+      "functionAppName" : "[concat(parameters('resourceNamePrefix'),'-function-app')]",
+      "appInsightsName" : "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
       "gwlbId" :           "[resourceId('Microsoft.Network/loadBalancers',variables('gwlbName'))]",
       "vnetId": "[resourceId(parameters('virtualNetworkRg'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
       "mgmtSubnetId": "[concat(variables('vnetID'),'/subnets/', parameters('mgmtSubnet'))]",
@@ -353,7 +398,11 @@
       "idleTimeoutInMinutes": 30,
       "publisher":        "cisco",
       "offer":            "cisco-ftdv",
-      "sku":              "[parameters('ftdLicensingSku')]",
+      "gen1Byol": "ftdv-azure-byol",
+      "gen1Payg": "ftdv-azure-payg",
+      "gen2Byol": "cisco-ftdv-x86-byol",
+      "gen2Payg": "cisco-ftdv-x86-payg",
+      "sku":              "[if(contains(variables('gen2Version'), parameters('softwareVersion')), if(equals(parameters('ftdLicensingSku'), 'byol'), variables('gen2Byol'), variables('gen2Payg')), if(equals(parameters('ftdLicensingSku'), 'byol'), variables('gen1Byol'), variables('gen1Payg')))]",
       "role1":                 "[guid(resourceGroup().id,subscription().subscriptionId,'role1')]",
       "role2":                 "[guid(resourceGroup().id,subscription().subscriptionId,'role2')]",
       "internalTunnelPortNumber": 2000,
@@ -528,6 +577,9 @@
         "location": "[resourceGroup().location]",
         "sku": {
             "name": "Standard_LRS"
+        },
+        "properties": {
+            "minimumTlsVersion": "TLS1_2"
         }
       },
         {
@@ -661,7 +713,7 @@
           "virtualNetworkSubnetId": "[if(equals(variables('functionHostingPlanType'), 'premium'), variables('functionAppSubnetId'), json('null'))]",
           "vnetRouteAllEnabled": true,
           "siteConfig": {
-            "linuxFxVersion": "Python|3.9",
+            "linuxFxVersion": "Python|3.11",
             "appSettings": [
               {
                 "name": "AzureWebJobsDashboard",
@@ -749,7 +801,11 @@
               },
               {
                 "name": "OUTSIDE_NIC_INTERFACE",
-                "value": "GigabitEthernet0/0"
+                "value": "[variables('outsideInterface')]"
+              },
+              {
+                "name": "CCL_NIC_INTERFACE",
+                "value": "[variables('cclInterface')]"
               },
               {
                 "name": "OUTSIDE_NIC_NAME",
@@ -866,6 +922,10 @@
               {
                 "name": "PERFORMANCE_TIER",
                 "value": "[parameters('ftdvPerformanceTier')]"
+              },
+              {
+                "name": "AUTOSCALING",
+                "value": "[parameters('autoscaling')]"
               },
               {
                 "name": "SCALING_METRICS_LIST",
@@ -1015,8 +1075,8 @@
             "[concat('Microsoft.Network/loadBalancers/', variables('gwlbName'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataSecGrp'))]",
-            "[concat('Microsoft.Network/networkSecurityGroups/',variables('blockAllSecGrp'))]"
-
+            "[concat('Microsoft.Network/networkSecurityGroups/',variables('blockAllSecGrp'))]",
+            "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
         ],
         "sku": {
           "name": "[parameters('vmSize')]",
@@ -1044,8 +1104,15 @@
                 "offer": "[variables('offer')]",
                 "sku": "[variables('sku')]",
                 "version": "[parameters('softwareVersion')]"
+              },
+              "osDisk": {
+                "createOption": "FromImage",
+                "managedDisk": {
+                  "storageAccountType": "StandardSSD_LRS"
+                }
               }
             },
+            "securityProfile": "[variables('securityProfileBlock')]",
             "osProfile": {
               "computerNamePrefix": "[variables('vmssName')]",
               "adminUsername": "[parameters('ftdVmManagementUserName')]",
@@ -1139,11 +1206,13 @@
         "apiVersion": "2022-04-01",
         "name": "[variables('role1')]",
         "dependsOn": [
-            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]",
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
         ],
         "properties": {
             "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
-            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]"
+            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+            "principalType": "ServicePrincipal"
         }
       },
       {
@@ -1151,11 +1220,13 @@
         "apiVersion": "2022-04-01",
         "name": "[variables('role2')]",
         "dependsOn": [
-            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+            "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]",
+            "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
         ],
         "properties": {
             "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '974c5e8b-45b9-4653-ba55-5f855dd0fb88')]",
-            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]"
+            "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+            "principalType": "ServicePrincipal"
         }
       }
     ]
