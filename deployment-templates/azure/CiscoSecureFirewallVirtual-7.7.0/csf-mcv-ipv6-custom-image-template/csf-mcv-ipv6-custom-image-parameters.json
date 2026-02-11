@@ -43,9 +43,6 @@
     },
     "VmSize": {
       "value": "Standard_D4_v2"
-    },
-    "publicInboundPorts": {
-      "value": "none"
     }
   }
 }
