@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Stack deploying FTDv
+Parameters: 
+  Prefix:
+    Default: 'cim-cft'
+    Description: Prefix for the resources
+    Type: String
+  Region:
+    Default: us-east-1
+    Description: AWS Region to deploy the stack
+    Type: String
+  AvailabilityZone:
+    Default: us-east-1a
+    Description: Availability Zone for the subnets
+    Type: String
+  FTDvAMIID:
+    Default: ''
+    Description: FTDv AMI ID
+    Type: String  
+  KeyName:
+    Default: virtual_production_keypair
+    Description: Key pair name for SSH access to FTDv
+    Type: String  
+  AdminPassword:
+    Default: c0mpleX@1209
+    Description: Admin password for FTDv
+    Type: String  
+  DiagOff:
+    Default: 'true'
+    Description: Enable or disable Diagnostics subnet
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String  
+  MgmtSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Management subnet ID
+  InsideSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Inside subnet ID
+  OutsideSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Outside subnet ID
+  DiagSubnetId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^subnet-[0-9a-f]{8,17}$'
+    ConstraintDescription: Must be a valid subnet ID or empty if Diagnostics is not used.
+    Description: Diagnostics subnet ID  
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group ID for FTDv  
+  FTDInstanceType:
+    AllowedValues:
+      - c4.xlarge
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - m5zn.6xlarge
+      - m5zn.3xlarge
+      - m5zn.2xlarge
+      - m5zn.xlarge
+      - m5n.4xlarge
+      - m5n.2xlarge
+      - m5n.xlarge
+      - m5a.4xlarge
+      - m5a.2xlarge
+      - m5a.xlarge
+      - m5.4xlarge
+      - m5.2xlarge
+      - m5.xlarge
+      - c5d.4xlarge
+      - c5d.2xlarge
+      - c5d.xlarge
+      - c5ad.4xlarge
+      - c5ad.2xlarge
+      - c5ad.xlarge
+      - c5a.4xlarge
+      - c5a.2xlarge
+      - c5a.xlarge
+      - c3.xlarge
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      - c6a.xlarge
+      - c6a.2xlarge
+      - c6a.4xlarge
+      - c6in.xlarge
+      - c6in.2xlarge
+      - c6in.4xlarge
+    ConstraintDescription: Must be a valid FTDv instance type.
+    Default: c5.xlarge
+    Description: FTDv instance type
+    Type: String
+  Day0Config:
+    Type : String
+    Default: ''
+    Description: Day 0 configuration (leave empty to use default)
+
+
+Conditions:
+  CreateDiag: !Equals [!Ref DiagOff, 'false']
+  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']    
+
+Resources:
+  Mgmt:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: ftdv-mgmt
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
+      SourceDestCheck: false
+      SubnetId: !Ref MgmtSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-MgmtInterface
+  Inside:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: ftdv-inside
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
+      SourceDestCheck: false
+      SubnetId: !Ref InsideSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-InsideInterface
+  Outside:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: ftdv-outside
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
+      SourceDestCheck: false
+      SubnetId: !Ref OutsideSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-OutsideInterface
+  Diag:
+    Condition: CreateDiag
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      Description: ftdv-diag
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
+      SourceDestCheck: false
+      SubnetId: !Ref DiagSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-DiagInterface        
+  IPAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    DependsOn: FTDv
+    Properties:
+      AllocationId: !GetAtt IPAddress.AllocationId
+      NetworkInterfaceId: !Ref Mgmt
+      PrivateIpAddress: !GetAtt Mgmt.PrimaryPrivateIpAddress
+  FTDv:
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            VolumeType: gp3
+      ImageId: !Ref FTDvAMIID
+      InstanceType: !Ref FTDInstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces: !If
+        - CreateDiag
+        - - DeviceIndex: 0
+            NetworkInterfaceId: !Ref Mgmt
+          - DeviceIndex: 1
+            NetworkInterfaceId: !Ref Diag
+          - DeviceIndex: 2
+            NetworkInterfaceId: !Ref Inside
+          - DeviceIndex: 3
+            NetworkInterfaceId: !Ref Outside
+        - - DeviceIndex: 0
+            NetworkInterfaceId: !Ref Mgmt
+          - DeviceIndex: 1
+            NetworkInterfaceId: !Ref Inside
+          - DeviceIndex: 2
+            NetworkInterfaceId: !Ref Outside
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-FTDv
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !If
+          - UseDefaultDay0Config
+          - !Sub |
+              {
+                "DNS1": "8.8.8.8",
+                "FirewallMode": "routed",
+                "IPv4Mode": "DHCP",
+                "IPv6Mode": "DHCP",
+                "ManageLocally": "No",
+                "AdminPassword": "${AdminPassword}",
+                "Hostname": "${Prefix}-ftdv"
+              }
+          - !Ref Day0Config
+
+Outputs:
+  FtdvId:
+    Description: FTDv Instance ID
+    Value: !Ref FTDv
+  FtdvSSHIP:
+    Description: Public IP address of the FTDv instance
+    Value: !GetAtt IPAddress.PublicIp
+  FtdvMgmtIP:
+    Description: Management IP address of the FTDv instance
+    Value: !GetAtt Mgmt.PrimaryPrivateIpAddress
+  FtdvInsideIP:
+    Description: Inside IP address of the FTDv instance
+    Value: !GetAtt Inside.PrimaryPrivateIpAddress
+  FtdvOutsideIP:
+    Description: Outside IP address of the FTDv instance
+    Value: !GetAtt Outside.PrimaryPrivateIpAddress
+  FtdvDiagIP:
+    Description: Diagnostics IP address of the FTDv instance
+    Value: !If 
+      - CreateDiag
+      - !GetAtt Diag.PrimaryPrivateIpAddress
+      - ''
+  FtdvMgmtIPv6:
+    Description: Management IPv6 address of the FTDv instance
+    Value: !GetAtt Mgmt.PrimaryIpv6Address  
+  FtdvInsideIPv6:
+    Description: Inside IPv6 address of the FTDv instance
+    Value: !GetAtt Inside.PrimaryIpv6Address  
+  FtdvOutsideIPv6:
+    Description: Outside IPv6 address of the FTDv instance
+    Value: !GetAtt Outside.PrimaryIpv6Address  
+  FtdvDiagIPv6:
+    Description: Diagnostics IPv6 address of the FTDv instance
+    Value: !If 
+      - CreateDiag
+      - !GetAtt Diag.PrimaryIpv6Address
+      - ''    

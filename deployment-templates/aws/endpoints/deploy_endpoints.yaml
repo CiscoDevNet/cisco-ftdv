@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy two Ubuntu 24.04 (Noble) EC2 instances ("inside" and "outside") with a configurable username/password for SSH.
+
+Parameters:
+  ResourceNamePrefix:
+    Type: String
+    Default: automation
+    Description: Prefix for resource names.
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 key pair name to enable SSH key authentication.
+
+  LinuxUsername:
+    Type: String
+    Default: ubuntu
+    Description: Username to use/create on both EC2 instances. (If it already exists, it will be reused.)
+
+  LinuxPassword:
+    Type: String
+    Default: 'c0mpleX@1209'
+    NoEcho: true
+    Description: Password for the user.
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: EC2 instance type.
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+
+  InsideSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID for inside instance.
+
+  OutsideSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet ID for outside instance.
+
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group ID for EC2 instances (must allow inbound TCP/22 from your IP for SSH).
+
+  UbuntuNobleAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: Canonical Ubuntu 24.04 LTS (Noble) AMI via SSM public parameter.
+
+Resources:
+  LinuxInsideInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref UbuntuNobleAmiId
+      KeyName: !Ref KeyName
+      SubnetId: !Ref InsideSubnetId
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-inside"
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          apt-get update -y
+          apt-get install -y nmap apache2 iperf3
+
+  LinuxOutsideInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref UbuntuNobleAmiId
+      KeyName: !Ref KeyName
+      SubnetId: !Ref OutsideSubnetId
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-outside"
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          apt-get update -y
+          apt-get install -y nmap apache2 iperf3
+
+  LinuxInsideEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-inside-eip"
+
+  LinuxInsideEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt LinuxInsideEIP.AllocationId
+      InstanceId: !Ref LinuxInsideInstance
+
+  LinuxOutsideEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-outside-eip"
+
+  LinuxOutsideEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt LinuxOutsideEIP.AllocationId
+      InstanceId: !Ref LinuxOutsideInstance
+
+Outputs:
+  LinuxInsidePublicIP:
+    Description: Public IPv4 address of the inside instance
+    Value: !Ref LinuxInsideEIP
+
+  LinuxInsidePrivateIP:
+    Description: Private IPv4 address of the inside instance
+    Value: !GetAtt LinuxInsideInstance.PrivateIp
+
+  LinuxOutsidePublicIP:
+    Description: Public IPv4 address of the outside instance
+    Value: !Ref LinuxOutsideEIP
+
+  LinuxOutsidePrivateIP:
+    Description: Private IPv4 address of the outside instance
+    Value: !GetAtt LinuxOutsideInstance.PrivateIp

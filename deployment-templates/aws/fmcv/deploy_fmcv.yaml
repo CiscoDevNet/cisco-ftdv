@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Stack deploying NGFWv testbed
+
+Parameters:
+  FMCvInstanceType:
+    AllowedValues:
+      - c4.4xlarge
+      - c3.4xlarge
+      - c5.4xlarge
+      - c6i.4xlarge
+      - c6a.4xlarge
+      - c6in.4xlarge
+    ConstraintDescription: Must be a valid FMCv instance type.
+    Default: c5.4xlarge
+    Description: FMCv instance type
+    Type: String
+  Prefix:
+    Default: 'cim-cft'
+    Description: Prefix for the resources
+    Type: String
+  Region:
+    Default: us-east-1
+    Description: AWS Region to deploy the stack
+    Type: String
+  AvailabilityZone:
+    Default: us-east-1a
+    Description: Availability Zone for the subnets
+    Type: String
+  FMCvAMIID:
+    Default: ''
+    Description: FMCv AMI ID
+    Type: String  
+  KeyName:
+    Default: virtual_production_keypair
+    Description: Key pair name for SSH access to FMCv
+    Type: String  
+  AdminPassword:
+    Default: c0mpleX@1209
+    Description: Admin password for FMCv
+    Type: String 
+  FMCvSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Management subnet ID  
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group ID for FMCv    
+  Day0Config:
+    Type: String
+    Default: ''
+    Description: Day 0 configuration (leave empty to use default)
+
+Conditions:
+  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']
+
+Resources:
+  FMCvNetworkInterface:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref FMCvSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-FMCv-ENI
+
+  FMCv:
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            VolumeType: gp3
+      ImageId: !Ref FMCvAMIID
+      InstanceType: !Ref FMCvInstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref FMCvNetworkInterface
+          DeviceIndex: 0
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-FMCv
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !If
+          - UseDefaultDay0Config
+          - !Sub |
+              #MC
+              {
+              "AdminPassword": "${AdminPassword}",
+              "Hostname": "fmcv-aws",
+              "IPv4Mode": "DHCP",
+              "IPv6Mode": "DHCP"}
+          - !Ref Day0Config
+
+  FMCvEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-FMCv-EIP
+
+  FMCvEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt FMCvEIP.AllocationId
+      NetworkInterfaceId: !Ref FMCvNetworkInterface
+
+Outputs:
+  FMCvId:
+    Description: FMCv Instance ID
+    Value: !Ref FMCv
+  FMCvSSHIP:
+    Description: Public IP address of the FMCv instance
+    Value: !Ref FMCvEIP
+  FMCvPrivateIP:
+    Description: Private IP address of the FMCv instance
+    Value: !GetAtt FMCvNetworkInterface.PrimaryPrivateIpAddress
+  FMCvIPv6:
+    Description: IPv6 address of the FMCv instance
+    Value: !GetAtt FMCvNetworkInterface.PrimaryIpv6Address
