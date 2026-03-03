@@ -159,10 +159,6 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
   }
   EOT
 
-  labels = {
-    autostop = "false"
-  }
-
   scheduling {
     on_host_maintenance = "MIGRATE"
     automatic_restart   = true

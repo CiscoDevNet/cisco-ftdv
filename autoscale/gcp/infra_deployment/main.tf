@@ -263,4 +263,64 @@ resource "google_vpc_access_connector" "connector" {
   max_instances = 10
   min_instances = 2
 }
+## VPC and Subnet Outputs
+output "mgmt_vpc_name" {
+  value = google_compute_network.mgmt_vpc.name
+}
+
+output "inside_vpc_name" {
+  value = google_compute_network.inside_vpc.name
+}
+
+output "outside_vpc_name" {
+  value = google_compute_network.outside_vpc.name
+}
+
+output "diag_vpc_name" {
+  value = var.with_diagnostic ? google_compute_network.diag_vpc[0].name : null
+}
+
+output "mgmt_subnet_name" {
+  value = google_compute_subnetwork.mgmt_subnet.name
+}
+
+output "inside_subnet_name" {
+  value = google_compute_subnetwork.inside_subnet.name
+}
+
+output "outside_subnet_name" {
+  value = google_compute_subnetwork.outside_subnet.name
+}
+
+output "diag_subnet_name" {
+  value = var.with_diagnostic ? google_compute_subnetwork.diag_subnet[0].name : null
+}
+
+##VPC Connector Output
+output "vpc_connector_name" {
+  value = google_vpc_access_connector.connector.name
+}
+
+##Firewall Rule Outputs
+output "mgmt_firewall_rule_name" {
+  description = "Name of the management firewall rule"
+  value       = google_compute_firewall.mgmt_firewall.name
+}
+
+output "inside_firewall_rule_name" {
+  description = "Name of the inside firewall rule"
+  value       = google_compute_firewall.inside_firewall.name
+}
+
+output "outside_firewall_rule_name" {
+  description = "Name of the outside firewall rule"
+  value       = google_compute_firewall.outside_firewall.name
+}
+
+output "diag_firewall_rule_name" {
+  description = "Name of the diagnostic firewall rule"
+  value       = var.with_diagnostic ? google_compute_firewall.diag_firewall[0].name : null
+}
+
+
 

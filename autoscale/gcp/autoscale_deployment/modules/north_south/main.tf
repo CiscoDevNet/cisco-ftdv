@@ -450,12 +450,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     on_host_maintenance = "MIGRATE"
     automatic_restart   = true
   }
-
-  labels = {
-    autostop = "false"
-  }
 }
-
 resource "google_compute_region_instance_group_manager" "ftdv_instance_group" {
   name               = "${var.resource_name_prefix}-ftdv-instance-group"
   region             = var.region

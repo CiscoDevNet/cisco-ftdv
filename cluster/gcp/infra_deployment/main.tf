@@ -280,10 +280,80 @@ output "ccl_subnet_self_link" {
   value = google_compute_subnetwork.ccl_subnet.self_link
 }
 
+# VPC Names
+output "mgmt_vpc_name" {
+  value = google_compute_network.mgmt_vpc.name
+}
+
+output "inside_vpc_name" {
+  value = google_compute_network.inside_vpc.name
+}
+
+output "outside_vpc_name" {
+  value = google_compute_network.outside_vpc.name
+}
+
+output "ccl_vpc_name" {
+  value = google_compute_network.ccl_vpc.name
+}
+
+output "diag_vpc_name" {
+  description = "Name of diagnostic VPC"
+  value = lower(tostring(var.with_diagnostic)) == "true" ? google_compute_network.diag_vpc[0].name : null
+}
+
+# Subnet Names
+output "mgmt_subnet_name" {
+  value = google_compute_subnetwork.mgmt_subnet.name
+}
+output "inside_subnet_name" {
+  value = google_compute_subnetwork.inside_subnet.name
+}
+
+output "outside_subnet_name" {
+  value = google_compute_subnetwork.outside_subnet.name
+}
+
+output "ccl_subnet_name" {
+  value = google_compute_subnetwork.ccl_subnet.name
+}
+
+output "diag_subnet_name" {
+  description = "Name of diagnostic subnet"
+  value = lower(tostring(var.with_diagnostic)) == "true" ? google_compute_subnetwork.diag_subnet[0].name : null
+}
+
+##VPC Connector and NAT GW Outputs
 output "vpc_connector_name" {
   value = google_vpc_access_connector.connector.name
 }
 
 output "mgmt_nat_ip" {
   value = var.ftd_reg_via_public_ip && length(google_compute_address.mgmtgw_public_ip) > 0 ? google_compute_address.mgmtgw_public_ip[0].address : null
+}
+
+##Firewall Rule Outputs
+output "mgmt_firewall_rule_name" {
+  description = "Name of the management firewall rule"
+  value       = google_compute_firewall.mgmt_firewall.name
+}
+
+output "inside_firewall_rule_name" {
+  description = "Name of the inside firewall rule"
+  value       = google_compute_firewall.inside_firewall.name
+}
+
+output "outside_firewall_rule_name" {
+  description = "Name of the outside firewall rule"
+  value       = google_compute_firewall.outside_firewall.name
+}
+
+output "ccl_firewall_rule_name" {
+  description = "Name of the ccl firewall rule"
+  value       = google_compute_firewall.ccl_firewall.name
+}
+
+output "diag_firewall_rule_name" {
+  description = "Name of the diagnostic firewall rule"
+  value       = var.with_diagnostic ? google_compute_firewall.diag_firewall[0].name : null
 }
