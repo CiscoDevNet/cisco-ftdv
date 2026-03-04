@@ -357,3 +357,13 @@ output "diag_firewall_rule_name" {
   description = "Name of the diagnostic firewall rule"
   value       = var.with_diagnostic ? google_compute_firewall.diag_firewall[0].name : null
 }
+
+output "inside_hc_firewall_rule_name" {
+  description = "Name of the inside health check firewall rule"
+  value       = google_compute_firewall.inside_hc_firewall.name
+}
+
+output "outside_hc_firewall_rule_name" {
+  description = "Name of the outside health check firewall rule"
+  value       = google_compute_firewall.outside_hc_firewall.name
+}
