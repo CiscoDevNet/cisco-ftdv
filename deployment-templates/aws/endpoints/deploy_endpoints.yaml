@@ -1,5 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploy two Ubuntu 24.04 (Noble) EC2 instances ("inside" and "outside") with a configurable username/password for SSH.
+Description: >-
+  Deploy two Ubuntu 24.04 (Noble) EC2 instances ("inside" and "outside").
+  Each instance gets two NICs: eth0 on the management subnet (with an EIP
+  for SSH access) and eth1 on the data subnet (inside or outside).
 
 Parameters:
   ResourceNamePrefix:
@@ -32,13 +35,17 @@ Parameters:
       - t3.medium
       - t3.large
 
+  MgmtSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Management subnet ID (eth0) - used for SSH access via EIP.
+
   InsideSubnetId:
     Type: AWS::EC2::Subnet::Id
-    Description: Subnet ID for inside instance.
+    Description: Inside data subnet ID (eth1 of inside instance).
 
   OutsideSubnetId:
     Type: AWS::EC2::Subnet::Id
-    Description: Subnet ID for outside instance.
+    Description: Outside data subnet ID (eth1 of outside instance).
 
   SecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
@@ -50,39 +57,43 @@ Parameters:
     Description: Canonical Ubuntu 24.04 LTS (Noble) AMI via SSM public parameter.
 
 Resources:
+  # -------- Inside endpoint --------
+  InsideMgmtENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref MgmtSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Description: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
+
+  InsideDataENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref InsideSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Description: !Sub "${ResourceNamePrefix}-inside-data-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-inside-data-eni"
+
   LinuxInsideInstance:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref UbuntuNobleAmiId
       KeyName: !Ref KeyName
-      SubnetId: !Ref InsideSubnetId
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref InsideMgmtENI
+          DeviceIndex: 0
+        - NetworkInterfaceId: !Ref InsideDataENI
+          DeviceIndex: 1
       Tags:
         - Key: Name
           Value: !Sub "${ResourceNamePrefix}-linux-inside"
-        - Key: autostop
-          Value: 'false'
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          set -euxo pipefail
-          apt-get update -y
-          apt-get install -y nmap apache2 iperf3
-
-  LinuxOutsideInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: !Ref InstanceType
-      ImageId: !Ref UbuntuNobleAmiId
-      KeyName: !Ref KeyName
-      SubnetId: !Ref OutsideSubnetId
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
-      Tags:
-        - Key: Name
-          Value: !Sub "${ResourceNamePrefix}-linux-outside"
         - Key: autostop
           Value: 'false'
       UserData:
@@ -104,7 +115,53 @@ Resources:
     Type: AWS::EC2::EIPAssociation
     Properties:
       AllocationId: !GetAtt LinuxInsideEIP.AllocationId
-      InstanceId: !Ref LinuxInsideInstance
+      NetworkInterfaceId: !Ref InsideMgmtENI
+
+  # -------- Outside endpoint --------
+  OutsideMgmtENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref MgmtSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Description: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
+
+  OutsideDataENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref OutsideSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Description: !Sub "${ResourceNamePrefix}-outside-data-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-outside-data-eni"
+
+  LinuxOutsideInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref UbuntuNobleAmiId
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref OutsideMgmtENI
+          DeviceIndex: 0
+        - NetworkInterfaceId: !Ref OutsideDataENI
+          DeviceIndex: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-outside"
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          apt-get update -y
+          apt-get install -y nmap apache2 iperf3
 
   LinuxOutsideEIP:
     Type: AWS::EC2::EIP
@@ -118,21 +175,29 @@ Resources:
     Type: AWS::EC2::EIPAssociation
     Properties:
       AllocationId: !GetAtt LinuxOutsideEIP.AllocationId
-      InstanceId: !Ref LinuxOutsideInstance
+      NetworkInterfaceId: !Ref OutsideMgmtENI
 
 Outputs:
   LinuxInsidePublicIP:
-    Description: Public IPv4 address of the inside instance
+    Description: Public IPv4 address of the inside instance (mgmt EIP)
     Value: !Ref LinuxInsideEIP
 
   LinuxInsidePrivateIP:
-    Description: Private IPv4 address of the inside instance
-    Value: !GetAtt LinuxInsideInstance.PrivateIp
+    Description: Private IPv4 address of the inside instance (mgmt interface)
+    Value: !GetAtt InsideMgmtENI.PrimaryPrivateIpAddress
+
+  LinuxInsideDataIP:
+    Description: Private IPv4 address of the inside data interface
+    Value: !GetAtt InsideDataENI.PrimaryPrivateIpAddress
 
   LinuxOutsidePublicIP:
-    Description: Public IPv4 address of the outside instance
+    Description: Public IPv4 address of the outside instance (mgmt EIP)
     Value: !Ref LinuxOutsideEIP
 
   LinuxOutsidePrivateIP:
-    Description: Private IPv4 address of the outside instance
-    Value: !GetAtt LinuxOutsideInstance.PrivateIp
+    Description: Private IPv4 address of the outside instance (mgmt interface)
+    Value: !GetAtt OutsideMgmtENI.PrimaryPrivateIpAddress
+
+  LinuxOutsideDataIP:
+    Description: Private IPv4 address of the outside data interface
+    Value: !GetAtt OutsideDataENI.PrimaryPrivateIpAddress
