@@ -90,7 +90,7 @@ ilb_health_check_port        = 8989                                             
 ilb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
 ilb_draining_timeout_sec     = 60                                                    # Timeout for draining connections (seconds)
 ilb_check_interval_sec       = 10                                                    # Interval between health checks for ILB (seconds)
-ilb_unhealthy_threshold      = 1                                                     # Number of failed health checks before marking unhealthy
+ilb_unhealthy_threshold      = 3                                                     # Number of failed health checks before marking unhealthy
 
 # The below parameters are used for 'north_south' deployment type only
 # --------------------
@@ -103,6 +103,6 @@ elb_front_end_ports          = "all"                                            
 # ELB Health Check
 elb_health_check_port        = 7878                                                  # ELB health-check port, NAT required in FMC
 elb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
-elb_unhealthy_threshold      = 2                                                     # Number of failed health checks before marking unhealthy
+elb_unhealthy_threshold      = 3                                                     # Number of failed health checks before marking unhealthy
 elb_check_interval_sec       = 10                                                    # Interval between health checks for ELB (seconds)
 elb_draining_timeout_sec     = 60                                                    # Timeout for draining connections (seconds)

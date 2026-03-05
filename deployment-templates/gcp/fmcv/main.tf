@@ -17,7 +17,7 @@ variable "mgmt_subnet_name" {}
 
 variable "day0_config" {}
 
-# variable "admin_password" {}
+variable "dualstack" {}
 
 ############################################################################################
 
@@ -43,27 +43,20 @@ resource "google_compute_instance" "fmcv_instance" {
   network_interface {
     network    = var.mgmt_vpc_name
     subnetwork = var.mgmt_subnet_name
-    stack_type = "IPV4_IPV6"
+    stack_type = var.dualstack ? "IPV4_IPV6" : "IPV4_ONLY"    
     access_config {
       network_tier = "PREMIUM"
     }
-    ipv6_access_config {
-      network_tier = "PREMIUM"
+    dynamic "ipv6_access_config" {
+      for_each = var.dualstack ? [1] : []
+      content {
+        network_tier = "PREMIUM"
+      }
     }
   }
-
   can_ip_forward = true
-
   metadata_startup_script = var.day0_config
 
-  # metadata_startup_script = <<EOF
-  # {
-  #   "AdminPassword": "${var.admin_password}",
-  #   "Hostname": "cim-tf-fmcv",
-  #   "IPv4Mode": "dhcp",
-  #   "IPv6Mode": "dhcp",
-  # }
-  # EOF
   labels = {
     autostop = "false"
   }
@@ -76,7 +69,7 @@ resource "google_compute_instance" "fmcv_instance" {
 
 # Outputs
 output "fmcv_ssh_ip" {
-  description = "Public IP address of the management interface"
+  description = "Public IPv4 address of the management interface"
   value = length(google_compute_instance.fmcv_instance.network_interface[0].access_config) > 0 ? google_compute_instance.fmcv_instance.network_interface[0].access_config[0].nat_ip : null
 }
 output "fmcv_mgmt_ip" {
@@ -85,8 +78,8 @@ output "fmcv_mgmt_ip" {
 }
 output "fmcv_mgmt_ipv6" {
   description = "IPv6 address of the FMCv"
-  value = google_compute_instance.fmcv_instance.network_interface[0].ipv6_access_config[0].external_ipv6
-} 
+  value = var.dualstack ? google_compute_instance.fmcv_instance.network_interface[0].ipv6_access_config[0].external_ipv6 : null
+}
 output "fmcv_instance_name" {
   description = "Name of the fmcv instance"
   value = google_compute_instance.fmcv_instance.name
