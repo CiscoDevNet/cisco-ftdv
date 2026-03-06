@@ -42,14 +42,14 @@ outside_hc_firewall_rule_name= "<resource-name>-ftdv-outside-hc-firewall-rule"  
 # --------------------
 # Instance Details
 # --------------------
-machine_type                 = "n1-standard-8"                                       # GCP Supported machine type
+machine_type                 = "c2-standard-8"                                       # GCP Supported machine type
 source_image_url             = "projects/cisco-public/global/images/<image-name>"    # Source image location for FTDv
 public_key                   = "<ssh-public-key>"                                    # Public Key for SSH access, e.g. ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4v
 
 # --------------------
 # Autoscale Details
 # --------------------
-auto_scaling                 = true                                                  # Enable autoscaling
+auto_scaling                 = true                                                  # BOOL - Enable autoscaling
 cpu_utilization_target       = 0.60                                                  # Target CPU utilization for autoscaling (0.0 to 1.0)
 min_ftd_count                = 0                                                     # Minimum number of FTDv instances
 max_ftd_count                = 2                                                     # Maximum number of FTDv instances
@@ -61,10 +61,10 @@ ftd_password_secret_name     = ""                                               
 hostname                     = "ftdv"                                                # Hostname for FTDv, e.g. cisco-ngfwv
 ccl_subnet_range             = "<first ip> <last ip>"                                # Subnet range for CCL, space separated
 cluster_grp_name             = "<any-name-for-cluster>"                              # Cluster group name for FTDv
-with_diagnostic              = false                                                 # Whether to enable diagnostics
-assign_public_ip_to_mgmt     = true                                                  # Whether to assign public IP to management interface
-ftd_reg_via_public_ip        = true                                                  # Whether to register FTDv with public IP
-enable_secure_boot           = false                                                 # Supported from version 10.0 onwards only. Whether to enable secure boot
+with_diagnostic              = false                                                 # BOOL - Whether to enable diagnostics
+assign_public_ip_to_mgmt     = true                                                  # BOOL - Whether to assign public IP to management interface
+ftd_reg_via_public_ip        = true                                                  # BOOL - Whether to register FTDv with public IP
+enable_secure_boot           = false                                                 # BOOL - Supported from version 10.0 onwards only. Whether to enable secure boot
 
 # --------------------
 # FMC Information & FTDv Configuration

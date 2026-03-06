@@ -9,7 +9,9 @@ variable "resource_name_prefix" {}
 variable "region" {}
 variable "mgmt_ip_cidr_range" {}
 variable "vpc_connector_ip_cidr_range" {}
-variable "with_diagnostic" {}
+variable "with_diagnostic" {
+  type = bool
+}
 variable "diag_ip_cidr_range" {
   default = ""
   nullable = false
@@ -222,9 +224,9 @@ resource "google_vpc_access_connector" "connector" {
 # So when "ftd_reg_via_public_ip" is set to true, Google Function traffic will go via NAT GW's Public IP.
 
 # Create a static Public Address to assign to NAT GW
-resource "google_compute_address" "mgmtgw_public_ip" {
+resource "google_compute_address" "mgmt_gw_public_ip" {
   count  = var.ftd_reg_via_public_ip ? 1 : 0
-  name   = "${var.resource_name_prefix}-mgmtgw-public-ip"
+  name   = "${var.resource_name_prefix}-mgmt-gw-public-ip"
   region = var.region
 }
 
@@ -239,45 +241,12 @@ resource "google_compute_router" "mgmt_nat_router" {
 # Management NAT Gateway configuration
 resource "google_compute_router_nat" "mgmt_nat" {
   count                              = var.ftd_reg_via_public_ip ? 1 : 0
-  name                               = "${var.resource_name_prefix}-cloud-nat"
+  name                               = "${var.resource_name_prefix}-mgmt-nat"
   router                             = google_compute_router.mgmt_nat_router[0].name
   region                             = var.region
   nat_ip_allocate_option             = "MANUAL_ONLY"
-  nat_ips                            = [google_compute_address.mgmtgw_public_ip[0].self_link]
+  nat_ips                            = [google_compute_address.mgmt_gw_public_ip[0].self_link]
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
-}
-
-
-output "mgmt_vpc_self_link" {
-  value = google_compute_network.mgmt_vpc.self_link
-}
-
-output "mgmt_subnet_self_link" {
-  value = google_compute_subnetwork.mgmt_subnet.self_link
-}
-
-output "inside_vpc_self_link" {
-  value = google_compute_network.inside_vpc.self_link
-}
-
-output "inside_subnet_self_link" {
-  value = google_compute_subnetwork.inside_subnet.self_link
-}
-
-output "outside_vpc_self_link" {
-  value = google_compute_network.outside_vpc.self_link
-}
-
-output "outside_subnet_self_link" {
-  value = google_compute_subnetwork.outside_subnet.self_link
-}
-
-output "ccl_vpc_self_link" {
-  value = google_compute_network.ccl_vpc.self_link
-}
-
-output "ccl_subnet_self_link" {
-  value = google_compute_subnetwork.ccl_subnet.self_link
 }
 
 # VPC Names
@@ -299,7 +268,7 @@ output "ccl_vpc_name" {
 
 output "diag_vpc_name" {
   description = "Name of diagnostic VPC"
-  value = lower(tostring(var.with_diagnostic)) == "true" ? google_compute_network.diag_vpc[0].name : null
+  value = var.with_diagnostic ? google_compute_network.diag_vpc[0].name : null
 }
 
 # Subnet Names
@@ -320,16 +289,20 @@ output "ccl_subnet_name" {
 
 output "diag_subnet_name" {
   description = "Name of diagnostic subnet"
-  value = lower(tostring(var.with_diagnostic)) == "true" ? google_compute_subnetwork.diag_subnet[0].name : null
+  value = var.with_diagnostic ? google_compute_subnetwork.diag_subnet[0].name : null
 }
 
-##VPC Connector and NAT GW Outputs
+##VPC Connector and NAT GW, Router Outputs
 output "vpc_connector_name" {
   value = google_vpc_access_connector.connector.name
 }
 
 output "mgmt_nat_ip" {
-  value = var.ftd_reg_via_public_ip && length(google_compute_address.mgmtgw_public_ip) > 0 ? google_compute_address.mgmtgw_public_ip[0].address : null
+  value = var.ftd_reg_via_public_ip && length(google_compute_address.mgmt_gw_public_ip) > 0 ? google_compute_address.mgmt_gw_public_ip[0].address : null
+}
+
+output "mgmt_nat_router" {
+  value = var.ftd_reg_via_public_ip && length(google_compute_router.mgmt_nat_router) > 0 ? google_compute_router.mgmt_nat_router[0].name : null
 }
 
 ##Firewall Rule Outputs
