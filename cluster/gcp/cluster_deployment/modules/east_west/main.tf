@@ -288,11 +288,11 @@ resource "google_compute_address" "ftdv_ilb_ip_outside" {
 
 # Outputs
 output "ilb_in_name" {
-  value = google_compute_region_backend_service.ftdv_ilb_inside.name
+  value = google_compute_forwarding_rule.ftdv_fr_ilb_inside.name
 }
 
 output "ilb_out_name" {
-  value = google_compute_region_backend_service.ftdv_ilb_outside.name
+  value = google_compute_forwarding_rule.ftdv_fr_ilb_outside.name
 }
 
 output "ilb_in_ip" {

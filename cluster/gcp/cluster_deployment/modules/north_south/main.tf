@@ -327,11 +327,14 @@ resource "google_compute_router_nat" "outside_nat" {
 
 # Outputs
 output "elb_name" {
-  value = google_compute_region_backend_service.ftdv_elb.name
+  value = one(concat(
+    google_compute_forwarding_rule.ftdv_fr_elb1[*].name,
+    google_compute_forwarding_rule.ftdv_fr_elb2[*].name
+  ))
 }
 
 output "ilb_name" {
-  value = google_compute_region_backend_service.ftdv_ilb.name
+  value = google_compute_forwarding_rule.ftdv_fr_ilb.name
 }
 
 output "outside_nat_router" {
