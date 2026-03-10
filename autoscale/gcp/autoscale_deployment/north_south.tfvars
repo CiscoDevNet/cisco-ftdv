@@ -41,24 +41,24 @@ service_account_mail_id = "service-account-email" # e.g., "random@asav.iam.gserv
 
 # VPC and Subnetwork Configuration
 outside_vpc_name        = "outside-vpc-name"        # e.g., "random-outside-vpc"
-outside_subnetwork_name = "outside-subnetwork-name" # e.g., "random-outside-subnet"
+outside_subnet_name = "outside-subnetwork-name" # e.g., "random-outside-subnet"
 inside_vpc_name         = "inside-vpc-name"         # e.g., "random-inside-vpc"
-inside_subnetwork_name  = "inside-subnetwork-name"  # e.g., "random-inside-subnet"
+inside_subnet_name  = "inside-subnetwork-name"  # e.g., "random-inside-subnet"
 mgmt_vpc_name           = "mgmt-vpc-name"           # e.g., "random-mgmt-vpc"
-mgmt_subnetwork_name    = "mgmt-subnetwork-name"    # e.g., "random-mgmt-subnet"
+mgmt_subnet_name    = "mgmt-subnetwork-name"    # e.g., "random-mgmt-subnet"
 diag_vpc_name           = "diag-vpc-name"           # e.g., "random-diag-vpc"
-diag_subnetwork_name    = "diag-subnetwork-name"    # e.g., "random-diag-subnet"
+diag_subnet_name    = "diag-subnetwork-name"    # e.g., "random-diag-subnet"
 
 # Deployment and Diagnostic Configuration of FTDv
 deploy_using_external_ip = false
 with_diagnostic          = false
 
 # Firewall Rules
-mgmt_firewall_rule         = "allow-ftd-m" # e.g., "allow-ftd-m"
-outside_firewall_rule      = "allow-ftd-o" # e.g., "allow-ftd-o"
-inside_firewall_rule       = "allow-ftd-i" # e.g., "allow-ftd-i"
-health_check_firewall_rule = "allow-ftd-h" # e.g., "allow-ftd-h"
-diag_firewall_rule         = "allow-ftd-d" # e.g., "allow-ftd-d"
+mgmt_firewall_rule_name         = "allow-ftd-m" # e.g., "allow-ftd-m"
+outside_firewall_rule_name      = "allow-ftd-o" # e.g., "allow-ftd-o"
+inside_firewall_rule_name       = "allow-ftd-i" # e.g., "allow-ftd-i"
+health_check_firewall_rule_name = "allow-ftd-h" # e.g., "allow-ftd-h"
+diag_firewall_rule_name         = "allow-ftd-d" # e.g., "allow-ftd-d"
 
 # FMC Configuration
 fmc_ip                 = "fmc-ip"              # e.g., "10.115.0.2"

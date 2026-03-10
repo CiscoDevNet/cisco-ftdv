@@ -245,10 +245,10 @@ variable "outside_vpc_name" {
   }
 }
 
-variable "outside_subnetwork_name" {
+variable "outside_subnet_name" {
   description = "Subnet name for the outside VPC."
   validation {
-    condition     = length(var.outside_subnetwork_name) > 0
+    condition     = length(var.outside_subnet_name) > 0
     error_message = "Please provide a valid outside VPC subnet name."
   }
 }
@@ -261,10 +261,10 @@ variable "inside_vpc_name" {
   }
 }
 
-variable "inside_subnetwork_name" {
+variable "inside_subnet_name" {
   description = "Subnet name for the inside VPC."
   validation {
-    condition     = length(var.inside_subnetwork_name) > 0
+    condition     = length(var.inside_subnet_name) > 0
     error_message = "Please provide a valid inside VPC subnet name."
   }
 }
@@ -277,10 +277,10 @@ variable "mgmt_vpc_name" {
   }
 }
 
-variable "mgmt_subnetwork_name" {
+variable "mgmt_subnet_name" {
   description = "Subnet name for the management VPC."
   validation {
-    condition     = length(var.mgmt_subnetwork_name) > 0
+    condition     = length(var.mgmt_subnet_name) > 0
     error_message = "Please provide a valid management VPC subnet name."
   }
 }
@@ -293,10 +293,10 @@ variable "diag_vpc_name" {
   }
 }
 
-variable "diag_subnetwork_name" {
+variable "diag_subnet_name" {
   description = "Subnet name for the diagnostic VPC."
   validation {
-    condition     = length(var.diag_subnetwork_name) > 0
+    condition     = length(var.diag_subnet_name) > 0
     error_message = "Please provide a valid diagnostic VPC subnet name."
   }
 }
@@ -311,42 +311,42 @@ variable "with_diagnostic" {
   type        = bool
 }
 
-variable "mgmt_firewall_rule" {
+variable "mgmt_firewall_rule_name" {
   description = "Firewall rule for management traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.mgmt_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.mgmt_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "outside_firewall_rule" {
+variable "outside_firewall_rule_name" {
   description = "Firewall rule for external traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.outside_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.outside_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "inside_firewall_rule" {
+variable "inside_firewall_rule_name" {
   description = "Firewall rule for internal traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.inside_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.inside_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "health_check_firewall_rule" {
+variable "health_check_firewall_rule_name" {
   description = "Firewall rule for health checks."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.health_check_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.health_check_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "diag_firewall_rule" {
+variable "diag_firewall_rule_name" {
   description = "Firewall rule for diagnostic traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
@@ -562,21 +562,59 @@ module "ftdv_autoscale" {
   admin_password             = var.admin_password
   public_key                 = var.public_key
   outside_vpc_name           = var.outside_vpc_name
-  outside_subnetwork_name    = var.outside_subnetwork_name
+  outside_subnet_name       = var.outside_subnet_name
   inside_vpc_name            = var.inside_vpc_name
-  inside_subnetwork_name     = var.inside_subnetwork_name
+  inside_subnet_name        = var.inside_subnet_name
   mgmt_vpc_name              = var.mgmt_vpc_name
-  mgmt_subnetwork_name       = var.mgmt_subnetwork_name
+  mgmt_subnet_name          = var.mgmt_subnet_name
   diag_vpc_name              = var.diag_vpc_name
-  diag_subnetwork_name       = var.diag_subnetwork_name
+  diag_subnet_name          = var.diag_subnet_name
   deploy_using_external_ip   = var.deploy_using_external_ip
   with_diagnostic            = var.with_diagnostic
-  mgmt_firewall_rule         = var.mgmt_firewall_rule
-  outside_firewall_rule      = var.outside_firewall_rule
-  inside_firewall_rule       = var.inside_firewall_rule
-  health_check_firewall_rule = var.health_check_firewall_rule
-  diag_firewall_rule         = var.diag_firewall_rule
+  mgmt_firewall_rule         = var.mgmt_firewall_rule_name
+  outside_firewall_rule      = var.outside_firewall_rule_name
+  inside_firewall_rule       = var.inside_firewall_rule_name
+  health_check_firewall_rule = var.health_check_firewall_rule_name
+  diag_firewall_rule         = var.diag_firewall_rule_name
   zone                       = var.zone
 
   depends_on = [module.ftdv_functions]
+}
+
+# Outputs
+
+output "elb_name" {
+  value = module.ftdv_autoscale.elb_name
+}
+
+output "ilb_name" {
+  value = module.ftdv_autoscale.ilb_name
+}
+
+output "elb_ip" {
+  value = module.ftdv_autoscale.elb_ip
+}
+
+output "ilb_ip" {
+  value = module.ftdv_autoscale.ilb_ip
+}
+
+output "outside_nat_router" {
+  value = module.ftdv_autoscale.outside_nat_router
+}
+
+output "outside_nat" {
+  value = module.ftdv_autoscale.outside_nat
+}
+
+output "instance_group_name" {
+  value = module.ftdv_autoscale.instance_group_name
+}
+
+output "scale_out_function_name" {
+  value = module.ftdv_functions.scale_out_function_name
+}
+
+output "scale_in_function_name" {
+  value = module.ftdv_functions.scale_in_function_name
 }
