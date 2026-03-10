@@ -263,6 +263,30 @@ resource "google_vpc_access_connector" "connector" {
   max_instances = 10
   min_instances = 2
 }
+
+# Create a static Public Address to assign to NAT GW
+resource "google_compute_address" "mgmt_gw_public_ip" {
+  name   = "${var.resource_name_prefix}-mgmt-gw-public-ip"
+  region = var.region
+}
+
+# Management NAT Router
+resource "google_compute_router" "mgmt_nat_router" {
+  name    = "${var.resource_name_prefix}-mgmt-nat-router"
+  network = google_compute_network.mgmt_vpc.self_link
+  region  = var.region
+}
+
+# Management NAT Gateway configuration
+resource "google_compute_router_nat" "mgmt_nat" {
+  name                               = "${var.resource_name_prefix}-mgmt-nat"
+  router                             = google_compute_router.mgmt_nat_router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "MANUAL_ONLY"
+  nat_ips                            = [google_compute_address.mgmt_gw_public_ip.self_link]
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
 ## VPC and Subnet Outputs
 output "mgmt_vpc_name" {
   value = google_compute_network.mgmt_vpc.name
@@ -296,9 +320,17 @@ output "diag_subnet_name" {
   value = var.with_diagnostic ? google_compute_subnetwork.diag_subnet[0].name : null
 }
 
-##VPC Connector Output
+##VPC Connector and NAT GW, Router Outputs
 output "vpc_connector_name" {
   value = google_vpc_access_connector.connector.name
+}
+
+output "mgmt_nat_ip" {
+  value = google_compute_address.mgmt_gw_public_ip.address
+}
+
+output "mgmt_nat_router" {
+  value = google_compute_router.mgmt_nat_router.name
 }
 
 ##Firewall Rule Outputs
@@ -324,12 +356,12 @@ output "diag_firewall_rule_name" {
 
 output "inside_hc_firewall_rule_name" {
   description = "Name of the inside health check firewall rule"
-  value       = google_compute_firewall.inside_hc_firewall.name
+  value       = google_compute_firewall.hc_firewall_inside.name
 }
 
 output "outside_hc_firewall_rule_name" {
   description = "Name of the outside health check firewall rule"
-  value       = google_compute_firewall.outside_hc_firewall.name
+  value       = google_compute_firewall.hc_firewall_outside.name
 }
 
 
