@@ -288,7 +288,7 @@ variable "mgmt_subnet_name" {
 variable "diag_vpc_name" {
   description = "Name of the diagnostic VPC."
   validation {
-    condition     = length(var.diag_vpc_name) > 0
+    condition     = !var.with_diagnostic || length(var.diag_vpc_name) > 0
     error_message = "Diagnostic VPC name cannot be empty."
   }
 }
@@ -296,7 +296,7 @@ variable "diag_vpc_name" {
 variable "diag_subnet_name" {
   description = "Subnet name for the diagnostic VPC."
   validation {
-    condition     = length(var.diag_subnet_name) > 0
+    condition     = !var.with_diagnostic || length(var.diag_subnet_name) > 0
     error_message = "Please provide a valid diagnostic VPC subnet name."
   }
 }
@@ -346,7 +346,7 @@ variable "health_check_firewall_rule_name" {
 variable "diag_firewall_rule_name" {
   description = "Firewall rule for diagnostic traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule_name))
+    condition     = !var.with_diagnostic || can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
