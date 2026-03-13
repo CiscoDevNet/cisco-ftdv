@@ -184,6 +184,7 @@ resource "google_compute_firewall" "inside_hc_firewall" {
   allow {
     protocol = "tcp"
   }
+  disabled = true
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
 }
 
@@ -194,6 +195,7 @@ resource "google_compute_firewall" "outside_hc_firewall" {
   allow {
     protocol = "tcp"
   }
+  disabled = true
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16", "209.85.152.0/22", "209.85.204.0/22"]
 }
 
