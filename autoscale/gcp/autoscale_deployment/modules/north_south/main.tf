@@ -395,7 +395,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     dynamic "access_config" {
       for_each = var.deploy_using_external_ip ? [1] : []
       content {
-        nat_ip = true
+        network_tier = "PREMIUM"
       }
     }
   }
@@ -553,6 +553,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb" {
   load_balancing_scheme = "INTERNAL"
   all_ports             = true
   backend_service       = google_compute_region_backend_service.ftdv_backend_service_ilb.id
+  ip_address            = google_compute_address.ftdv_ilb_ip.address
   network               = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"
   subnetwork            = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
 }

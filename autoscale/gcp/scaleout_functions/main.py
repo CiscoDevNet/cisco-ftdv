@@ -69,7 +69,7 @@ def scale_out(event, context):
           response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
           
           # mgmt ip -> nic2
-          if  eval(os.getenv('SSH_USING_EXTERNAL_IP')) is False:
+          if  os.getenv('SSH_USING_EXTERNAL_IP', 'false').lower() != 'true':
                #internal ip
                ssh_ip = response['networkInterfaces'][2]['networkIP']
           else:
