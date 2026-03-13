@@ -138,10 +138,8 @@ variable "ftdv_password" {
 
 variable "ssh_using_external_ip" {
   description = "Indicates whether SSH is using an external IP."
-  validation {
-    condition     = var.ssh_using_external_ip == "True" || var.ssh_using_external_ip == "False"
-    error_message = "Please provide a valid string value ('True' or 'False')."
-  }
+  type        = bool
+  default     = false
 }
 
 variable "license_caps" {
