@@ -287,18 +287,14 @@ variable "mgmt_subnet_name" {
 
 variable "diag_vpc_name" {
   description = "Name of the diagnostic VPC."
-  validation {
-    condition     = !var.with_diagnostic || length(var.diag_vpc_name) > 0
-    error_message = "Diagnostic VPC name cannot be empty."
-  }
+  default      = null
+  nullable     = true
 }
 
 variable "diag_subnet_name" {
   description = "Subnet name for the diagnostic VPC."
-  validation {
-    condition     = !var.with_diagnostic || length(var.diag_subnet_name) > 0
-    error_message = "Please provide a valid diagnostic VPC subnet name."
-  }
+  default      = null
+  nullable     = true
 }
 
 variable "deploy_using_external_ip" {
@@ -345,10 +341,8 @@ variable "health_check_firewall_rule_name" {
 
 variable "diag_firewall_rule_name" {
   description = "Firewall rule for diagnostic traffic."
-  validation {
-    condition     = !var.with_diagnostic || can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule_name))
-    error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
-  }
+  default      = null
+  nullable     = true
 }
 
 variable "fmc_ip" {
