@@ -62,6 +62,7 @@ Resources:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref MgmtSubnetId
+      Ipv6AddressCount: 1
       GroupSet:
         - !Ref SecurityGroupId
       Description: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
@@ -73,6 +74,7 @@ Resources:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref InsideSubnetId
+      Ipv6AddressCount: 1
       GroupSet:
         - !Ref SecurityGroupId
       Description: !Sub "${ResourceNamePrefix}-inside-data-eni"
@@ -123,6 +125,7 @@ Resources:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref MgmtSubnetId
+      Ipv6AddressCount: 1
       GroupSet:
         - !Ref SecurityGroupId
       Description: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
@@ -134,6 +137,7 @@ Resources:
     Type: AWS::EC2::NetworkInterface
     Properties:
       SubnetId: !Ref OutsideSubnetId
+      Ipv6AddressCount: 1
       GroupSet:
         - !Ref SecurityGroupId
       Description: !Sub "${ResourceNamePrefix}-outside-data-eni"
@@ -203,3 +207,19 @@ Outputs:
   LinuxOutsideDataIP:
     Description: Private IPv4 address of the outside data interface
     Value: !GetAtt OutsideDataENI.PrimaryPrivateIpAddress
+
+  LinuxInsideMgmtIPv6:
+    Description: IPv6 address of the inside instance management interface
+    Value: !Select [0, !GetAtt InsideMgmtENI.Ipv6Addresses]
+
+  LinuxInsideDataIPv6:
+    Description: IPv6 address of the inside data interface
+    Value: !Select [0, !GetAtt InsideDataENI.Ipv6Addresses]
+
+  LinuxOutsideMgmtIPv6:
+    Description: IPv6 address of the outside instance management interface
+    Value: !Select [0, !GetAtt OutsideMgmtENI.Ipv6Addresses]
+
+  LinuxOutsideDataIPv6:
+    Description: IPv6 address of the outside data interface
+    Value: !Select [0, !GetAtt OutsideDataENI.Ipv6Addresses]
