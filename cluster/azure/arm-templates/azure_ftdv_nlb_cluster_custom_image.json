@@ -713,6 +713,10 @@
                      "value":"azure-utility-ip"
                   },
                   {
+                     "name": "HEALTH_CHECK_PORT_NUMBER",
+                     "value": "[parameters('healthCheckPortNumber')]"
+                  },
+                  {
                      "name":"FMC_DOMAIN_UUID",
                      "value":"e276abec-e0f2-11e3-8169-6d9ed49b625f"
                   },
