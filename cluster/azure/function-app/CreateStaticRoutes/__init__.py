@@ -125,7 +125,8 @@ def main(req: func.HttpRequest):
             route_creation_error = 1
 
     if route_creation_error == 1:
-        return func.HttpResponse("Failed to create route",status_code=400)
+        return func.HttpResponse("Failed to create route", status_code=400)
         
     log.info("CreateStaticRoutes:::: Successfully created static routes")
+
     return func.HttpResponse("SUCCESS",status_code=200)

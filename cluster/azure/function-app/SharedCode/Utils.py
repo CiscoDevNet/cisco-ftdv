@@ -285,6 +285,23 @@ class FMC:
                 if item['name'] == name:
                     return str(item['id'])
         return "ERROR"
+
+    def getClusterIdByName(self, name):
+        """
+        Purpose:    To get cluster id by passing name of the cluster
+        Parameters: Name of cluster
+        Returns:    Cluster Id or ERROR
+        Raises:
+        """
+        log.info("util:::: Getting Cluster ID for: {}".format(name))
+        api_path = "/api/fmc_config/v1/domain/" + self.domain_uuid + "/deviceclusters/ftddevicecluster"
+        url = self.server + api_path + '?offset=0&limit=1000'
+        r = self.rest_get(url)
+        if r.status_code == 200 and 'items' in r.json():
+            for item in r.json()['items']:
+                if item['name'] == name:
+                    return str(item['id'])
+        return "ERROR"
     
     def getObjIdByName(self, objName, cmd):
         """
@@ -317,6 +334,24 @@ class FMC:
         for item in r.json()['items']:
             if item['type'] == type and item['name'] == objName:
                 return str(item['id'])
+        
+        return "ERROR"
+
+    def fmcGetNetworkObjectId(self, objName):
+        """
+        Purpose:    Get Network Object Id by Name (from /object/networks endpoint)
+        Parameters: Object Name
+        Returns:    Object Id or ERROR
+        Raises:
+        """
+        log.info("util:::: Getting Network object {} ID".format(objName))
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/object/networks?offset=0&limit=1000"
+        r = self.rest_get(url)
+        
+        if r.status_code == 200 and 'items' in r.json():
+            for item in r.json()['items']:
+                if item['name'] == objName:
+                    return str(item['id'])
         
         return "ERROR"
 
@@ -635,6 +670,207 @@ class FMC:
             return "ERROR"
 
 # ======================================= Delete functions =================================================
+    def fmcCreatePlatformSettingsPolicy(self, rule_name):
+        """
+        Purpose:    To create a Platform Settings Policy
+        Parameters: rule_name - Name for the platform settings policy
+        Returns:    UUID of created policy or ERROR
+        Raises:
+        """
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/policy/ftdplatformsettingspolicies"
+        post_data = {
+            "type": "FTDPlatformSettingsPolicy",
+            "name": rule_name,
+            "description": "Platform Settings for Health Check"
+        }
+        log.info("util:::: Creating Platform Settings Policy: {}".format(rule_name))
+
+        r = self.rest_post(url, post_data)
+        if 200 <= r.status_code <= 202:
+            try:
+                return r.json().get('id', 'ERROR')
+            except:
+                return "ERROR"
+        else:
+            log.error("util:::: Failed to create Platform Settings Policy: {} .. probably already existing".format(rule_name))
+            return "ERROR"
+
+    def fmcGetPlatformSettingsPolicyId(self, policy_name):
+        """
+        Purpose:    Get Platform Settings Policy Id by name
+        Parameters: policy_name - Name of the platform settings policy
+        Returns:    Policy Id or ERROR
+        Raises:
+        """
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/policy/ftdplatformsettingspolicies"
+        url = url + '?offset=0&limit=1000'
+        log.info("util:::: Getting Platform Settings Policy ID for: {}".format(policy_name))
+
+        r = self.rest_get(url)
+        if r.status_code == 200:
+            try:
+                if 'items' in r.json():
+                    for item in r.json()['items']:
+                        if item['name'] == policy_name:
+                            return str(item['id'])
+            except:
+                pass
+        return "ERROR"
+
+    def fmcCreateHttpsAccessRule(self, policy_id, port, inside_zone_id, outside_zone_id):
+        """
+        Purpose:    To create HTTPS access rule in platform settings for health check
+        Parameters: policy_id - Platform settings policy ID
+                    port - Health check port number
+                    inside_zone_id - Inside security zone ID
+                    outside_zone_id - Outside security zone ID
+        Returns:    SUCCESS or ERROR
+        Raises:
+        """
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/policy/platformsettingspolicies/" + policy_id + "/httpaccesssettings"
+        post_data = {
+            "type": "HTTPAccessSetting",
+            "enableHttpServer": True,
+            "httpPort": int(port),
+            "httpAccessList": [
+                {
+                    "securityZone": {
+                        "id": inside_zone_id,
+                        "type": "SecurityZone"
+                    }
+                },
+                {
+                    "securityZone": {
+                        "id": outside_zone_id,
+                        "type": "SecurityZone"
+                    }
+                }
+            ]
+        }
+        log.info("util:::: Creating HTTP Access Rule for health check on port: {}".format(port))
+
+        r = self.rest_post(url, post_data)
+        if 201 <= r.status_code <= 202:
+            return "SUCCESS"
+        else:
+            log.error("util:::: Failed to create HTTP Access Rule")
+            return "ERROR"
+
+    def fmcUpdatePlatformSettingsHttpAccess(self, policy_id, port, inside_zone_id, outside_zone_id, inside_zone_name="inside", outside_zone_name="outside"):
+        """
+        Purpose:    To update platform settings with HTTP access for health check using public API
+        Parameters: policy_id - Platform settings policy ID
+                    port - Health check port number
+                    inside_zone_id - Inside security zone ID
+                    outside_zone_id - Outside security zone ID
+                    inside_zone_name - Inside security zone name
+                    outside_zone_name - Outside security zone name
+        Returns:    SUCCESS or ERROR
+        Raises:
+        """
+        # Get the any-ipv4 network object ID for HTTP access
+        any_ipv4_id = self.fmcGetNetworkObjectId("any-ipv4")
+        if any_ipv4_id == "ERROR":
+            log.error("util:::: Failed to get any-ipv4 network object ID")
+            return "ERROR"
+        
+        log.info("util:::: Using any-ipv4 network object ID: {}".format(any_ipv4_id))
+        
+        # Build httpConfiguration payload with zones and network (matching working debug script)
+        http_configuration = [
+            {
+                "ipAddress": {
+                    "name": "any-ipv4",
+                    "id": any_ipv4_id,
+                    "type": "Network"
+                },
+                "interfaces": {
+                    "objects": [
+                        {
+                            "name": inside_zone_name,
+                            "id": inside_zone_id,
+                            "type": "SecurityZone"
+                        },
+                        {
+                            "name": outside_zone_name,
+                            "id": outside_zone_id,
+                            "type": "SecurityZone"
+                        }
+                    ]
+                }
+            }
+        ]
+        
+        # Use public API with PUT method (httpaccesssettings/{policy_id})
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/policy/ftdplatformsettingspolicies/" + policy_id + "/httpaccesssettings/" + policy_id
+        
+        payload = {
+            "id": policy_id,
+            "enableHttpServer": True,
+            "port": int(port),
+            "httpConfiguration": http_configuration
+        }
+        
+        log.info("util:::: Updating Platform Settings HTTP Access with public API on port: {}".format(port))
+        log.info("util:::: URL: {}".format(url))
+        log.info("util:::: Payload: {}".format(payload))
+        
+        r = self.rest_put(url, payload)
+        if 200 <= r.status_code <= 202:
+            log.info("util:::: Successfully updated HTTP Access Settings with zones and network")
+            return "SUCCESS"
+        else:
+            log.error("util:::: Failed to update HTTP Access Settings: {}".format(r.text))
+            return "ERROR"
+
+    def fmcAssignPlatformSettingsToDeviceGroup(self, policy_id, policy_name, target_id, target_type="DeviceCluster"):
+        """
+        Purpose:    To assign platform settings policy to a device group or cluster
+        Parameters: policy_id - Platform settings policy ID
+                    policy_name - Platform settings policy name
+                    target_id - Device group or cluster ID
+                    target_type - Type of target (DeviceCluster or DeviceGroup)
+        Returns:    SUCCESS or ERROR
+        Raises:
+        """
+        url = self.server + "/api/fmc_config/v1/domain/" + self.domain_uuid + "/assignment/policyassignments"
+        post_data = {
+            "type": "PolicyAssignment",
+            "policy": {
+                "type": "FTDPlatformSettingsPolicy",
+                "id": policy_id,
+                "name": policy_name
+            },
+            "targets": [
+                {
+                    "id": target_id,
+                    "type": target_type
+                }
+            ]
+        }
+        log.info("util:::: Assigning Platform Settings Policy {} to {} ({})".format(policy_name, target_type, target_id))
+
+        r = self.rest_post(url, post_data)
+        if 200 <= r.status_code <= 202:
+            log.info("util:::: Successfully assigned Platform Settings Policy")
+            return "SUCCESS"
+        elif r.status_code == 406 and "already has some assignments" in r.text:
+            # Policy already assigned, try PUT to update
+            log.info("util:::: Policy already assigned, trying PUT to update...")
+            put_url = url + "/" + policy_id
+            post_data["id"] = policy_id
+            r = self.rest_put(put_url, post_data)
+            if 200 <= r.status_code <= 202:
+                log.info("util:::: Successfully updated Platform Settings Policy assignment")
+                return "SUCCESS"
+            else:
+                # Assignment already exists, consider it success
+                log.info("util:::: Policy assignment already exists - OK")
+                return "SUCCESS"
+        else:
+            log.error("util:::: Failed to assign Platform Settings: {}".format(r.text))
+            return "ERROR"
+
     def fmcDeleteHPNatRules(self, natPolicyId):
         """
         Purpose:    To delete Health Probe nat rules
