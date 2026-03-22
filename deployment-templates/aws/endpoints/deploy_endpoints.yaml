@@ -64,6 +64,7 @@ Resources:
       SubnetId: !Ref MgmtSubnetId
       GroupSet:
         - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
       Description: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
       Tags:
         - Key: Name
@@ -75,6 +76,7 @@ Resources:
       SubnetId: !Ref InsideSubnetId
       GroupSet:
         - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
       Description: !Sub "${ResourceNamePrefix}-inside-data-eni"
       Tags:
         - Key: Name
@@ -125,6 +127,7 @@ Resources:
       SubnetId: !Ref MgmtSubnetId
       GroupSet:
         - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
       Description: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
       Tags:
         - Key: Name
@@ -136,6 +139,7 @@ Resources:
       SubnetId: !Ref OutsideSubnetId
       GroupSet:
         - !Ref SecurityGroupId
+      Ipv6AddressCount: 1
       Description: !Sub "${ResourceNamePrefix}-outside-data-eni"
       Tags:
         - Key: Name
