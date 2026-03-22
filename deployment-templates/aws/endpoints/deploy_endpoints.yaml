@@ -51,10 +51,21 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
     Description: Security Group ID for EC2 instances (must allow inbound TCP/22 from your IP for SSH).
 
+  EnableIPv6:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable IPv6 on ENIs. Set to false when subnets lack IPv6 CIDR (e.g. cluster/autoscale infra).
+
   UbuntuNobleAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
     Description: Canonical Ubuntu 24.04 LTS (Noble) AMI via SSM public parameter.
+
+Conditions:
+  HasIPv6: !Equals [!Ref EnableIPv6, 'true']
 
 Resources:
   # -------- Inside endpoint --------
@@ -64,7 +75,7 @@ Resources:
       SubnetId: !Ref MgmtSubnetId
       GroupSet:
         - !Ref SecurityGroupId
-      Ipv6AddressCount: 1
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
       Description: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
       Tags:
         - Key: Name
@@ -76,7 +87,7 @@ Resources:
       SubnetId: !Ref InsideSubnetId
       GroupSet:
         - !Ref SecurityGroupId
-      Ipv6AddressCount: 1
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
       Description: !Sub "${ResourceNamePrefix}-inside-data-eni"
       Tags:
         - Key: Name
@@ -127,7 +138,7 @@ Resources:
       SubnetId: !Ref MgmtSubnetId
       GroupSet:
         - !Ref SecurityGroupId
-      Ipv6AddressCount: 1
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
       Description: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
       Tags:
         - Key: Name
@@ -139,7 +150,7 @@ Resources:
       SubnetId: !Ref OutsideSubnetId
       GroupSet:
         - !Ref SecurityGroupId
-      Ipv6AddressCount: 1
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
       Description: !Sub "${ResourceNamePrefix}-outside-data-eni"
       Tags:
         - Key: Name
