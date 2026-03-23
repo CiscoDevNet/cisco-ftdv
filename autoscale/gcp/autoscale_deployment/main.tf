@@ -399,14 +399,6 @@ variable "policy_id" {
   }
 }
 
-variable "ftdv_password" {
-  description = "Password for FTDv access."
-  validation {
-    condition     = length(var.ftdv_password) >= 8
-    error_message = "Password must be at least 8 characters long."
-  }
-}
-
 variable "ssh_using_external_ip" {
   description = "Indicates whether SSH is using an external IP."
   validation {
@@ -523,13 +515,18 @@ module "ftdv_functions" {
   nat_id                  = var.nat_id
   grp_id                  = var.grp_id
   policy_id               = var.policy_id
-  ftdv_password           = var.ftdv_password
+  ftdv_password           = var.admin_password
   ssh_using_external_ip   = var.ssh_using_external_ip
   license_caps            = var.license_caps
   instance_prefix_in_fmc  = var.instance_prefix_in_fmc
   fmc_password_secret     = var.fmc_password_secret
   new_ftd_password_secret = var.new_ftd_password_secret
   health_check_port       = var.health_check_port
+}
+
+resource "time_sleep" "wait_after_functions" {
+  create_duration = "60s"
+  depends_on      = [module.ftdv_functions]
 }
 
 module "ftdv_autoscale" {
@@ -578,5 +575,5 @@ module "ftdv_autoscale" {
   diag_firewall_rule         = var.diag_firewall_rule
   zone                       = var.zone
 
-  depends_on = [module.ftdv_functions]
+  depends_on = [time_sleep.wait_after_functions]
 }

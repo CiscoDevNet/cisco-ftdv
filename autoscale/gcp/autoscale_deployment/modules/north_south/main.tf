@@ -401,8 +401,9 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     dynamic "access_config" {
       for_each = var.deploy_using_external_ip ? [1] : []
       content {
-        nat_ip = true
+        network_tier = "PREMIUM"
       }
+
     }
   }
 
