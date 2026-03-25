@@ -281,6 +281,21 @@
                                                     ]
                                                 }
                                             },
+                                            "ConfigureHealthProbe": {
+                                                "type": "Function",
+                                                "inputs": {
+                                                    "body": "@body('GetFtdIPs')",
+                                                    "function": {
+                                                        "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RESOURCE_GROUP_NAME/providers/Microsoft.Web/sites/FUNCTION_APP_NAME/functions/ConfigureHealthProbe"
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "CreateStaticRoutes": [
+                                                        "Succeeded",
+                                                        "Failed"
+                                                    ]
+                                                }
+                                            },
                                             "Delay_For_FMC_To_Update_State": {
                                                 "type": "Wait",
                                                 "inputs": {
@@ -318,7 +333,7 @@
                                                     }
                                                 },
                                                 "runAfter": {
-                                                    "CreateStaticRoutes": [
+                                                    "ConfigureHealthProbe": [
                                                         "Succeeded",
                                                         "Failed"
                                                     ]

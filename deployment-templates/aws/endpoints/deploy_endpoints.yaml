@@ -1,5 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploy two Ubuntu 24.04 (Noble) EC2 instances ("inside" and "outside") with a configurable username/password for SSH.
+Description: >-
+  Deploy two Ubuntu 24.04 (Noble) EC2 instances ("inside" and "outside").
+  Each instance gets two NICs: eth0 on the management subnet (with an EIP
+  for SSH access) and eth1 on the data subnet (inside or outside).
 
 Parameters:
   ResourceNamePrefix:
@@ -32,33 +35,75 @@ Parameters:
       - t3.medium
       - t3.large
 
+  MgmtSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Management subnet ID (eth0) - used for SSH access via EIP.
+
   InsideSubnetId:
     Type: AWS::EC2::Subnet::Id
-    Description: Subnet ID for inside instance.
+    Description: Inside data subnet ID (eth1 of inside instance).
 
   OutsideSubnetId:
     Type: AWS::EC2::Subnet::Id
-    Description: Subnet ID for outside instance.
+    Description: Outside data subnet ID (eth1 of outside instance).
 
   SecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
     Description: Security Group ID for EC2 instances (must allow inbound TCP/22 from your IP for SSH).
+
+  EnableIPv6:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable IPv6 on ENIs. Set to false when subnets lack IPv6 CIDR (e.g. cluster/autoscale infra).
 
   UbuntuNobleAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
     Description: Canonical Ubuntu 24.04 LTS (Noble) AMI via SSM public parameter.
 
+Conditions:
+  HasIPv6: !Equals [!Ref EnableIPv6, 'true']
+
 Resources:
+  # -------- Inside endpoint --------
+  InsideMgmtENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref MgmtSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
+      Description: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-inside-mgmt-eni"
+
+  InsideDataENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref InsideSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
+      Description: !Sub "${ResourceNamePrefix}-inside-data-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-inside-data-eni"
+
   LinuxInsideInstance:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref UbuntuNobleAmiId
       KeyName: !Ref KeyName
-      SubnetId: !Ref InsideSubnetId
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref InsideMgmtENI
+          DeviceIndex: 0
+        - NetworkInterfaceId: !Ref InsideDataENI
+          DeviceIndex: 1
       Tags:
         - Key: Name
           Value: !Sub "${ResourceNamePrefix}-linux-inside"
@@ -69,28 +114,7 @@ Resources:
           #!/bin/bash
           set -euxo pipefail
           apt-get update -y
-          apt-get install -y nmap apache2 iperf3
-
-  LinuxOutsideInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: !Ref InstanceType
-      ImageId: !Ref UbuntuNobleAmiId
-      KeyName: !Ref KeyName
-      SubnetId: !Ref OutsideSubnetId
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
-      Tags:
-        - Key: Name
-          Value: !Sub "${ResourceNamePrefix}-linux-outside"
-        - Key: autostop
-          Value: 'false'
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          set -euxo pipefail
-          apt-get update -y
-          apt-get install -y nmap apache2 iperf3
+          apt-get install -y nmap apache2 iperf3 net-tools
 
   LinuxInsideEIP:
     Type: AWS::EC2::EIP
@@ -102,9 +126,58 @@ Resources:
 
   LinuxInsideEIPAssociation:
     Type: AWS::EC2::EIPAssociation
+    DependsOn: LinuxInsideInstance
     Properties:
       AllocationId: !GetAtt LinuxInsideEIP.AllocationId
-      InstanceId: !Ref LinuxInsideInstance
+      NetworkInterfaceId: !Ref InsideMgmtENI
+
+  # -------- Outside endpoint --------
+  OutsideMgmtENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref MgmtSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
+      Description: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-outside-mgmt-eni"
+
+  OutsideDataENI:
+    Type: AWS::EC2::NetworkInterface
+    Properties:
+      SubnetId: !Ref OutsideSubnetId
+      GroupSet:
+        - !Ref SecurityGroupId
+      Ipv6AddressCount: !If [HasIPv6, 1, !Ref "AWS::NoValue"]
+      Description: !Sub "${ResourceNamePrefix}-outside-data-eni"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-outside-data-eni"
+
+  LinuxOutsideInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref UbuntuNobleAmiId
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - NetworkInterfaceId: !Ref OutsideMgmtENI
+          DeviceIndex: 0
+        - NetworkInterfaceId: !Ref OutsideDataENI
+          DeviceIndex: 1
+      Tags:
+        - Key: Name
+          Value: !Sub "${ResourceNamePrefix}-linux-outside"
+        - Key: autostop
+          Value: 'false'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          apt-get update -y
+          apt-get install -y nmap apache2 iperf3 net-tools
 
   LinuxOutsideEIP:
     Type: AWS::EC2::EIP
@@ -116,23 +189,32 @@ Resources:
 
   LinuxOutsideEIPAssociation:
     Type: AWS::EC2::EIPAssociation
+    DependsOn: LinuxOutsideInstance
     Properties:
       AllocationId: !GetAtt LinuxOutsideEIP.AllocationId
-      InstanceId: !Ref LinuxOutsideInstance
+      NetworkInterfaceId: !Ref OutsideMgmtENI
 
 Outputs:
   LinuxInsidePublicIP:
-    Description: Public IPv4 address of the inside instance
+    Description: Public IPv4 address of the inside instance (mgmt EIP)
     Value: !Ref LinuxInsideEIP
 
   LinuxInsidePrivateIP:
-    Description: Private IPv4 address of the inside instance
-    Value: !GetAtt LinuxInsideInstance.PrivateIp
+    Description: Private IPv4 address of the inside instance (mgmt interface)
+    Value: !GetAtt InsideMgmtENI.PrimaryPrivateIpAddress
+
+  LinuxInsideDataIP:
+    Description: Private IPv4 address of the inside data interface
+    Value: !GetAtt InsideDataENI.PrimaryPrivateIpAddress
 
   LinuxOutsidePublicIP:
-    Description: Public IPv4 address of the outside instance
+    Description: Public IPv4 address of the outside instance (mgmt EIP)
     Value: !Ref LinuxOutsideEIP
 
   LinuxOutsidePrivateIP:
-    Description: Private IPv4 address of the outside instance
-    Value: !GetAtt LinuxOutsideInstance.PrivateIp
+    Description: Private IPv4 address of the outside instance (mgmt interface)
+    Value: !GetAtt OutsideMgmtENI.PrimaryPrivateIpAddress
+
+  LinuxOutsideDataIP:
+    Description: Private IPv4 address of the outside data interface
+    Value: !GetAtt OutsideDataENI.PrimaryPrivateIpAddress

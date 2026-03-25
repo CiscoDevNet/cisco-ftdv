@@ -397,6 +397,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
       content {
         network_tier = "PREMIUM"
       }
+
     }
   }
 
