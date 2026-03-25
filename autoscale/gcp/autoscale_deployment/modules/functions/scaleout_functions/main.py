@@ -68,15 +68,17 @@ def scale_out(event, context):
           region = zone[:-2]
           api = discovery.build('compute', 'v1',cache_discovery=False)
           response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
+
+          ##SSH IP (internal) for function to access FTDv
+          ssh_ip = response['networkInterfaces'][2]['networkIP']
           
           # mgmt ip -> nic2
-          if  os.getenv('SSH_USING_EXTERNAL_IP', 'false').lower() != 'true':
+          if  os.getenv('REGISTER_USING_EXTERNAL_IP', 'false').lower() != 'true':
                #internal ip
-               ssh_ip = response['networkInterfaces'][2]['networkIP']
+               ftd_reg_ip = response['networkInterfaces'][2]['networkIP']
           else:
                # this will fetch external ip, when FMCv is on other platform
-               #external ip
-               ssh_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP'] #external
+               ftd_reg_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP']
 
           print("FTDv Name: "+instanceName+ " IP for Login: "+ssh_ip)
 
@@ -193,7 +195,7 @@ def scale_out(event, context):
           print("FMCv version needs to be upgraded.")
           return
 
-     fmc.register_ftdv(vm_name=vm_name, mgmtip=ssh_ip, reg_id=reg_id, nat_id=nat_id, policy_id=policy_id, grp_id=grp_id)
+     fmc.register_ftdv(vm_name=vm_name, mgmtip=ftd_reg_ip, reg_id=reg_id, nat_id=nat_id, policy_id=policy_id, grp_id=grp_id)
 
      minutes = 3
      if (time.time() - start_time) <= timeout_time:
@@ -228,7 +230,7 @@ def scale_out(event, context):
      time.sleep(150)
      
      if (time.time() - start_time) <= timeout_time:
-          nic0 = "GigabitEthernet0/0"
+          nic0 = "Ethernet0/0"
           nic_id = fmc.get_nic_id_by_name(vm_name, nic0)
           for i in range(20):
                if nic_id == None:
@@ -276,8 +278,8 @@ def scale_out(event, context):
           print("Created OUTSIDE_GW object in FMCv")
      
      print("Configuring Interfaces")
-     fmc.configure_nic_dhcp(vm_name, 'GigabitEthernet0/0', "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
-     fmc.configure_nic_dhcp(vm_name, 'GigabitEthernet0/1', "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
+     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/0', "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
+     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/1', "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
      
      print("Adding Static Routes")
      fmc.create_static_network_route(vm_name, 'outside', 'any-ipv4', os.getenv("OUTSIDE_GW_NAME"), metric=1)

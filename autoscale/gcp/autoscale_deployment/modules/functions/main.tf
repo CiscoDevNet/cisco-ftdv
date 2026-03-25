@@ -136,7 +136,7 @@ variable "ftdv_password" {
   }
 }
 
-variable "ssh_using_external_ip" {
+variable "register_using_external_ip" {
   description = "Indicates whether SSH is using an external IP."
   type        = bool
   default     = false
@@ -281,7 +281,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
     GRP_ID                 = var.grp_id
     POLICY_ID              = var.policy_id
     FTDV_PASSWORD          = var.ftdv_password
-    SSH_USING_EXTERNAL_IP  = var.ssh_using_external_ip
+    REGISTER_USING_EXTERNAL_IP  = var.register_using_external_ip
     LICENSE_CAPS           = var.license_caps
     INSTANCE_PREFIX_IN_FMC = var.instance_prefix_in_fmc
     OUTSIDE_GW_NAME        = var.outside_gw_name

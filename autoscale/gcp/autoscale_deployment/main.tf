@@ -393,7 +393,7 @@ variable "policy_id" {
   }
 }
 
-variable "ssh_using_external_ip" {
+variable "register_using_external_ip" {
   description = "Indicates whether SSH is using an external IP."
   type        = bool
   default     = false
@@ -508,7 +508,7 @@ module "ftdv_functions" {
   grp_id                  = var.grp_id
   policy_id               = var.policy_id
   ftdv_password           = var.admin_password
-  ssh_using_external_ip   = var.ssh_using_external_ip
+  register_using_external_ip   = var.register_using_external_ip
   license_caps            = var.license_caps
   instance_prefix_in_fmc  = var.instance_prefix_in_fmc
   fmc_password_secret     = var.fmc_password_secret
