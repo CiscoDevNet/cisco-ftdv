@@ -83,7 +83,7 @@ variable "max_ftd_replicas" {
   description = "Maximum number of FTD replicas to maintain."
   type        = number
   validation {
-    condition     = var.max_ftd_replicas > 0
+    condition     = var.max_ftd_replicas >= 0
     error_message = "Max FTD replicas must be greater than 0."
   }
 }
