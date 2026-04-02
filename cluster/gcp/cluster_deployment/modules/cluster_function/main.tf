@@ -126,7 +126,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_cluster_scaleout_action_object.name
   timeout               = 540
-  min_instances         = 2
+  min_instances         = 0
   max_instances         = 16
   ingress_settings      = "ALLOW_ALL"
 
