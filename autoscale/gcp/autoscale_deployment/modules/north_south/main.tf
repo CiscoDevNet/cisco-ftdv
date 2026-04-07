@@ -292,7 +292,7 @@ variable "diag_subnet_name" {
   nullable     = true
 }
 
-variable "deploy_using_external_ip" {
+variable "assign_public_ip_to_mgmt" {
   description = "Indicates whether to deploy using an external IP."
   type        = bool
 }
@@ -393,7 +393,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.mgmt_subnet_name}"
 
     dynamic "access_config" {
-      for_each = var.deploy_using_external_ip ? [1] : []
+      for_each = var.assign_public_ip_to_mgmt ? [1] : []
       content {
         network_tier = "PREMIUM"
       }

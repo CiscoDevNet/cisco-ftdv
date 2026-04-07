@@ -297,7 +297,7 @@ variable "diag_subnet_name" {
   nullable     = true
 }
 
-variable "deploy_using_external_ip" {
+variable "assign_public_ip_to_mgmt" {
   description = "Indicates whether to deploy using an external IP."
   type        = bool
 }
@@ -558,7 +558,7 @@ module "ftdv_autoscale" {
   mgmt_subnet_name          = var.mgmt_subnet_name
   diag_vpc_name              = var.diag_vpc_name
   diag_subnet_name          = var.diag_subnet_name
-  deploy_using_external_ip   = var.deploy_using_external_ip
+  assign_public_ip_to_mgmt   = var.assign_public_ip_to_mgmt
   with_diagnostic            = var.with_diagnostic
   mgmt_firewall_rule         = var.mgmt_firewall_rule_name
   outside_firewall_rule      = var.outside_firewall_rule_name

@@ -50,7 +50,7 @@ diag_vpc_name           = "diag-vpc-name"           # e.g., "random-diag-vpc"
 diag_subnet_name    = "diag-subnetwork-name"    # e.g., "random-diag-subnet"
 
 # Deployment and Diagnostic Configuration of FTDv
-deploy_using_external_ip = false
+assign_public_ip_to_mgmt = false
 with_diagnostic          = false
 
 # Firewall Rules
