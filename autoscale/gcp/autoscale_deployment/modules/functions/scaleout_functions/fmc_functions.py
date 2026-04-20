@@ -193,6 +193,10 @@ class FirepowerManagementCenter:
           Returns:    Task id, None
           Raises:
           """
+          existing_device_id = self.get_device_id_by_name(vm_name)
+          if existing_device_id != '':
+               print("Device {} already registered on FMC, skipping registration".format(vm_name))
+               return None
           try:
                vm_policy_id = self.get_access_policy_id_by_name(policy_id)
           except Exception as e:
