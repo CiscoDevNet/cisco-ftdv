@@ -162,16 +162,39 @@ def configureManager(channel, fmc_ip, reg_id, nat_id):
      Raises:
      """
      cmd = 'configure manager add ' + fmc_ip + ' ' + reg_id + ' ' + nat_id
-     msg = send_cmd_and_wait_for_execution(channel, cmd, '>')
+     MAX_RETRIES = 5
+     RETRY_INTERVAL = 30
 
-     print("MESSAGE: "+msg)
-     
-     if "Manager successfully configured." in msg:
-          print("MANAGER CONFIGURED")
-          return
-     if "already exists" in msg:
-          print("MANAGER ALREADY EXISTS")
-          return
+     for attempt in range(MAX_RETRIES):
+          channel.settimeout(60)
+          total_msg = ""
+          try:
+               channel.send(cmd + "\n")
+               while True:
+                    rcv_buffer = channel.recv(10000)
+                    decoded = rcv_buffer.decode("utf-8")
+                    print(decoded)
+                    total_msg = total_msg + ' ' + decoded
+                    if "[yes/no]" in decoded:
+                         channel.send("yes\n")
+                    if ">" in decoded:
+                         break
+          except Exception as e:
+               print("Error occurred: {}".format(repr(e)))
+
+          print("MESSAGE: "+total_msg)
+
+          if "Manager successfully configured." in total_msg:
+               print("MANAGER CONFIGURED")
+               return
+          if "already exists" in total_msg:
+               print("MANAGER ALREADY EXISTS")
+               return
+          if "Manager Transition in Progress" in total_msg or "Local Manager successfully deleted" in total_msg:
+               print("Manager transition in progress, retrying in {} seconds (attempt {}/{})".format(RETRY_INTERVAL, attempt+1, MAX_RETRIES))
+               time.sleep(RETRY_INTERVAL)
+               continue
+          break
      return
 
 def check_ftdv_reg_status(channel):
