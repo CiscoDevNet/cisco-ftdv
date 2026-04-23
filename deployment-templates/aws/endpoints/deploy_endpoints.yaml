@@ -113,8 +113,13 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
+          # Disable unattended-upgrades to prevent apt lock contention
+          systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          # Wait for any existing apt/dpkg lock to be released
+          while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
           apt-get update -y
-          apt-get install -y nmap apache2 iperf3 net-tools
+          apt-get install -y nmap apache2 iperf3 net-tools hping3
 
   LinuxInsideEIP:
     Type: AWS::EC2::EIP
@@ -176,8 +181,13 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
+          # Disable unattended-upgrades to prevent apt lock contention
+          systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          # Wait for any existing apt/dpkg lock to be released
+          while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
           apt-get update -y
-          apt-get install -y nmap apache2 iperf3 net-tools
+          apt-get install -y nmap apache2 iperf3 net-tools hping3
 
   LinuxOutsideEIP:
     Type: AWS::EC2::EIP
