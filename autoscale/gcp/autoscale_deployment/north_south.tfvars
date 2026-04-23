@@ -68,7 +68,6 @@ reg_id                 = "reg-id"              # e.g., "regID"
 nat_id                 = "nat-id"              # e.g., "natId"
 grp_id                 = "grp-id"              # e.g., "random"
 policy_id              = "policy-id"           # e.g., "random"
-ftdv_password          = "ftdv-password"       # e.g., "Password@246"
 register_using_external_ip  = false             # true or false - for FMC-FTD registration
 license_caps           = "BASE,MALWARE,THREAT"
 instance_prefix_in_fmc = "instance-prefix-in-fmc" # e.g., "random"
