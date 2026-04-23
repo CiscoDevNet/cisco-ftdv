@@ -56,6 +56,8 @@ def scale_out(event, context):
      log_entry = json.loads(data_buffer)
 
 
+     ftd_reg_ip = None
+
      try:
           #First run, Info from logs
           #To get the Instance Name
@@ -80,9 +82,10 @@ def scale_out(event, context):
                # this will fetch external ip, when FMCv is on other platform
                ftd_reg_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP']
 
-          print("FTDv Name: "+instanceName+ " IP for Login: "+ssh_ip)
+          print("FTDv Name: "+instanceName+ " IP for Functions to Login: "+ssh_ip)
+          print("FTDv Name: "+instanceName+ " IP for Registration to FMCv: "+ftd_reg_ip)
 
-          info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone, "region": region}
+          info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone, "region": region, "ftd_reg_ip": ftd_reg_ip}
           first_run_flag = True
      except:
           prev_info = log_entry['textPayload']
@@ -92,6 +95,7 @@ def scale_out(event, context):
           prev_info = prev_info.replace("'", "\"")
           prev_info = json.loads(prev_info)
           count = prev_info["count"] + 1
+          # ftd_reg_ip = prev_info.get("ftd_reg_ip")
           print("Function retriggered count: "+str(count))
 
      if count > MAX_RETRIES_COUNT:
@@ -112,6 +116,7 @@ def scale_out(event, context):
           project_id = prev_info["project_id"]
           zone = prev_info["zone"]
           region = prev_info["region"]
+          ftd_reg_ip = prev_info.get("ftd_reg_ip", ftd_reg_ip)
           print("Function(retriggered) for "+ instanceName)
      except:
           print("First run of function")
@@ -244,7 +249,7 @@ def scale_out(event, context):
           return
 
      if nic_id == None:
-          print("Could not fetch NIC ID for FTDv:{}".format(vm_name))
+          print("ERROR: Could not fetch NIC ID for FTDv:{}".format(vm_name))
           print("Deleting Instance {}".format(instanceName))
           api = discovery.build('compute', 'v1',cache_discovery=False)
           response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()

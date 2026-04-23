@@ -105,6 +105,12 @@ variable "outside_ip_cidr_range" {
   type        = string
 }
 
+variable "register_using_external_ip" {
+  description = "Whether Cloud Functions should reach devices using public IPs."
+  type        = bool
+  default     = false
+}
+
 ##################################################
 # VPC and Subnet Resources
 
@@ -266,12 +272,14 @@ resource "google_vpc_access_connector" "connector" {
 
 # Create a static Public Address to assign to NAT GW
 resource "google_compute_address" "mgmt_gw_public_ip" {
+  count  = var.register_using_external_ip ? 1 : 0
   name   = "${var.resource_name_prefix}-mgmt-gw-public-ip"
   region = var.region
 }
 
 # Management NAT Router
 resource "google_compute_router" "mgmt_nat_router" {
+  count   = var.register_using_external_ip ? 1 : 0
   name    = "${var.resource_name_prefix}-mgmt-nat-router"
   network = google_compute_network.mgmt_vpc.self_link
   region  = var.region
@@ -279,11 +287,12 @@ resource "google_compute_router" "mgmt_nat_router" {
 
 # Management NAT Gateway configuration
 resource "google_compute_router_nat" "mgmt_nat" {
+  count                              = var.register_using_external_ip ? 1 : 0
   name                               = "${var.resource_name_prefix}-mgmt-nat"
-  router                             = google_compute_router.mgmt_nat_router.name
+  router                             = google_compute_router.mgmt_nat_router[0].name
   region                             = var.region
   nat_ip_allocate_option             = "MANUAL_ONLY"
-  nat_ips                            = [google_compute_address.mgmt_gw_public_ip.self_link]
+  nat_ips                            = [google_compute_address.mgmt_gw_public_ip[0].self_link]
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
 }
 
@@ -326,11 +335,11 @@ output "vpc_connector_name" {
 }
 
 output "mgmt_nat_ip" {
-  value = google_compute_address.mgmt_gw_public_ip.address
+  value = var.register_using_external_ip && length(google_compute_address.mgmt_gw_public_ip) > 0 ? google_compute_address.mgmt_gw_public_ip[0].address : null
 }
 
 output "mgmt_nat_router" {
-  value = google_compute_router.mgmt_nat_router.name
+  value = var.register_using_external_ip && length(google_compute_router.mgmt_nat_router) > 0 ? google_compute_router.mgmt_nat_router[0].name : null
 }
 
 ##Firewall Rule Outputs

@@ -113,7 +113,7 @@ variable "nat_id" {
 }
 
 variable "grp_id" {
-  description = "Group ID."
+  description = "Device Group Name."
   validation {
     condition     = length(var.grp_id) > 0
     error_message = "Group ID cannot be empty."
@@ -305,7 +305,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.register_using_external_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.insert.id
@@ -336,7 +336,7 @@ resource "google_cloudfunctions_function" "scalein_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.register_using_external_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.delete.id
