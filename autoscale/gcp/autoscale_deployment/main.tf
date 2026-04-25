@@ -52,6 +52,12 @@ variable "source_image_url" {
   }
 }
 
+variable "enable_secure_boot" {
+  description = "Enable Secure Boot for FTDv instances (supported from version 10.0 onwards)."
+  type        = bool
+  default     = false
+}
+
 variable "cpu_utilization_target" {
   description = "Target CPU utilization for autoscale."
   type        = number
@@ -528,6 +534,7 @@ module "ftdv_autoscale" {
   resource_name_prefix       = var.resource_name_prefix
   machine_type               = var.machine_type
   source_image_url           = var.source_image_url
+  enable_secure_boot         = var.enable_secure_boot
   cpu_utilization_target     = var.cpu_utilization_target
   cool_down_period_sec       = var.cool_down_period_sec
   min_ftd_replicas           = var.min_ftd_replicas

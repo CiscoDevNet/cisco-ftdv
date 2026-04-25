@@ -6,6 +6,7 @@ resource_name_prefix = "resource-name-prefix" # e.g., "random"
 # Machine Configuration
 machine_type     = "machine-type"     # e.g., "n1-standard-4"
 source_image_url = "source-image-url" # e.g., "projects/cisco-public/global/images/cisco-ftdv-7-6-0-113"
+enable_secure_boot = false # Supported from version 10.0 onwards. Set true to enable Secure Boot
 
 # Autoscaling Configuration
 cpu_utilization_target = 0.5

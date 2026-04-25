@@ -47,6 +47,11 @@ variable "source_image_url" {
   }
 }
 
+variable "enable_secure_boot" {
+  description = "Enable Secure Boot for FTDv instances (supported from version 10.0 onwards)."
+  type        = bool
+}
+
 variable "cpu_utilization_target" {
   description = "Target CPU utilization for autoscale."
   type        = number
@@ -407,6 +412,12 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
       network    = "projects/${var.project_id}/global/networks/${var.diag_vpc_name}"
       subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.diag_subnet_name}"
     }
+  }
+
+  shielded_instance_config {
+    enable_secure_boot          = var.enable_secure_boot
+    enable_vtpm                 = true
+    enable_integrity_monitoring = true
   }
 
   metadata = {
