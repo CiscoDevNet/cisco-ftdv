@@ -290,7 +290,7 @@ def handle_sns_event(sns_data):
                     cls_name, cls_mem = fmc.get_cluster_members(cls_id)
                 des, mins, maxs = aws_grp.get_asgroup_size()
                 if cls_mem:
-                    if des is len(cls_mem):
+                    if des == len(cls_mem):
                         logger.info("Cluster Members: {}".format(cls_mem))
                         if e_var['USER_NOTIFY_TOPIC_ARN'] != 'NA':
                             details_of_the_device = "Cluster Members "+str(cls_mem)
