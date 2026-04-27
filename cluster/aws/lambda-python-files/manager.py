@@ -325,6 +325,35 @@ def handle_sns_event(sns_data):
                 ftd.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
                 const.DISABLE_CLUSTER_REGISTER_FUNC = True
                 logger.info("Cluster is registered to FMC..!!")
+                # Wait for FMC to discover data nodes and tag them DONE
+                all_instances = aws_grp.get_instance_list()
+                if all_instances and cls_id and des and des > 1:
+                    data_node_ids = [i for i in all_instances if i != _m_attr['instance_id']]
+                    logger.info("Waiting for FMC to discover {} data node(s): {}".format(
+                        len(data_node_ids), data_node_ids))
+                    discovery_attempts = 20
+                    discovery_interval = 30
+                    all_discovered = False
+                    for attempt in range(1, discovery_attempts + 1):
+                        cls_name_poll, cls_mem_poll = fmc.get_cluster_members(cls_id)
+                        member_count = len(cls_mem_poll) if cls_mem_poll else 0
+                        logger.info("FMC discovery poll {}/{}: {}/{} members".format(
+                            attempt, discovery_attempts, member_count, des))
+                        if member_count >= des:
+                            all_discovered = True
+                            break
+                        time.sleep(discovery_interval)
+                    for data_iid in data_node_ids:
+                        try:
+                            data_ec2 = EC2Instance(data_iid, e_var['ClusterGrpName'])
+                            if all_discovered:
+                                data_ec2.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
+                                logger.info("Tagged data node {} as DONE".format(data_iid))
+                            else:
+                                data_ec2.create_instance_tags('NGFWvRegistrationStatus', 'PARTIAL')
+                                logger.warn("Tagged data node {} as PARTIAL (FMC did not discover all nodes)".format(data_iid))
+                        except Exception as e:
+                            logger.error("Failed to tag data node {}: {}".format(data_iid, str(e)))
             else:
                 logger.warn("Registration failed! trying again in next cycle...")
                 message_subject = 'Event: ' + e_var['ClusterGrpName'] + ' ' + 'cluster register' + ' ' + \
