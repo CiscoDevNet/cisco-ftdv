@@ -331,7 +331,9 @@ def handle_sns_event(sns_data):
                     data_node_ids = [i for i in all_instances if i != _m_attr['instance_id']]
                     logger.info("Waiting for FMC to discover {} data node(s): {}".format(
                         len(data_node_ids), data_node_ids))
-                    discovery_attempts = 20
+                    # Refresh FMC auth token — the one from registration may have expired
+                    fmc.get_auth_token()
+                    discovery_attempts = 10
                     discovery_interval = 30
                     all_discovered = False
                     for attempt in range(1, discovery_attempts + 1):
