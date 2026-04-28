@@ -269,7 +269,22 @@ def handle_sns_event(sns_data):
                                                                  _m_attr['instance_id'])
                 sns.publish_to_topic(e_var['ClusterManagerTopic'], message_subject, msg_body)
             else:
-                logger.info(" cluster_register function is disabled! Check constant.py")
+                # Data node: configure manager so FMC can discover it via sftunnel
+                logger.info("Data node detected, configuring manager for FMC discovery...")
+                reg_status = ftd.check_ftdv_reg_status()
+                if reg_status == 'NO_MANAGER':
+                    logger.info("Data node has no manager, sending: 'configure manager add'")
+                    request_response = ftd.configure_manager()
+                    if request_response == 'COMMAND_RAN':
+                        logger.info("Manager configured on data node successfully")
+                    else:
+                        logger.warn("Failed to configure manager on data node")
+                elif reg_status == 'COMPLETED':
+                    logger.info("Data node already registered with FMC")
+                else:
+                    logger.info("Data node manager status: {}".format(reg_status))
+                ftd.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
+                logger.info("Tagged data node as DONE")
         else:
             logger.warn("Cluster formation is un-successful, Retrying...")
             message_subject = 'Event: ' + e_var['ClusterGrpName'] + ' ' + 'instance poll' + ' ' + \
