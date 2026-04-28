@@ -661,7 +661,11 @@ def ftd_cls_init(instance_id, fmc):
     ftd.username = e_var['NgfwUserName']
     ftd.password = e_var['NgfwPassword']
     ftd.defaultPassword = const.DEFAULT_PASSWORD
-    ftd.fmc_ip = j_var['fmcIpforDeviceReg']
+    fmc_ip_for_reg = j_var['fmcIpforDeviceReg']
+    if fmc_ip_for_reg == 'DONTRESOLVE':
+        logger.info("fmcIpforDeviceReg is DONTRESOLVE, using FMC_SERVER env var: %s" % e_var['FmcIp'])
+        fmc_ip_for_reg = e_var['FmcIp']
+    ftd.fmc_ip = fmc_ip_for_reg
     ftd.reg_id = j_var['RegistrationId']
     ftd.nat_id = j_var['NatId']
     ftd.l_caps = j_var['licenseCaps']
