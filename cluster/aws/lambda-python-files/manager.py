@@ -287,7 +287,9 @@ def handle_sns_event(sns_data):
                 cls_mem = None
                 cls_id = fmc.get_cluster_id_by_name(e_var["fmcDeviceGroupName"])
                 if cls_id:
-                    cls_name, cls_mem = fmc.get_cluster_members(cls_id)
+                    result = fmc.get_cluster_members(cls_id)
+                    if result:
+                        cls_name, cls_mem = result
                 des, mins, maxs = aws_grp.get_asgroup_size()
                 if cls_mem:
                     if des == len(cls_mem):
@@ -337,8 +339,22 @@ def handle_sns_event(sns_data):
                     discovery_interval = 30
                     all_discovered = False
                     for attempt in range(1, discovery_attempts + 1):
-                        cls_name_poll, cls_mem_poll = fmc.get_cluster_members(cls_id)
-                        member_count = len(cls_mem_poll) if cls_mem_poll else 0
+                        try:
+                            poll_result = fmc.get_cluster_members(cls_id)
+                            if poll_result:
+                                cls_name_poll, cls_mem_poll = poll_result
+                                member_count = len(cls_mem_poll)
+                            else:
+                                member_count = 0
+                        except Exception as poll_err:
+                            logger.warn("FMC discovery poll {}/{} failed: {}".format(
+                                attempt, discovery_attempts, str(poll_err)))
+                            member_count = 0
+                            # Refresh token for next attempt
+                            try:
+                                fmc.get_auth_token()
+                            except Exception:
+                                pass
                         logger.info("FMC discovery poll {}/{}: {}/{} members".format(
                             attempt, discovery_attempts, member_count, des))
                         if member_count >= des:

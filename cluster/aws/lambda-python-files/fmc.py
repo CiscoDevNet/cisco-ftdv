@@ -396,7 +396,7 @@ class FirepowerManagementCenter:
         """
         Purpose:    To get devices name list from cluster
         Parameters: Cluster Id
-        Returns:    list or None
+        Returns:    (name_list, id_list) or None
         Raises:
         """
         count = 1
@@ -406,7 +406,13 @@ class FirepowerManagementCenter:
             logger.info("Get Cluster Members - Attempt Number: " + str(count))
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/deviceclusters/ftddevicecluster/"
             url = self.server + api_path + cls_id
-            r = self.rest_get(url)
+            try:
+                r = self.rest_get(url)
+            except Exception as err:
+                logger.error("get_cluster_members REST GET failed (attempt {}): {}".format(count, str(err)))
+                time.sleep(10)
+                count += 1
+                continue
             if 'controlDevice' in r.json():
                 # Add Control Node
                 member_id_list.append(r.json()['controlDevice']['deviceDetails']['id'])
