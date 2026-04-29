@@ -185,7 +185,7 @@ class NgfwInstance (CiscoEc2Instance):
         r, output, error = self.show_managers()
         logger.debug("status: %s output: %s error: %s" % (r, output, error))
 
-        if len(re.findall('Pending', output)) == 1:
+        if len(re.findall('Pending|In progress', output)) == 1:
             logger.debug("Instance " + self.vm_name + ", is pending to register with FMC")
             return "PENDING"
         elif len(re.findall('Completed', output)) == 1:
