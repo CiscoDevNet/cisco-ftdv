@@ -288,6 +288,12 @@ def handle_sns_event(sns_data):
                     logger.info("Data node already registered with FMC")
                 else:
                     logger.info("Data node manager status: {}".format(reg_status))
+                # Register data node with FMC after configuring manager.
+                # rest_post now has 401 retry so concurrent token issues are handled.
+                if reg_status != 'COMPLETED':
+                    logger.info("Data node: sending registration request to FMC")
+                    reg_response = ftd.send_registration_request()
+                    logger.info("Data node registration response: %s" % reg_response)
                 ftd.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
                 logger.info("Tagged data node as DONE")
         else:
@@ -339,9 +345,22 @@ def handle_sns_event(sns_data):
                         time.sleep(wait_interval)
             # Refresh FMC auth token before registration
             fmc.get_auth_token()
-            # Register data nodes with FMC from this (control node) Lambda
-            # to avoid concurrent token revocation across Lambda invocations.
+            # Register only data nodes that tagged DONE (have configured manager).
+            # Nodes not yet DONE will self-register from their own Lambda.
+            ready_dn_ids = []
             for dn_id in data_node_ids:
+                try:
+                    dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
+                    tags = dn_ec2.get_instance_tags() or []
+                    tag_dict = {t['Key']: t['Value'] for t in tags}
+                    if tag_dict.get('NGFWvRegistrationStatus') == 'DONE':
+                        ready_dn_ids.append(dn_id)
+                except Exception:
+                    pass
+            if len(ready_dn_ids) < len(data_node_ids):
+                logger.info("Skipping %d unready data node(s) — they will self-register" %
+                            (len(data_node_ids) - len(ready_dn_ids)))
+            for dn_id in ready_dn_ids:
                 try:
                     dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
                     dn_ip = dn_ec2.get_private_ip()
