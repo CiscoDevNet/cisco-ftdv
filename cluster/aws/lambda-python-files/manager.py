@@ -269,16 +269,33 @@ def handle_sns_event(sns_data):
                                                                  _m_attr['instance_id'])
                 sns.publish_to_topic(e_var['ClusterManagerTopic'], message_subject, msg_body)
             else:
-                # Data node: configure manager so FMC can discover it via sftunnel
-                logger.info("Data node detected, configuring manager for FMC discovery...")
+                # Data node: configure manager + register with FMC using private IP.
+                # The control node wait loop ensures this completes BEFORE the
+                # control node registers, so there is no cluster yet on FMC and
+                # register_device succeeds as a standalone entry.  When the
+                # control node later registers, FMC merges both into a cluster
+                # using the correct private IPs (not public IPs from auto-discovery).
+                logger.info("Data node detected, configuring manager and registering...")
                 reg_status = ftd.check_ftdv_reg_status()
                 if reg_status == 'NO_MANAGER':
                     logger.info("Data node has no manager, sending: 'configure manager add'")
                     request_response = ftd.configure_manager()
                     if request_response == 'COMMAND_RAN':
                         logger.info("Manager configured on data node successfully")
+                        reg_status = ftd.check_ftdv_reg_status()
+                        if reg_status == 'PENDING':
+                            logger.info("Data node pending, sending registration request to FMC")
+                            task_status = ftd.send_registration_request()
+                            if task_status == 'SUCCESS':
+                                logger.info("Data node FMC registration successful")
+                            else:
+                                logger.warn("Data node FMC registration returned: %s" % task_status)
                     else:
                         logger.warn("Failed to configure manager on data node")
+                elif reg_status == 'PENDING':
+                    logger.info("Data node pending, sending registration request to FMC")
+                    task_status = ftd.send_registration_request()
+                    logger.info("Data node FMC registration returned: %s" % task_status)
                 elif reg_status == 'COMPLETED':
                     logger.info("Data node already registered with FMC")
                 else:
@@ -298,6 +315,41 @@ def handle_sns_event(sns_data):
         if _m_attr['category'] == 'FIRST':
             if 'task_id' in _m_attr:
                 const.REG_TASK_ID = _m_attr['task_id']
+            # Wait for data nodes to finish configure_manager before
+            # registering with FMC.  FMC performs a one-shot cluster
+            # discovery right after the control node registers; data
+            # nodes must already have sftunnel ready at that point.
+            des, _, _ = aws_grp.get_asgroup_size()
+            if des and des > 1:
+                all_instances = aws_grp.get_instance_list()
+                if all_instances:
+                    data_node_ids = [i for i in all_instances if i != _m_attr['instance_id']]
+                    logger.info("Waiting for %d data node(s) to configure manager: %s" %
+                                (len(data_node_ids), data_node_ids))
+                    max_wait = 20
+                    wait_interval = 30
+                    for attempt in range(1, max_wait + 1):
+                        all_ready = True
+                        for dn_id in data_node_ids:
+                            try:
+                                dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
+                                tags = dn_ec2.get_instance_tags() or []
+                                tag_dict = {t['Key']: t['Value'] for t in tags}
+                                reg_tag = tag_dict.get('NGFWvRegistrationStatus', 'PENDING')
+                                if reg_tag != 'DONE':
+                                    all_ready = False
+                                    break
+                            except Exception as e:
+                                logger.debug("Error checking data node %s tags: %s" % (dn_id, str(e)))
+                                all_ready = False
+                                break
+                        if all_ready:
+                            logger.info("All data nodes ready (attempt %d/%d)" % (attempt, max_wait))
+                            break
+                        logger.info("Data node(s) not ready yet (attempt %d/%d)" % (attempt, max_wait))
+                        time.sleep(wait_interval)
+            # Refresh FMC auth token before registration
+            fmc.get_auth_token()
             if execute_cluster_register_first(ftd) == 'SUCCESS':
                 cls_mem = None
                 cls_id = fmc.get_cluster_id_by_name(e_var["fmcDeviceGroupName"])
