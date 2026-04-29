@@ -285,6 +285,7 @@ def handle_sns_event(sns_data):
                         reg_status = ftd.check_ftdv_reg_status()
                         if reg_status == 'PENDING':
                             logger.info("Data node pending, sending registration request to FMC")
+                            fmc.get_auth_token()
                             task_status = ftd.send_registration_request()
                             if task_status == 'SUCCESS':
                                 logger.info("Data node FMC registration successful")
@@ -294,6 +295,7 @@ def handle_sns_event(sns_data):
                         logger.warn("Failed to configure manager on data node")
                 elif reg_status == 'PENDING':
                     logger.info("Data node pending, sending registration request to FMC")
+                    fmc.get_auth_token()
                     task_status = ftd.send_registration_request()
                     logger.info("Data node FMC registration returned: %s" % task_status)
                 elif reg_status == 'COMPLETED':
