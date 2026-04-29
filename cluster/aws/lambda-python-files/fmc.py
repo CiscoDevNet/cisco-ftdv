@@ -103,6 +103,14 @@ class FirepowerManagementCenter:
             resp = r.text
             logging.info("REST POST <-- status_code: %s, url: %s" % (str(status_code), url))
             logging.info("REST POST <-- body: " + str(resp))
+            if status_code == 401:
+                logging.warning("REST POST 401 token expired for: %s, refreshing and retrying..." % url)
+                self.get_auth_token()
+                r = requests.post(url, data=json.dumps(post_data), headers=self.headers, verify=False)
+                status_code = r.status_code
+                resp = r.text
+                logging.info("REST POST retry <-- status_code: %s, url: %s" % (str(status_code), url))
+                logging.debug("REST POST retry <-- body: " + str(resp))
             if 201 <= status_code <= 202:
                 pass
             else:
