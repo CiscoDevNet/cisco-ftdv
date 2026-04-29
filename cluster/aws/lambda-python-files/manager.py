@@ -351,6 +351,10 @@ def handle_sns_event(sns_data):
                                       ftd.l_caps, ftd.performanceTier)
                 except Exception as e:
                     logger.warn("Data node %s FMC registration: %s" % (dn_id, str(e)))
+            # Refresh token again — FMC may invalidate the token used for
+            # device registration, so get a fresh one for the control node.
+            if data_node_ids:
+                fmc.get_auth_token()
             if execute_cluster_register_first(ftd) == 'SUCCESS':
                 cls_mem = None
                 cls_id = fmc.get_cluster_id_by_name(e_var["fmcDeviceGroupName"])
