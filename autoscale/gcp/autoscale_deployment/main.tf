@@ -94,15 +94,6 @@ variable "max_ftd_replicas" {
   }
 }
 
-variable "elb_port" {
-  description = "External Load Balancer port."
-  type        = number
-  validation {
-    condition     = var.elb_port > 0 && var.elb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
-  }
-}
-
 variable "elb_port_name" {
   description = "Port name for the external LB."
   validation {
@@ -171,15 +162,6 @@ variable "ilb_protocol_name" {
   validation {
     condition     = can(regex("^[A-Za-z0-9-]+$", var.ilb_protocol_name))
     error_message = "Protocol name can only include letters, numbers, or dashes."
-  }
-}
-
-variable "ilb_port" {
-  description = "Internal load balancer port."
-  type        = number
-  validation {
-    condition     = var.ilb_port > 0 && var.ilb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
   }
 }
 
@@ -539,7 +521,6 @@ module "ftdv_autoscale" {
   cool_down_period_sec       = var.cool_down_period_sec
   min_ftd_replicas           = var.min_ftd_replicas
   max_ftd_replicas           = var.max_ftd_replicas
-  elb_port                   = var.elb_port
   elb_port_name              = var.elb_port_name
   elb_protocol               = var.elb_protocol
   elb_protocol_name          = var.elb_protocol_name
@@ -550,7 +531,7 @@ module "ftdv_autoscale" {
   ilb_protocol               = var.ilb_protocol
   ilb_protocol_name          = var.ilb_protocol_name
   ilb_draining_timeout_sec   = var.ilb_draining_timeout_sec
-  ilb_port                   = var.ilb_port
+  health_check_port          = var.health_check_port
   ilb_check_interval_sec     = var.ilb_check_interval_sec
   ilb_timeout_sec            = var.ilb_timeout_sec
   ilb_unhealthy_threshold    = var.ilb_unhealthy_threshold

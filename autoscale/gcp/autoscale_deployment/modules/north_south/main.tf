@@ -88,15 +88,6 @@ variable "max_ftd_replicas" {
   }
 }
 
-variable "elb_port" {
-  description = "External Load Balancer port."
-  type        = number
-  validation {
-    condition     = var.elb_port > 0 && var.elb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
-  }
-}
-
 variable "elb_port_name" {
   description = "Port name for the external LB."
   validation {
@@ -177,11 +168,11 @@ variable "ilb_draining_timeout_sec" {
   }
 }
 
-variable "ilb_port" {
-  description = "Internal load balancer port."
+variable "health_check_port" {
+  description = "Port used by Google health checks (shared across ELB/ILB)."
   type        = number
   validation {
-    condition     = var.ilb_port > 0 && var.ilb_port < 65536
+    condition     = var.health_check_port > 0 && var.health_check_port < 65536
     error_message = "Please provide a valid port number (1-65535)."
   }
 }
@@ -509,7 +500,7 @@ resource "google_compute_region_health_check" "ftdv_hc_elb" {
   name   = "${var.resource_name_prefix}-ftdv-hc-elb"
   region = var.region
   tcp_health_check {
-    port         = var.elb_port
+    port         = var.health_check_port
     proxy_header = "NONE"
   }
   timeout_sec         = var.elb_timeout_sec
@@ -552,7 +543,7 @@ resource "google_compute_region_backend_service" "ftdv_backend_service_ilb" {
 resource "google_compute_health_check" "ftdv_hc_ilb" {
   name = "${var.resource_name_prefix}-ftdv-hc-ilb"
   tcp_health_check {
-    port = var.ilb_port
+    port = var.health_check_port
   }
   check_interval_sec  = var.ilb_check_interval_sec
   timeout_sec         = var.ilb_timeout_sec

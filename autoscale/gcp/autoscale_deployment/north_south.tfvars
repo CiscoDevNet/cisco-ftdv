@@ -17,7 +17,6 @@ zone                   = "b" # Deployment zone (comma separated alphabets, 3 at 
 
 
 # External Load Balancer Configuration
-elb_port                = 80
 elb_port_name           = "tcp"
 elb_protocol            = "TCP"
 elb_protocol_name       = "TCP"
@@ -30,7 +29,6 @@ elb_fe_ports            = ["80", "22"]
 ilb_protocol             = "TCP"
 ilb_protocol_name        = "TCP"
 ilb_draining_timeout_sec = 60
-ilb_port                 = 80
 ilb_check_interval_sec   = 10
 ilb_timeout_sec          = 5
 ilb_unhealthy_threshold  = 3

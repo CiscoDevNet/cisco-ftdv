@@ -140,6 +140,8 @@ class FirepowerManagementCenter:
           Returns:    Device Id
           Raises:
           """
+          if not self.domain_uuid:
+               self.get_auth_token()
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords"
           url = self.server + api_path + '?offset=0&limit=10000'
           r = self.rest_get(url)
@@ -158,6 +160,8 @@ class FirepowerManagementCenter:
           Raises:
           """
           print("De-registering: " + name)
+          if not self.domain_uuid:
+               self.get_auth_token()
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords/"
           dev_id = self.get_device_id_by_name(name)
           url = self.server + api_path + dev_id
