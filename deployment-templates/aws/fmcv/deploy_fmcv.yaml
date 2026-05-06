@@ -3,14 +3,6 @@ Description: Stack deploying NGFWv testbed
 
 Parameters:
   FMCvInstanceType:
-    AllowedValues:
-      - c4.4xlarge
-      - c3.4xlarge
-      - c5.4xlarge
-      - c6i.4xlarge
-      - c6a.4xlarge
-      - c6in.4xlarge
-    ConstraintDescription: Must be a valid FMCv instance type.
     Default: c5.4xlarge
     Description: FMCv instance type
     Type: String
