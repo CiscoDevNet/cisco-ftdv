@@ -91,6 +91,8 @@ Parameters:
       - c6in.xlarge
       - c6in.2xlarge
       - c6in.4xlarge
+      - c6in.8xlarge
+      - c6in.16xlarge
     ConstraintDescription: Must be a valid FTDv instance type.
     Default: c5.xlarge
     Description: FTDv instance type
@@ -99,11 +101,22 @@ Parameters:
     Type : String
     Default: ''
     Description: Day 0 configuration (leave empty to use default)
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 
 
 Conditions:
   CreateDiag: !Equals [!Ref DiagOff, 'false']
-  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']    
+  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 
 Resources:
   Mgmt:
@@ -169,6 +182,13 @@ Resources:
   FTDv:
     Type: AWS::EC2::Instance
     Properties:
+      MetadataOptions:
+        Fn::If:
+          - EnableIMDSv2
+          - HttpEndpoint: enabled
+            HttpTokens: required
+            HttpPutResponseHopLimit: 1
+          - !Ref "AWS::NoValue"
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
