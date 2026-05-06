@@ -212,14 +212,6 @@ variable "service_account_email" {
   }
 }
 
-variable "admin_password" {
-  description = "Password for admin access."
-  validation {
-    condition     = length(var.admin_password) >= 8
-    error_message = "Admin password must be at least 8 characters long."
-  }
-}
-
 variable "public_key" {
   description = "SSH public key for instance access."
   validation {
@@ -346,6 +338,10 @@ variable "zone" {
   }
 }
 
+locals {
+  default_ftdv_password = "th1S_w!ll_Be_C#@nged"
+}
+
 resource "google_compute_instance_template" "ftdv_instance_template" {
   name           = "${var.resource_name_prefix}-ftdv-instance-template"
   machine_type   = var.machine_type
@@ -425,7 +421,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
           }
     EOF
       ,
-      var.admin_password,
+      local.default_ftdv_password,
       var.with_diagnostic ? "" : ",\n        \"Diagnostic\": \"OFF\""
     )
     ssh-keys = var.public_key

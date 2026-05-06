@@ -209,14 +209,6 @@ variable "service_account_mail_id" {
   }
 }
 
-variable "admin_password" {
-  description = "Password for admin access."
-  validation {
-    condition     = length(var.admin_password) >= 8
-    error_message = "Admin password must be at least 8 characters long."
-  }
-}
-
 variable "public_key" {
   description = "SSH public key for instance access."
   validation {
@@ -495,7 +487,6 @@ module "ftdv_functions" {
   nat_id                  = var.nat_id
   grp_id                  = var.grp_id
   policy_id               = var.policy_id
-  ftdv_password           = var.admin_password
   register_using_external_ip   = var.register_using_external_ip
   license_caps            = var.license_caps
   instance_prefix_in_fmc  = var.instance_prefix_in_fmc
@@ -536,7 +527,6 @@ module "ftdv_autoscale" {
   ilb_timeout_sec            = var.ilb_timeout_sec
   ilb_unhealthy_threshold    = var.ilb_unhealthy_threshold
   service_account_email      = var.service_account_mail_id
-  admin_password             = var.admin_password
   public_key                 = var.public_key
   outside_vpc_name           = var.outside_vpc_name
   outside_subnet_name       = var.outside_subnet_name

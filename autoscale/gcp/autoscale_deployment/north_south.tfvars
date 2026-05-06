@@ -34,7 +34,6 @@ ilb_timeout_sec          = 5
 ilb_unhealthy_threshold  = 3
 
 # Security and Authentication of FTDv
-admin_password          = "admin-password"        # e.g., "Pass213@1209"
 public_key              = "public-key"            # e.g., "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGzAH1x13iuhyS6RSbUlOXMjPt/N8ptO2sasBCRJazsFq4q random@jasm-M-03LT"
 service_account_mail_id = "service-account-email" # e.g., "random@asav.iam.gserviceaccount.com"
 

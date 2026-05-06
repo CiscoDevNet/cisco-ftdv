@@ -128,14 +128,6 @@ variable "policy_id" {
   }
 }
 
-variable "ftdv_password" {
-  description = "Password for FTDv access."
-  validation {
-    condition     = length(var.ftdv_password) >= 8
-    error_message = "Password must be at least 8 characters long."
-  }
-}
-
 variable "register_using_external_ip" {
   description = "Indicates whether SSH is using an external IP."
   type        = bool
@@ -180,6 +172,10 @@ variable "health_check_port" {
     condition     = can(regex("^[0-9]+$", var.health_check_port))
     error_message = "Please provide a valid port number."
   }
+}
+
+locals {
+  default_ftdv_password = "th1S_w!ll_Be_C#@nged"
 }
 
 resource "google_storage_bucket" "ftdv_bucket" {
@@ -283,7 +279,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
     NAT_ID                 = var.nat_id
     GRP_ID                 = var.grp_id
     POLICY_ID              = var.policy_id
-    FTDV_PASSWORD          = var.ftdv_password
+    FTDV_PASSWORD          = local.default_ftdv_password
     REGISTER_USING_EXTERNAL_IP  = var.register_using_external_ip
     LICENSE_CAPS           = var.license_caps
     INSTANCE_PREFIX_IN_FMC = var.instance_prefix_in_fmc
