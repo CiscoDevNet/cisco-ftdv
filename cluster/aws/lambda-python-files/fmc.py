@@ -59,29 +59,28 @@ class FirepowerManagementCenter:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
         try:
-            logging.info("REST GET --> " + url)
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
             r = requests.get(url, headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.get(url, headers=headers, verify='/path/to/ssl_certificate')
             status_code = r.status_code
             resp = r.text
-            logging.info("REST GET <-- status_code: %s, url: %s" % (str(status_code), url))
-            logging.debug("REST GET <-- body: " + str(resp))
-            if status_code == 401:
-                logging.warning("REST GET 401 token expired for: %s, refreshing and retrying..." % url)
-                self.get_auth_token()
-                r = requests.get(url, headers=self.headers, verify=False)
-                logging.info("REST GET retry <-- status_code: %s, url: %s" % (str(r.status_code), url))
-                logging.debug("REST GET retry <-- body: " + str(r.text))
-            if 200 <= r.status_code <= 300:
+            logging.debug("Response status_code: " + str(status_code))
+            logging.debug("Response body: " + str(resp))
+            if 200 <= status_code <= 300:
+                # logging.debug("GET successful. Response data --> ")
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
                 pass
             else:
-                logging.error("REST GET failed with status %s for url: %s, body: %s" % (str(r.status_code), url, str(r.text)))
                 r.raise_for_status()
                 raise Exception("Error occurred in Get -->"+resp)
         except requests.exceptions.HTTPError as err:
             raise Exception("Error in connection --> "+str(err))
         finally:
             if r: r.close()
-        return r
+            return r
 
     def rest_post(self, url, post_data):
         """
@@ -96,32 +95,29 @@ class FirepowerManagementCenter:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
         try:
-            logging.info("REST POST --> %s" % url)
-            logging.info("REST POST --> data: %s" % str(post_data))
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
+            logging.debug("Post_data " + str(post_data))
             r = requests.post(url, data=json.dumps(post_data), headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.post(url,data=json.dumps(post_data), headers=self.headers, verify='/path/to/ssl_certificate')
             status_code = r.status_code
             resp = r.text
-            logging.info("REST POST <-- status_code: %s, url: %s" % (str(status_code), url))
-            logging.info("REST POST <-- body: " + str(resp))
-            if status_code == 401:
-                logging.warning("REST POST 401 token expired for: %s, refreshing and retrying..." % url)
-                self.get_auth_token()
-                r = requests.post(url, data=json.dumps(post_data), headers=self.headers, verify=False)
-                status_code = r.status_code
-                resp = r.text
-                logging.info("REST POST retry <-- status_code: %s, url: %s" % (str(status_code), url))
-                logging.debug("REST POST retry <-- body: " + str(resp))
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
+            # logging.debug("Status code is: "+str(status_code))
             if 201 <= status_code <= 202:
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
                 pass
             else:
-                logging.error("REST POST failed with status %s for url: %s, body: %s" % (str(status_code), url, str(resp)))
                 r.raise_for_status()
                 raise Exception("Error occurred in POST --> "+resp)
         except requests.exceptions.HTTPError as err:
             raise Exception("Error in connection --> "+str(err))
         finally:
             if r: r.close()
-        return r
+            return r
 
     def rest_put(self, url, put_data):
         """
@@ -136,24 +132,26 @@ class FirepowerManagementCenter:
             logging.debug("Getting a new authToken")
             self.get_auth_token()
         try:
-            logging.info("REST PUT --> %s" % url)
-            logging.info("REST PUT --> data: %s" % str(put_data))
+            # REST call with SSL verification turned off:
+            logging.info("Request: " + url)
+            logging.info("Put_data: " + str(put_data))
             r = requests.put(url, data=json.dumps(put_data), headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.put(url, data=json.dumps(put_data), headers=headers, verify='/path/to/ssl_certificate')
             status_code = r.status_code
             resp = r.text
-            logging.info("REST PUT <-- status_code: %s, url: %s" % (str(status_code), url))
-            logging.info("REST PUT <-- body: " + str(resp))
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
             if status_code == 200:
                 pass
             else:
-                logging.error("REST PUT failed with status %s for url: %s, body: %s" % (str(status_code), url, str(resp)))
                 r.raise_for_status()
                 raise Exception("Error occurred in put -->" + resp)
         except requests.exceptions.HTTPError as err:
             raise Exception("Error in connection --> "+str(err))
         finally:
             if r: r.close()
-        return r
+            return r
 
     def rest_delete(self, url):
         """
@@ -169,23 +167,28 @@ class FirepowerManagementCenter:
             self.get_auth_token()
 
         try:
-            logging.info("REST DELETE --> %s" % url)
+            # REST call with SSL verification turned off:
+            logging.debug("Request: " + url)
             r = requests.delete(url, headers=self.headers, verify=False)
+            # REST call with SSL verification turned on:
+            # r = requests.delete(url, headers=headers, verify='/path/to/ssl_certificate')
             status_code = r.status_code
             resp = r.text
-            logging.info("REST DELETE <-- status_code: %s, url: %s" % (str(status_code), url))
-            logging.debug("REST DELETE <-- body: " + str(resp))
+            logging.info("Response status_code: " + str(status_code))
+            logging.info("Response body: " + str(resp))
             if 200 <= status_code <= 300:
+                # logging.debug("GET successful. Response data --> ")
+                # json_resp = json.loads(resp)
+                # logging.debug(json.dumps(json_resp,sort_keys=True,indent=4, separators=(',', ': ')))
                 pass
             else:
-                logging.error("REST DELETE failed with status %s for url: %s, body: %s" % (str(status_code), url, str(resp)))
                 r.raise_for_status()
                 raise Exception("Error occurred in Delete -->"+resp)
         except requests.exceptions.HTTPError as err:
             raise Exception("Error in connection --> "+str(err))
         finally:
             if r: r.close()
-        return r
+            return r
 
     def get_auth_token(self):
         """
@@ -404,7 +407,7 @@ class FirepowerManagementCenter:
         """
         Purpose:    To get devices name list from cluster
         Parameters: Cluster Id
-        Returns:    (name_list, id_list) or None
+        Returns:    list or None
         Raises:
         """
         count = 1
@@ -414,13 +417,7 @@ class FirepowerManagementCenter:
             logger.info("Get Cluster Members - Attempt Number: " + str(count))
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/deviceclusters/ftddevicecluster/"
             url = self.server + api_path + cls_id
-            try:
-                r = self.rest_get(url)
-            except Exception as err:
-                logger.error("get_cluster_members REST GET failed (attempt {}): {}".format(count, str(err)))
-                time.sleep(10)
-                count += 1
-                continue
+            r = self.rest_get(url)
             if 'controlDevice' in r.json():
                 # Add Control Node
                 member_id_list.append(r.json()['controlDevice']['deviceDetails']['id'])
@@ -772,16 +769,13 @@ class FirepowerManagementCenter:
             logger.info("Check Task Status - Attempt Number: " + str(count))
             api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/job/taskstatuses/"
             url = self.server + api_path + task_id
-            try:
-                r = self.rest_get(url)
-                if 'message' in r.json():
-                    status = r.json()['message']
-                    return status
-            except Exception as e:
-                logger.error("Error checking task status: " + str(e))
+            r = self.rest_get(url)
+            if 'message' in r.json():
+                status = r.json()['message']
+                return status
             time.sleep(10)
             count += 1
-        return "PENDING"
+        return None
 
     def check_deploy_status(self, vm_name):
         """

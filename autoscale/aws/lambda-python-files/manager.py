@@ -620,14 +620,9 @@ def execute_vm_configure_first(ftd, fmc):
                 logger.info('Checking that system deployment after registration is done.')
                 deploy_status = fmc.check_deploy_status(ftd.vm_name)
                 if deploy_status != 'DEPLOYED':
-                    deploy_status = ftd.ftdv_deploy_polling(2)
+                    deploy_status = ftd.ftdv_deploy_polling(5)
                     if deploy_status != "SUCCESS":
-                        logger.info("System auto-deploy not complete, triggering deployment explicitly")
-                        if fmc.start_deployment(ftd.vm_name) is None:
-                            raise ValueError("System Configuration deployment REST post failing")
-                        deploy_status = ftd.ftdv_deploy_polling(5)
-                        if deploy_status != "SUCCESS":
-                            raise ValueError("System Configuration deployment failed")
+                        raise ValueError("System Configuration deployment failed")
                     logger.info("System deployment finished, proceeding to configure device ....")
             # Configure interfaces from FMC
             nic_status = ftd.check_and_configure_interface()

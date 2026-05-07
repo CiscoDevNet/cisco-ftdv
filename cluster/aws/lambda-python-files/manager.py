@@ -269,33 +269,7 @@ def handle_sns_event(sns_data):
                                                                  _m_attr['instance_id'])
                 sns.publish_to_topic(e_var['ClusterManagerTopic'], message_subject, msg_body)
             else:
-                # Data node: configure manager only (SSH, no FMC API calls).
-                # FMC registration for data nodes is handled by the control
-                # node's cluster_register Lambda to avoid concurrent token
-                # revocation between parallel Lambda invocations.
-                logger.info("Data node detected, configuring manager...")
-                reg_status = ftd.check_ftdv_reg_status()
-                if reg_status == 'NO_MANAGER':
-                    logger.info("Data node has no manager, sending: 'configure manager add'")
-                    request_response = ftd.configure_manager()
-                    if request_response == 'COMMAND_RAN':
-                        logger.info("Manager configured on data node successfully")
-                    else:
-                        logger.warn("Failed to configure manager on data node")
-                elif reg_status == 'PENDING':
-                    logger.info("Data node already has manager configured, pending registration")
-                elif reg_status == 'COMPLETED':
-                    logger.info("Data node already registered with FMC")
-                else:
-                    logger.info("Data node manager status: {}".format(reg_status))
-                # Register data node with FMC after configuring manager.
-                # rest_post now has 401 retry so concurrent token issues are handled.
-                if reg_status != 'COMPLETED':
-                    logger.info("Data node: sending registration request to FMC")
-                    reg_response = ftd.send_registration_request()
-                    logger.info("Data node registration response: %s" % reg_response)
-                ftd.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
-                logger.info("Tagged data node as DONE")
+                logger.info(" cluster_register function is disabled! Check constant.py")
         else:
             logger.warn("Cluster formation is un-successful, Retrying...")
             message_subject = 'Event: ' + e_var['ClusterGrpName'] + ' ' + 'instance poll' + ' ' + \
@@ -309,81 +283,14 @@ def handle_sns_event(sns_data):
         if _m_attr['category'] == 'FIRST':
             if 'task_id' in _m_attr:
                 const.REG_TASK_ID = _m_attr['task_id']
-            # Wait for data nodes to finish configure_manager before
-            # registering with FMC.  FMC performs a one-shot cluster
-            # discovery right after the control node registers; data
-            # nodes must already have sftunnel ready at that point.
-            data_node_ids = []
-            des, _, _ = aws_grp.get_asgroup_size()
-            if des and des > 1:
-                all_instances = aws_grp.get_instance_list()
-                if all_instances:
-                    data_node_ids = [i for i in all_instances if i != _m_attr['instance_id']]
-                    logger.info("Waiting for %d data node(s) to configure manager: %s" %
-                                (len(data_node_ids), data_node_ids))
-                    max_wait = 20
-                    wait_interval = 30
-                    for attempt in range(1, max_wait + 1):
-                        all_ready = True
-                        for dn_id in data_node_ids:
-                            try:
-                                dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
-                                tags = dn_ec2.get_instance_tags() or []
-                                tag_dict = {t['Key']: t['Value'] for t in tags}
-                                reg_tag = tag_dict.get('NGFWvRegistrationStatus', 'PENDING')
-                                if reg_tag != 'DONE':
-                                    all_ready = False
-                                    break
-                            except Exception as e:
-                                logger.debug("Error checking data node %s tags: %s" % (dn_id, str(e)))
-                                all_ready = False
-                                break
-                        if all_ready:
-                            logger.info("All data nodes ready (attempt %d/%d)" % (attempt, max_wait))
-                            break
-                        logger.info("Data node(s) not ready yet (attempt %d/%d)" % (attempt, max_wait))
-                        time.sleep(wait_interval)
-            # Refresh FMC auth token before registration
-            fmc.get_auth_token()
-            # Register only data nodes that tagged DONE (have configured manager).
-            # Nodes not yet DONE will self-register from their own Lambda.
-            ready_dn_ids = []
-            for dn_id in data_node_ids:
-                try:
-                    dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
-                    tags = dn_ec2.get_instance_tags() or []
-                    tag_dict = {t['Key']: t['Value'] for t in tags}
-                    if tag_dict.get('NGFWvRegistrationStatus') == 'DONE':
-                        ready_dn_ids.append(dn_id)
-                except Exception:
-                    pass
-            if len(ready_dn_ids) < len(data_node_ids):
-                logger.info("Skipping %d unready data node(s) — they will self-register" %
-                            (len(data_node_ids) - len(ready_dn_ids)))
-            for dn_id in ready_dn_ids:
-                try:
-                    dn_ec2 = EC2Instance(dn_id, e_var['ClusterGrpName'])
-                    dn_ip = dn_ec2.get_private_ip()
-                    dn_name = e_var['ClusterGrpName'] + '-' + dn_id
-                    logger.info("Registering data node %s (IP: %s) with FMC" % (dn_name, dn_ip))
-                    fmc.register_ftdv(dn_name, dn_ip, ftd.reg_id, ftd.nat_id,
-                                      ftd.l_caps, ftd.performanceTier)
-                except Exception as e:
-                    logger.warn("Data node %s FMC registration: %s" % (dn_id, str(e)))
-            # Refresh token again — FMC may invalidate the token used for
-            # device registration, so get a fresh one for the control node.
-            if data_node_ids:
-                fmc.get_auth_token()
             if execute_cluster_register_first(ftd) == 'SUCCESS':
                 cls_mem = None
                 cls_id = fmc.get_cluster_id_by_name(e_var["fmcDeviceGroupName"])
                 if cls_id:
-                    result = fmc.get_cluster_members(cls_id)
-                    if result:
-                        cls_name, cls_mem = result
+                    cls_name, cls_mem = fmc.get_cluster_members(cls_id)
                 des, mins, maxs = aws_grp.get_asgroup_size()
                 if cls_mem:
-                    if des == len(cls_mem):
+                    if des is len(cls_mem):
                         logger.info("Cluster Members: {}".format(cls_mem))
                         if e_var['USER_NOTIFY_TOPIC_ARN'] != 'NA':
                             details_of_the_device = "Cluster Members "+str(cls_mem)
@@ -418,51 +325,6 @@ def handle_sns_event(sns_data):
                 ftd.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
                 const.DISABLE_CLUSTER_REGISTER_FUNC = True
                 logger.info("Cluster is registered to FMC..!!")
-                # Wait for FMC to discover data nodes and tag them DONE
-                all_instances = aws_grp.get_instance_list()
-                if all_instances and cls_id and des and des > 1:
-                    data_node_ids = [i for i in all_instances if i != _m_attr['instance_id']]
-                    logger.info("Waiting for FMC to discover {} data node(s): {}".format(
-                        len(data_node_ids), data_node_ids))
-                    # Refresh FMC auth token — the one from registration may have expired
-                    fmc.get_auth_token()
-                    discovery_attempts = 10
-                    discovery_interval = 30
-                    all_discovered = False
-                    for attempt in range(1, discovery_attempts + 1):
-                        try:
-                            poll_result = fmc.get_cluster_members(cls_id)
-                            if poll_result:
-                                cls_name_poll, cls_mem_poll = poll_result
-                                member_count = len(cls_mem_poll)
-                            else:
-                                member_count = 0
-                        except Exception as poll_err:
-                            logger.warn("FMC discovery poll {}/{} failed: {}".format(
-                                attempt, discovery_attempts, str(poll_err)))
-                            member_count = 0
-                            # Refresh token for next attempt
-                            try:
-                                fmc.get_auth_token()
-                            except Exception:
-                                pass
-                        logger.info("FMC discovery poll {}/{}: {}/{} members".format(
-                            attempt, discovery_attempts, member_count, des))
-                        if member_count >= des:
-                            all_discovered = True
-                            break
-                        time.sleep(discovery_interval)
-                    for data_iid in data_node_ids:
-                        try:
-                            data_ec2 = EC2Instance(data_iid, e_var['ClusterGrpName'])
-                            if all_discovered:
-                                data_ec2.create_instance_tags('NGFWvRegistrationStatus', 'DONE')
-                                logger.info("Tagged data node {} as DONE".format(data_iid))
-                            else:
-                                data_ec2.create_instance_tags('NGFWvRegistrationStatus', 'PARTIAL')
-                                logger.warn("Tagged data node {} as PARTIAL (FMC did not discover all nodes)".format(data_iid))
-                        except Exception as e:
-                            logger.error("Failed to tag data node {}: {}".format(data_iid, str(e)))
             else:
                 logger.warn("Registration failed! trying again in next cycle...")
                 message_subject = 'Event: ' + e_var['ClusterGrpName'] + ' ' + 'cluster register' + ' ' + \
@@ -737,11 +599,7 @@ def ftd_cls_init(instance_id, fmc):
     ftd.username = e_var['NgfwUserName']
     ftd.password = e_var['NgfwPassword']
     ftd.defaultPassword = const.DEFAULT_PASSWORD
-    fmc_ip_for_reg = j_var['fmcIpforDeviceReg']
-    if fmc_ip_for_reg == 'DONTRESOLVE':
-        logger.info("fmcIpforDeviceReg is DONTRESOLVE, using FMC_SERVER env var: %s" % e_var['FmcIp'])
-        fmc_ip_for_reg = e_var['FmcIp']
-    ftd.fmc_ip = fmc_ip_for_reg
+    ftd.fmc_ip = j_var['fmcIpforDeviceReg']
     ftd.reg_id = j_var['RegistrationId']
     ftd.nat_id = j_var['NatId']
     ftd.l_caps = j_var['licenseCaps']

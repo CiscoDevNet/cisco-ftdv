@@ -185,7 +185,7 @@ class NgfwInstance (CiscoEc2Instance):
         r, output, error = self.show_managers()
         logger.debug("status: %s output: %s error: %s" % (r, output, error))
 
-        if len(re.findall('Pending|In progress', output)) == 1:
+        if len(re.findall('Pending', output)) == 1:
             logger.debug("Instance " + self.vm_name + ", is pending to register with FMC")
             return "PENDING"
         elif len(re.findall('Completed', output)) == 1:
@@ -403,7 +403,7 @@ class ManagedDevice(NgfwInstance):
                     self.reg_sts = 'FAILED'
                     return "FAILED"
                 else:
-                    logging.debug("Registration status in FTDv: " + str(status_in_ftdv) + " & in FMC: " + str(status_in_fmc))
+                    logging.debug("Registration status in FTDv: " + status_in_ftdv + " & in FMC: " + status_in_fmc)
                     logging.debug("Sleeping for 30 seconds")
                     time.sleep(1*30)
         if status_in_ftdv == "COMPLETED" or status_in_fmc == "SUCCESS":
@@ -433,7 +433,7 @@ class ManagedDevice(NgfwInstance):
                     self.reg_sts = 'FAILED'
                     return "FAILED"
                 else:
-                    logging.debug("Registration status in FMC: " + str(status_in_fmc))
+                    logging.debug("Registration status in FMC: " + status_in_fmc)
                     logging.debug("Sleeping for 30 seconds")
                     time.sleep(1*30)
         self.reg_sts = 'FAILED'
