@@ -42,8 +42,8 @@ outside_hc_firewall_rule_name= "<resource-name>-ftdv-outside-hc-firewall-rule"  
 # --------------------
 # Instance Details
 # --------------------
-machine_type                 = "n1-standard-8"                                       # GCP Supported machine type
-source_image_url             = "projects/cisco-public/global/images/<image-name>"    # Source image location for FTDv
+machine_type                 = "c2-standard-8"                                       # GCP Supported machine type
+source_image_url             = "projects/cisco-public/global/images/<image-name>"    # Source image location for FTDv, e.g. projects/mpi-cisco-public/global/images/cisco-secure-firewall-ftdv-x86-byol-10-0-0-140
 public_key                   = "<ssh-public-key>"                                    # Public Key for SSH access, e.g. ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4v
 
 # --------------------
@@ -78,6 +78,8 @@ fmc_username                 = ""                                               
 license_caps                 = ""                                                    # License capabilities e.g. BASE,MALWARE,URLFilter,THREAT
 performance_tier             = ""                                                    # Performance tier for FTDv e.g. FTDv20, FTDv30 etc.
 vpc_connector_name           = "<resource-name>-connector"                           # Name of VPC connector
+inside_zone                  = "inside-sz"                                           # FMC security zone name for inside interface
+outside_zone                 = "outside-sz"                                          # FMC security zone name for outside interface
 
 # --------------------
 # Internal Load Balancer Configuration
