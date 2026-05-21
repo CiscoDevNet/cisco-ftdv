@@ -63,9 +63,20 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
     Description: Canonical Ubuntu 24.04 LTS (Noble) AMI via SSM public parameter.
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V2 only (token required)"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required)"
 
 Conditions:
   HasIPv6: !Equals [!Ref EnableIPv6, 'true']
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required)"
 
 Resources:
   # -------- Inside endpoint --------
@@ -96,6 +107,13 @@ Resources:
   LinuxInsideInstance:
     Type: AWS::EC2::Instance
     Properties:
+      MetadataOptions:
+        Fn::If:
+          - EnableIMDSv2
+          - HttpEndpoint: enabled
+            HttpTokens: required
+            HttpPutResponseHopLimit: 1
+          - !Ref "AWS::NoValue"
       InstanceType: !Ref InstanceType
       ImageId: !Ref UbuntuNobleAmiId
       KeyName: !Ref KeyName
@@ -113,8 +131,13 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
+          # Disable unattended-upgrades to prevent apt lock contention
+          systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          # Wait for any existing apt/dpkg lock to be released
+          while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
           apt-get update -y
-          apt-get install -y nmap apache2 iperf3 net-tools
+          apt-get install -y nmap apache2 iperf3 net-tools hping3
 
   LinuxInsideEIP:
     Type: AWS::EC2::EIP
@@ -159,6 +182,13 @@ Resources:
   LinuxOutsideInstance:
     Type: AWS::EC2::Instance
     Properties:
+      MetadataOptions:
+        Fn::If:
+          - EnableIMDSv2
+          - HttpEndpoint: enabled
+            HttpTokens: required
+            HttpPutResponseHopLimit: 1
+          - !Ref "AWS::NoValue"
       InstanceType: !Ref InstanceType
       ImageId: !Ref UbuntuNobleAmiId
       KeyName: !Ref KeyName
@@ -176,8 +206,13 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
+          # Disable unattended-upgrades to prevent apt lock contention
+          systemctl stop unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          systemctl disable unattended-upgrades apt-daily.service apt-daily-upgrade.service || true
+          # Wait for any existing apt/dpkg lock to be released
+          while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
           apt-get update -y
-          apt-get install -y nmap apache2 iperf3 net-tools
+          apt-get install -y nmap apache2 iperf3 net-tools hping3
 
   LinuxOutsideEIP:
     Type: AWS::EC2::EIP

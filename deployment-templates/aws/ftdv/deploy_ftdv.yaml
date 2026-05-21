@@ -51,47 +51,6 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
     Description: Security group ID for FTDv  
   FTDInstanceType:
-    AllowedValues:
-      - c4.xlarge
-      - c5.xlarge
-      - c5.2xlarge
-      - c5.4xlarge
-      - m5zn.6xlarge
-      - m5zn.3xlarge
-      - m5zn.2xlarge
-      - m5zn.xlarge
-      - m5n.4xlarge
-      - m5n.2xlarge
-      - m5n.xlarge
-      - m5a.4xlarge
-      - m5a.2xlarge
-      - m5a.xlarge
-      - m5.4xlarge
-      - m5.2xlarge
-      - m5.xlarge
-      - c5d.4xlarge
-      - c5d.2xlarge
-      - c5d.xlarge
-      - c5ad.4xlarge
-      - c5ad.2xlarge
-      - c5ad.xlarge
-      - c5a.4xlarge
-      - c5a.2xlarge
-      - c5a.xlarge
-      - c3.xlarge
-      - c5n.xlarge
-      - c5n.2xlarge
-      - c5n.4xlarge
-      - c6i.xlarge
-      - c6i.2xlarge
-      - c6i.4xlarge
-      - c6a.xlarge
-      - c6a.2xlarge
-      - c6a.4xlarge
-      - c6in.xlarge
-      - c6in.2xlarge
-      - c6in.4xlarge
-    ConstraintDescription: Must be a valid FTDv instance type.
     Default: c5.xlarge
     Description: FTDv instance type
     Type: String
@@ -99,11 +58,22 @@ Parameters:
     Type : String
     Default: ''
     Description: Day 0 configuration (leave empty to use default)
+  InstanceMetadataServiceVersion:
+    Description: Select IMDS version to be used by the instances
+    Type: String
+    Default: "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
+    AllowedValues:
+      - "V1 and V2 (token optional)"
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 
 
 Conditions:
   CreateDiag: !Equals [!Ref DiagOff, 'false']
-  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']    
+  UseDefaultDay0Config: !Equals [!Ref Day0Config, '']
+  EnableIMDSv2:
+    Fn::Equals:
+      - !Ref InstanceMetadataServiceVersion
+      - "V2 only (token required) [IMDSv2 ONLY APPLICABLE FOR VERSION 7.6 AND ABOVE]"
 
 Resources:
   Mgmt:
@@ -169,6 +139,13 @@ Resources:
   FTDv:
     Type: AWS::EC2::Instance
     Properties:
+      MetadataOptions:
+        Fn::If:
+          - EnableIMDSv2
+          - HttpEndpoint: enabled
+            HttpTokens: required
+            HttpPutResponseHopLimit: 1
+          - !Ref "AWS::NoValue"
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:

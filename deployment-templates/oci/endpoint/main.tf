@@ -193,6 +193,10 @@ resource "oci_core_instance" "vm" {
 resource "oci_core_vnic_attachment" "vm_data_vnic" {
   instance_id  = oci_core_instance.vm.id
   display_name = "${var.instance_name}-data-vnic"
+  # Serialize fresh-instance network mutations. OCI was creating the primary-VNIC
+  # IPv6 address and the secondary VNIC in parallel, and the attachment could end
+  # up reported back as DETACHED instead of ATTACHED.
+  depends_on = [oci_core_ipv6.vm_ipv6]
 
   create_vnic_details {
     subnet_id        = var.data_subnet_id

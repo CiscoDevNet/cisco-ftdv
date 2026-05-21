@@ -353,6 +353,7 @@ def scale_out(event, context):
                         print(f"Firewall rule '{firewall_rule_name}' is already enabled or does not have a 'disabled' attribute.")
             except Exception as e:
                 print("ERROR: Exception occured in enabling Health Check Firewall Rule ", str(e))
+
     else:
         # For data nodes check if node got registered to FMCv.
         status_in_ftdv = "NA"
@@ -407,7 +408,36 @@ def scale_out(event, context):
         ftd.closeShell(ssh)
         recalling(data, project_id, region, function_name)
         return "Recalling"
-    
+
+    # Configure GCP LB health-check NAT rules in FMCv once the full cluster is formed
+    # and at least one node is confirmed in the cluster. Runs only on the control node.
+    if control_node and full_cluster_formed:
+        try:
+            cluster_grp_name     = os.getenv('CLS_GRP_NAME')
+            inside_zone          = os.getenv('INSIDE_ZONE') or None
+            outside_zone         = os.getenv('OUTSIDE_ZONE') or None
+            ilb_hc_port          = int(os.getenv('ILB_HC_PORT', '8989'))
+            elb_hc_port_env      = os.getenv('ELB_HC_PORT')
+            elb_hc_port          = int(elb_hc_port_env) if elb_hc_port_env else None
+            resource_name_prefix = os.getenv('RESOURCE_NAME_PREFIX')
+            inside_subnet_name   = os.getenv('INSIDE_SUBNET_NAME') or None
+            outside_subnet_name  = os.getenv('OUTSIDE_SUBNET_NAME') or None
+
+            fmc.configure_health_check_nat(
+                cluster_name=cluster_grp_name,
+                inside_zone=inside_zone,
+                outside_zone=outside_zone,
+                ilb_hc_port=ilb_hc_port,
+                elb_hc_port=elb_hc_port,
+                project_id=project_id,
+                region=region,
+                resource_name_prefix=resource_name_prefix,
+                inside_subnet_name=inside_subnet_name,
+                outside_subnet_name=outside_subnet_name,
+            )
+        except Exception as e:
+            print("ERROR: Exception occurred in configuring health-check NAT rules in FMCv ", str(e))
+
     #Closing FTDv ssh session
     ftd.closeShell(ssh)
     print("INFO: Function completed successfully")

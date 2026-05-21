@@ -78,6 +78,8 @@ fmc_username                 = ""                                               
 license_caps                 = ""                                                    # License capabilities e.g. BASE,MALWARE,URLFilter,THREAT
 performance_tier             = ""                                                    # Performance tier for FTDv e.g. FTDv20, FTDv30 etc.
 vpc_connector_name           = "<resource-name>-connector"                           # Name of VPC connector
+inside_zone                  = "inside-sz"                                           # FMC security zone name for inside interface
+outside_zone                 = "outside-sz"                                          # FMC security zone name for outside interface
 
 # --------------------
 # Internal Load Balancer Configuration

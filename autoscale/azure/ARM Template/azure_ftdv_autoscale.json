@@ -97,16 +97,13 @@
       },
       "softwareVersion": {
         "type": "string",
-        "defaultValue": "77089.0.0",
+        "defaultValue": "10.00.140",
         "allowedValues": [
-            "77089.0.0",
-            "760113.0.0",
-            "742172.0.0",
-            "73119.0.0",
-            "72944.0.0",
-            "71092.0.0",
-            "706236.0.0",
-            "640110.0.0"
+            "10.00.140",
+            "7.711.1061",
+            "7.64.69",
+            "7.44.462",
+            "7.211.313"
         ],
         "metadata": {
             "description": "FTD Software version to use. Note: FMCv version 7.7 can only manage FTDv version 7.2 and above"
@@ -321,8 +318,16 @@
       "idleTimeoutInMinutes": 30,
       "publisher":        "cisco",
       "offer":            "cisco-ftdv",
-      "sku":              "[parameters('ftdLicensingSku')]",
-      "customData": "[concat('{\"AdminPassword\":\"', parameters('ftdAdminUserPassword'), '\",\"Hostname\": \"cisco-ftdv\", \"FmcIp\": \"DONTRESOLVE\", \"FmcRegKey\":\"1234\", \"FmcNatId\":\"5678\"}')]"
+      "gen2Version": ["10.00.140"],
+      "useEthernetInterface": "[contains(variables('gen2Version'), parameters('softwareVersion'))]",
+      "insideInterface": "[if(variables('useEthernetInterface'), 'Ethernet0/1', 'GigabitEthernet0/1')]",
+      "outsideInterface": "[if(variables('useEthernetInterface'), 'Ethernet0/0', 'GigabitEthernet0/0')]",
+      "gen1Byol": "ftdv-azure-byol",
+      "gen1Payg": "ftdv-azure-payg",
+      "gen2Byol": "cisco-ftdv-x86-byol",
+      "gen2Payg": "cisco-ftdv-x86-payg",
+      "sku":              "[if(contains(variables('gen2Version'), parameters('softwareVersion')), if(equals(parameters('ftdLicensingSku'), 'ftdv-azure-byol'), variables('gen2Byol'), variables('gen2Payg')), parameters('ftdLicensingSku'))]",
+      "customData": "[concat('{\"AdminPassword\":\"', parameters('ftdAdminUserPassword'), '\",\"Hostname\": \"cisco-ftdv\", \"FmcIp\": \"DONTRESOLVE\", \"FmcRegKey\":\"1234\", \"FmcNatId\":\"5678\"}') ]"
     },
     "resources": [
       {
@@ -580,7 +585,7 @@
               },
               {
                 "name": "INSIDE_NIC_INTERFACE",
-                "value": "GigabitEthernet0/1"
+                "value": "[variables('insideInterface')]"
               },
               {
                 "name": "INSIDE_NIC_NAME",
@@ -600,7 +605,7 @@
               },
               {
                 "name": "OUTSIDE_NIC_INTERFACE",
-                "value": "GigabitEthernet0/0"
+                "value": "[variables('outsideInterface')]"
               },
               {
                 "name": "OUTSIDE_NIC_NAME",
