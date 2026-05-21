@@ -1,0 +1,69 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "value": "cisco-tdv"
+    },
+    "vmImageId": {
+      "value": "/subscriptions/{subscription-id}/resourceGroups/myresourcegroup1/providers/Microsoft.Compute/images/myImage"
+    },
+    "adminUsername": {
+      "value": "cisco"
+    },
+    "adminPassword": {
+      "value": "Password@2026"
+    },
+    "vmStorageAccount": {
+      "value": "ciscotdvstorage"
+    },
+    "availabilityZone": {
+      "value": 0
+    },
+    "customData": {
+      "value": "{\"AdminPassword\": \"Password@2026\",\"Hostname\": \"cisco-tdv\", \"ManageLocally\":\"No\", \"Diagnostic\": \"OFF\"}"
+    },
+    "virtualNetworkResourceGroup": {
+      "value": "test-tdv-rg"
+    },
+    "virtualNetworkName": {
+      "value": "test-tdv-vnet"
+    },
+    "mgmtSubnetName": {
+      "value": "mgmt"
+    },
+    "mgmtSubnetIP": {
+      "value": "10.4.0.10"
+    },
+    "data1SubnetName": {
+      "value": "data1"
+    },
+    "data1SubnetIP": {
+      "value": "10.4.1.10"
+    },
+    "data2SubnetName": {
+      "value": "data2"
+    },
+    "data2SubnetIP": {
+      "value": "10.4.2.10"
+    },
+    "data3SubnetName": {
+      "value": "data3"
+    },
+    "data3SubnetIP": {
+      "value": "10.4.3.10"
+    },
+    "vmSize": {
+      "value": "Standard_D8s_v3"
+    },
+    "publicInboundPorts": {
+      "value": "None"
+    },
+    "selectedInboundPorts": {
+      "value": ["22", "443", "8305"]
+    },
+    "enableSecureBoot": {
+      "value": false
+    }
+  }
+}
