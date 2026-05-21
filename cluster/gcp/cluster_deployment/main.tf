@@ -478,6 +478,14 @@ variable "fmc_password_secret_name" {
   }
 }
 
+variable "inside_zone" {
+  default = "inside-sz"
+}
+
+variable "outside_zone" {
+  default = "outside-sz"
+}
+
 variable "enable_secure_boot" {
   description = "Enable Secure Boot for the instance."
   type        = bool
@@ -507,6 +515,12 @@ module "ftdv_cluster_function" {
   vpc_connector_name       = var.vpc_connector_name
   ftd_password_secret_name = var.ftd_password_secret_name
   perf_tier                = var.performance_tier
+  inside_zone              = var.inside_zone
+  outside_zone             = var.outside_zone
+  ilb_hc_port              = var.ilb_health_check_port
+  elb_hc_port              = var.elb_health_check_port
+  inside_subnet_name       = var.inside_subnet_name
+  outside_subnet_name      = var.outside_subnet_name
 }
 
 resource "time_sleep" "wait_for_function" {
