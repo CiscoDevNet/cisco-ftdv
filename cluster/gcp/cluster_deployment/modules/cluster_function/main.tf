@@ -17,6 +17,23 @@ variable "ftd_reg_via_public_ip" {}
 variable "license_caps" {}
 variable "ftd_password_secret_name" {}
 
+variable "inside_zone" {
+  default = "inside-sz"
+}
+variable "outside_zone" {
+  default = "outside-sz"
+}
+variable "ilb_hc_port" {
+  description = "ILB health-check port; the scaleout function uses this when creating the FMC HC NAT rule."
+}
+variable "elb_hc_port" {
+  description = "ELB health-check port; null for east_west deployments where no ELB exists."
+  default  = null
+  nullable = true
+}
+variable "inside_subnet_name" {}
+variable "outside_subnet_name" {}
+
 # Create storage bucket for storing Cloud Functions code
 resource "google_storage_bucket" "ftdv_bucket" {
   name          = "${var.resource_name_prefix}-ftdv-cluster-bucket"
@@ -141,6 +158,12 @@ resource "google_cloudfunctions_function" "scaleout_action" {
     LICENSE_CAPS           = var.license_caps
     PERF_TIER              = var.perf_tier
     FORCE_STOP             = "false"
+    INSIDE_ZONE            = var.inside_zone
+    OUTSIDE_ZONE           = var.outside_zone
+    ILB_HC_PORT            = var.ilb_hc_port
+    INSIDE_SUBNET_NAME     = var.inside_subnet_name
+    OUTSIDE_SUBNET_NAME    = var.outside_subnet_name
+    ELB_HC_PORT            = var.elb_hc_port != null ? var.elb_hc_port : ""
   }
 
   secret_environment_variables {
