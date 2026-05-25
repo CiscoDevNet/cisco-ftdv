@@ -28,13 +28,21 @@ from SharedCode.Utils import FMC
 from SharedCode import azure_utils as azutils
 from SharedCode.cluster_utils import ClusterUtils
 
+def vm_exists_in_vmss(vm_name):
+    """Check if a VM with the given name exists in the VMSS."""
+    vmss_vms = azutils.get_vmss_vm_list()
+    for vm in vmss_vms:
+        if vm.name == vm_name:
+            return True
+    return False
+
 def main(req: func.HttpRequest):
     fmc = FMC()
     del_bad_ftd = os.environ.get("DELETE_FAULTY_FTD")
 
     if del_bad_ftd != "YES":
         log.error("DeleteUnRegisteredFTD:::: Feature to delete unregistered FTD is not enabled")
-        return func.HttpResponse("SUCCESS" ,status_code=200)
+        return func.HttpResponse("SUCCESS", status_code=200)
 
     req_body = req.get_json()
     ftdv_name = req_body.get('ftdDevName')
@@ -43,6 +51,11 @@ def main(req: func.HttpRequest):
     ftdv_username = os.environ.get("FTD_USERNAME")
     ftdv_password = os.environ.get("FTD_PASSWORD")
     log.warning("DeleteUnRegisteredFTD:::: Checking if {}:{} is registered to FMC".format(ftdv_name,ftdv_public_ip))
+
+    # --------- Check if VM exists in VMSS before proceeding ------------------------------------
+    if not vm_exists_in_vmss(ftdv_name):
+        log.warning("DeleteUnRegisteredFTD:::: VM {} not found in Azure VMSS. VM may have been deleted by Azure.".format(ftdv_name))
+        return func.HttpResponse("VM not found in Azure VMSS - already deleted", status_code=400)
 
     # --------- Checking if the ftdv device is a data node ------------------------------------
     ftdv = ClusterUtils(ftdv_public_ip, ftdv_port_number, ftdv_username, ftdv_password)
