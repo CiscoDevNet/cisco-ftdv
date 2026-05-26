@@ -15,4 +15,4 @@ with_diagnostic = true # true if you want to enable diagnostic on FTDv
 
 
 # FTD-FMC Registration
-register_using_external_ip  = false             # true or false - for FMC-FTD registration
+ftd_reg_via_public_ip  = false             # true or false - for FMC-FTD registration

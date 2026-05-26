@@ -128,8 +128,8 @@ variable "policy_id" {
   }
 }
 
-variable "register_using_external_ip" {
-  description = "Indicates whether SSH is using an external IP."
+variable "ftd_reg_via_public_ip" {
+  description = "Whether FTDv should register to FMC using its public IP (also routes Cloud Function egress via the public/NAT path)."
   type        = bool
   default     = false
 }
@@ -268,7 +268,6 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_autoscale_scaleout_action_object.name
   timeout               = 540
-  min_instances         = 0
   max_instances         = 1
   ingress_settings      = "ALLOW_ALL"
 
@@ -280,7 +279,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
     GRP_ID                 = var.grp_id
     POLICY_ID              = var.policy_id
     FTDV_PASSWORD          = local.default_ftdv_password
-    REGISTER_USING_EXTERNAL_IP  = var.register_using_external_ip
+    FTD_REG_VIA_PUBLIC_IP  = var.ftd_reg_via_public_ip
     LICENSE_CAPS           = var.license_caps
     INSTANCE_PREFIX_IN_FMC = var.instance_prefix_in_fmc
     OUTSIDE_GW_NAME        = var.outside_gw_name
@@ -303,7 +302,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = var.register_using_external_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.insert.id
@@ -317,7 +316,6 @@ resource "google_cloudfunctions_function" "scalein_action" {
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_autoscale_scalein_action_object.name
   timeout               = 540
-  min_instances         = 0
   max_instances         = 1
   ingress_settings      = "ALLOW_ALL"
 
@@ -334,7 +332,7 @@ resource "google_cloudfunctions_function" "scalein_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = var.register_using_external_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.delete.id

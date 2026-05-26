@@ -658,6 +658,10 @@ output "ilb_out_name" {
   value = var.type_of_deployment == "east_west" ? module.east_west[0].ilb_out_name : null
 }
 
+output "instance_group_name" {
+  value = var.type_of_deployment == "north_south" ? try(module.north_south[0].instance_group_name, null) : try(module.east_west[0].instance_group_name, null)
+}
+
 output "elb_ip" {
   value = var.type_of_deployment == "north_south" ? module.north_south[0].elb_ip : null
 }
@@ -680,10 +684,6 @@ output "outside_nat_router" {
 
 output "outside_nat" {
   value = var.type_of_deployment == "north_south" ? module.north_south[0].outside_nat : null
-}
-
-output "instance_group_name" {
-  value = var.type_of_deployment == "north_south" ? one(module.north_south[*].instance_group_name) : one(module.east_west[*].instance_group_name)
 }
 
 output "scale_out_function_name" {

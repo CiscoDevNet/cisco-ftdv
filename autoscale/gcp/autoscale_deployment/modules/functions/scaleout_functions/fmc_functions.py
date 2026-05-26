@@ -361,9 +361,10 @@ class FirepowerManagementCenter:
           Returns:    Nic Id, None
           Raises:
           """
-          if nic_name != 'Ethernet0/0' and nic_name != 'Ethernet0/1':
-               print("Warning - nic name must be Ethernet0/0 or Ethernet0/1. "
-                              "The argument name was " + nic_name)
+          valid_nics = {'Ethernet0/0', 'Ethernet0/1', 'GigabitEthernet0/0', 'GigabitEthernet0/1'}
+          if nic_name not in valid_nics:
+               print("Warning - nic name must be one of " + ", ".join(sorted(valid_nics)) + ". "
+                              "The nic name found was " + nic_name)
           device_id = self.get_device_id_by_name(device_name)
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords/" + device_id + "/physicalinterfaces"
           url = self.server + api_path + '?offset=0&limit=10000'

@@ -90,7 +90,7 @@ variable "max_ftd_replicas" {
   type        = number
   validation {
     condition     = var.max_ftd_replicas >= 0
-    error_message = "Max FTD replicas must be greater than 0."
+    error_message = "Max FTD replicas must be a non-negative integer."
   }
 }
 
@@ -373,8 +373,8 @@ variable "policy_id" {
   }
 }
 
-variable "register_using_external_ip" {
-  description = "Indicates whether SSH is using an external IP."
+variable "ftd_reg_via_public_ip" {
+  description = "Whether FTDv registers to FMC using its public IP (also drives Cloud Function egress via public/NAT path)."
   type        = bool
   default     = false
 }
@@ -487,7 +487,7 @@ module "ftdv_functions" {
   nat_id                  = var.nat_id
   grp_id                  = var.grp_id
   policy_id               = var.policy_id
-  register_using_external_ip   = var.register_using_external_ip
+  ftd_reg_via_public_ip   = var.ftd_reg_via_public_ip
   license_caps            = var.license_caps
   instance_prefix_in_fmc  = var.instance_prefix_in_fmc
   fmc_password_secret     = var.fmc_password_secret
@@ -558,6 +558,10 @@ output "ilb_name" {
   value = module.ftdv_autoscale.ilb_name
 }
 
+output "instance_group_name" {
+  value = module.ftdv_autoscale.instance_group_name
+}
+
 output "elb_ip" {
   value = module.ftdv_autoscale.elb_ip
 }
@@ -572,10 +576,6 @@ output "outside_nat_router" {
 
 output "outside_nat" {
   value = module.ftdv_autoscale.outside_nat
-}
-
-output "instance_group_name" {
-  value = module.ftdv_autoscale.instance_group_name
 }
 
 output "scale_out_function_name" {

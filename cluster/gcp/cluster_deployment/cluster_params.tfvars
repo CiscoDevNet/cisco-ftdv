@@ -88,7 +88,7 @@ ilb_frontend_protocol        = "TCP"                                            
 ilb_backend_protocol         = "TCP"                                                 # Backend protocol
 
 # ILB Health Check
-ilb_health_check_port        = 80                                                  # ILB Health-check balancer port, NAT required in FMC
+ilb_health_check_port        = 8989                                                # ILB health-check balancer port, NAT required in FMC
 ilb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
 ilb_draining_timeout_sec     = 60                                                    # Timeout for draining connections (seconds)
 ilb_check_interval_sec       = 10                                                    # Interval between health checks for ILB (seconds)
@@ -103,7 +103,7 @@ elb_backend_protocol         = "TCP"                                            
 elb_front_end_ports          = "all"                                                 # List of ELB frontend(listener) ports, e.g. "all" or [22, 80, 443] 
 
 # ELB Health Check
-elb_health_check_port        = 80                                                    # ELB health-check port, NAT required in FMC
+elb_health_check_port        = 7878                                                  # ELB health-check port, NAT required in FMC
 elb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
 elb_unhealthy_threshold      = 3                                                     # Number of failed health checks before marking unhealthy
 elb_check_interval_sec       = 10                                                    # Interval between health checks for ELB (seconds)
