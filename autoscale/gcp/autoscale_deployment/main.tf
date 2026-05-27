@@ -52,6 +52,12 @@ variable "source_image_url" {
   }
 }
 
+variable "enable_secure_boot" {
+  description = "Enable Secure Boot for FTDv instances (supported from version 10.0 onwards)."
+  type        = bool
+  default     = false
+}
+
 variable "cpu_utilization_target" {
   description = "Target CPU utilization for autoscale."
   type        = number
@@ -83,17 +89,8 @@ variable "max_ftd_replicas" {
   description = "Maximum number of FTD replicas to maintain."
   type        = number
   validation {
-    condition     = var.max_ftd_replicas > 0
-    error_message = "Max FTD replicas must be greater than 0."
-  }
-}
-
-variable "elb_port" {
-  description = "External Load Balancer port."
-  type        = number
-  validation {
-    condition     = var.elb_port > 0 && var.elb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
+    condition     = var.max_ftd_replicas >= 0
+    error_message = "Max FTD replicas must be a non-negative integer."
   }
 }
 
@@ -168,15 +165,6 @@ variable "ilb_protocol_name" {
   }
 }
 
-variable "ilb_port" {
-  description = "Internal load balancer port."
-  type        = number
-  validation {
-    condition     = var.ilb_port > 0 && var.ilb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
-  }
-}
-
 variable "ilb_check_interval_sec" {
   description = "Health check interval for the ILB in seconds."
   type        = number
@@ -221,14 +209,6 @@ variable "service_account_mail_id" {
   }
 }
 
-variable "admin_password" {
-  description = "Password for admin access."
-  validation {
-    condition     = length(var.admin_password) >= 8
-    error_message = "Admin password must be at least 8 characters long."
-  }
-}
-
 variable "public_key" {
   description = "SSH public key for instance access."
   validation {
@@ -245,10 +225,10 @@ variable "outside_vpc_name" {
   }
 }
 
-variable "outside_subnetwork_name" {
+variable "outside_subnet_name" {
   description = "Subnet name for the outside VPC."
   validation {
-    condition     = length(var.outside_subnetwork_name) > 0
+    condition     = length(var.outside_subnet_name) > 0
     error_message = "Please provide a valid outside VPC subnet name."
   }
 }
@@ -261,10 +241,10 @@ variable "inside_vpc_name" {
   }
 }
 
-variable "inside_subnetwork_name" {
+variable "inside_subnet_name" {
   description = "Subnet name for the inside VPC."
   validation {
-    condition     = length(var.inside_subnetwork_name) > 0
+    condition     = length(var.inside_subnet_name) > 0
     error_message = "Please provide a valid inside VPC subnet name."
   }
 }
@@ -277,31 +257,27 @@ variable "mgmt_vpc_name" {
   }
 }
 
-variable "mgmt_subnetwork_name" {
+variable "mgmt_subnet_name" {
   description = "Subnet name for the management VPC."
   validation {
-    condition     = length(var.mgmt_subnetwork_name) > 0
+    condition     = length(var.mgmt_subnet_name) > 0
     error_message = "Please provide a valid management VPC subnet name."
   }
 }
 
 variable "diag_vpc_name" {
   description = "Name of the diagnostic VPC."
-  validation {
-    condition     = length(var.diag_vpc_name) > 0
-    error_message = "Diagnostic VPC name cannot be empty."
-  }
+  default      = null
+  nullable     = true
 }
 
-variable "diag_subnetwork_name" {
+variable "diag_subnet_name" {
   description = "Subnet name for the diagnostic VPC."
-  validation {
-    condition     = length(var.diag_subnetwork_name) > 0
-    error_message = "Please provide a valid diagnostic VPC subnet name."
-  }
+  default      = null
+  nullable     = true
 }
 
-variable "deploy_using_external_ip" {
+variable "assign_public_ip_to_mgmt" {
   description = "Indicates whether to deploy using an external IP."
   type        = bool
 }
@@ -311,44 +287,42 @@ variable "with_diagnostic" {
   type        = bool
 }
 
-variable "mgmt_firewall_rule" {
+variable "mgmt_firewall_rule_name" {
   description = "Firewall rule for management traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.mgmt_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.mgmt_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "outside_firewall_rule" {
+variable "outside_firewall_rule_name" {
   description = "Firewall rule for external traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.outside_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.outside_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "inside_firewall_rule" {
+variable "inside_firewall_rule_name" {
   description = "Firewall rule for internal traffic."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.inside_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.inside_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "health_check_firewall_rule" {
+variable "health_check_firewall_rule_name" {
   description = "Firewall rule for health checks."
   validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.health_check_firewall_rule))
+    condition     = can(regex("^[A-Za-z0-9-_]+$", var.health_check_firewall_rule_name))
     error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
   }
 }
 
-variable "diag_firewall_rule" {
+variable "diag_firewall_rule_name" {
   description = "Firewall rule for diagnostic traffic."
-  validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule))
-    error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
-  }
+  default      = null
+  nullable     = true
 }
 
 variable "fmc_ip" {
@@ -399,12 +373,10 @@ variable "policy_id" {
   }
 }
 
-variable "ssh_using_external_ip" {
-  description = "Indicates whether SSH is using an external IP."
-  validation {
-    condition     = var.ssh_using_external_ip == "True" || var.ssh_using_external_ip == "False"
-    error_message = "Please provide a valid string value ('True' or 'False')."
-  }
+variable "ftd_reg_via_public_ip" {
+  description = "Whether FTDv registers to FMC using its public IP (also drives Cloud Function egress via public/NAT path)."
+  type        = bool
+  default     = false
 }
 
 variable "license_caps" {
@@ -515,8 +487,7 @@ module "ftdv_functions" {
   nat_id                  = var.nat_id
   grp_id                  = var.grp_id
   policy_id               = var.policy_id
-  ftdv_password           = var.admin_password
-  ssh_using_external_ip   = var.ssh_using_external_ip
+  ftd_reg_via_public_ip   = var.ftd_reg_via_public_ip
   license_caps            = var.license_caps
   instance_prefix_in_fmc  = var.instance_prefix_in_fmc
   fmc_password_secret     = var.fmc_password_secret
@@ -536,11 +507,11 @@ module "ftdv_autoscale" {
   resource_name_prefix       = var.resource_name_prefix
   machine_type               = var.machine_type
   source_image_url           = var.source_image_url
+  enable_secure_boot         = var.enable_secure_boot
   cpu_utilization_target     = var.cpu_utilization_target
   cool_down_period_sec       = var.cool_down_period_sec
   min_ftd_replicas           = var.min_ftd_replicas
   max_ftd_replicas           = var.max_ftd_replicas
-  elb_port                   = var.elb_port
   elb_port_name              = var.elb_port_name
   elb_protocol               = var.elb_protocol
   elb_protocol_name          = var.elb_protocol_name
@@ -551,29 +522,66 @@ module "ftdv_autoscale" {
   ilb_protocol               = var.ilb_protocol
   ilb_protocol_name          = var.ilb_protocol_name
   ilb_draining_timeout_sec   = var.ilb_draining_timeout_sec
-  ilb_port                   = var.ilb_port
+  health_check_port          = var.health_check_port
   ilb_check_interval_sec     = var.ilb_check_interval_sec
   ilb_timeout_sec            = var.ilb_timeout_sec
   ilb_unhealthy_threshold    = var.ilb_unhealthy_threshold
   service_account_email      = var.service_account_mail_id
-  admin_password             = var.admin_password
   public_key                 = var.public_key
   outside_vpc_name           = var.outside_vpc_name
-  outside_subnetwork_name    = var.outside_subnetwork_name
+  outside_subnet_name       = var.outside_subnet_name
   inside_vpc_name            = var.inside_vpc_name
-  inside_subnetwork_name     = var.inside_subnetwork_name
+  inside_subnet_name        = var.inside_subnet_name
   mgmt_vpc_name              = var.mgmt_vpc_name
-  mgmt_subnetwork_name       = var.mgmt_subnetwork_name
+  mgmt_subnet_name          = var.mgmt_subnet_name
   diag_vpc_name              = var.diag_vpc_name
-  diag_subnetwork_name       = var.diag_subnetwork_name
-  deploy_using_external_ip   = var.deploy_using_external_ip
+  diag_subnet_name          = var.diag_subnet_name
+  assign_public_ip_to_mgmt   = var.assign_public_ip_to_mgmt
   with_diagnostic            = var.with_diagnostic
-  mgmt_firewall_rule         = var.mgmt_firewall_rule
-  outside_firewall_rule      = var.outside_firewall_rule
-  inside_firewall_rule       = var.inside_firewall_rule
-  health_check_firewall_rule = var.health_check_firewall_rule
-  diag_firewall_rule         = var.diag_firewall_rule
+  mgmt_firewall_rule         = var.mgmt_firewall_rule_name
+  outside_firewall_rule      = var.outside_firewall_rule_name
+  inside_firewall_rule       = var.inside_firewall_rule_name
+  health_check_firewall_rule = var.health_check_firewall_rule_name
+  diag_firewall_rule         = var.diag_firewall_rule_name
   zone                       = var.zone
 
   depends_on = [time_sleep.wait_after_functions]
+}
+
+# Outputs
+
+output "elb_name" {
+  value = module.ftdv_autoscale.elb_name
+}
+
+output "ilb_name" {
+  value = module.ftdv_autoscale.ilb_name
+}
+
+output "instance_group_name" {
+  value = module.ftdv_autoscale.instance_group_name
+}
+
+output "elb_ip" {
+  value = module.ftdv_autoscale.elb_ip
+}
+
+output "ilb_ip" {
+  value = module.ftdv_autoscale.ilb_ip
+}
+
+output "outside_nat_router" {
+  value = module.ftdv_autoscale.outside_nat_router
+}
+
+output "outside_nat" {
+  value = module.ftdv_autoscale.outside_nat
+}
+
+output "scale_out_function_name" {
+  value = module.ftdv_functions.scale_out_function_name
+}
+
+output "scale_in_function_name" {
+  value = module.ftdv_functions.scale_in_function_name
 }

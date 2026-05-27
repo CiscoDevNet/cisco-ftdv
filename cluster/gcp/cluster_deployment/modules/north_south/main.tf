@@ -103,17 +103,17 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.outside_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnets/${var.outside_subnet_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.outside_subnet_name}"
   }
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnets/${var.inside_subnet_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
   }
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.mgmt_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnets/${var.mgmt_subnet_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.mgmt_subnet_name}"
 
     dynamic "access_config" {
       for_each = var.assign_public_ip_to_mgmt ? [1] : []
@@ -128,13 +128,13 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     for_each = var.with_diagnostic ? [1] : []
     content {
       network    = "projects/${var.project_id}/global/networks/${var.diag_vpc_name}"
-      subnetwork = "projects/${var.project_id}/regions/${var.region}/subnets/${var.diag_subnet_name}"
+      subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.diag_subnet_name}"
     }
   }
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.ccl_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnets/${var.ccl_subnet_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.ccl_subnet_name}"
   }
 
   reservation_affinity {
@@ -158,10 +158,6 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     }
   }
   EOT
-
-  labels = {
-    autostop = "false"
-  }
 
   scheduling {
     on_host_maintenance = "MIGRATE"
@@ -207,8 +203,8 @@ resource "google_compute_region_autoscaler" "ftdv_autoscaler" {
   }
 }
 
-resource "google_compute_region_backend_service" "ftdv_backend_service_ilb" {
-  name                  = "${var.resource_name_prefix}-ftdv-backend-service-ilb"
+resource "google_compute_region_backend_service" "ftdv_ilb" {
+  name                  = "${var.resource_name_prefix}-ftdv-ilb"
   region                = var.region
   protocol              = var.ilb_backend_protocol
   load_balancing_scheme = "INTERNAL"
@@ -242,7 +238,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb" {
   ip_protocol           = contains(["TCP", "UDP"], var.ilb_backend_protocol) ? var.ilb_backend_protocol : var.ilb_frontend_protocol
   load_balancing_scheme = "INTERNAL"
   ip_address            = google_compute_address.ilb_ip.self_link
-  backend_service       = google_compute_region_backend_service.ftdv_backend_service_ilb.self_link
+  backend_service       = google_compute_region_backend_service.ftdv_ilb.self_link
   network               = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"
   subnetwork            = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
 }
@@ -267,8 +263,8 @@ resource "google_compute_region_health_check" "ftdv_hc_elb" {
   }
 }
 
-resource "google_compute_region_backend_service" "ftdv_backend_service_elb" {
-  name                  = "${var.resource_name_prefix}-ftdv-backend-service-elb"
+resource "google_compute_region_backend_service" "ftdv_elb" {
+  name                  = "${var.resource_name_prefix}-ftdv-elb"
   region                = var.region
   protocol              = var.elb_backend_protocol
   load_balancing_scheme = "EXTERNAL"
@@ -290,7 +286,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_elb1" {
   ip_protocol           = contains(["TCP", "UDP"], var.elb_backend_protocol) ? var.elb_backend_protocol : var.elb_frontend_protocol
   load_balancing_scheme = "EXTERNAL"
   ip_address            = google_compute_address.elb_ip.self_link
-  backend_service       = google_compute_region_backend_service.ftdv_backend_service_elb.self_link
+  backend_service       = google_compute_region_backend_service.ftdv_elb.self_link
 
   ports = var.elb_front_end_ports
 }
@@ -303,7 +299,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_elb2" {
   ip_protocol           = var.elb_frontend_protocol
   load_balancing_scheme = "EXTERNAL"
   ip_address            = google_compute_address.elb_ip.self_link
-  backend_service       = google_compute_region_backend_service.ftdv_backend_service_elb.self_link
+  backend_service       = google_compute_region_backend_service.ftdv_elb.self_link
 
   all_ports = true
 }
@@ -314,17 +310,49 @@ resource "google_compute_address" "elb_ip" {
   region       = var.region
 }
 
-resource "google_compute_router" "cloud_nat_router" {
-  name    = "${var.resource_name_prefix}-cloud-nat-router"
+resource "google_compute_router" "outside_nat_router" {
+  name    = "${var.resource_name_prefix}-outside-nat-router"
   region  = var.region
   network = "projects/${var.project_id}/global/networks/${var.outside_vpc_name}"
 }
 
-resource "google_compute_router_nat" "cloud_nat" {
-  name   = "${var.resource_name_prefix}-cloud-nat"
-  router = google_compute_router.cloud_nat_router.name
+resource "google_compute_router_nat" "outside_nat" {
+  name   = "${var.resource_name_prefix}-outside-nat"
+  router = google_compute_router.outside_nat_router.name
   region = var.region
 
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+# Outputs
+output "elb_name" {
+  value = one(concat(
+    google_compute_forwarding_rule.ftdv_fr_elb1[*].name,
+    google_compute_forwarding_rule.ftdv_fr_elb2[*].name
+  ))
+}
+
+output "ilb_name" {
+  value = google_compute_forwarding_rule.ftdv_fr_ilb.name
+}
+
+output "outside_nat_router" {
+  value = google_compute_router.outside_nat_router.name
+}
+
+output "outside_nat" {
+  value = google_compute_router_nat.outside_nat.name
+}
+
+output "elb_ip" {
+  value = google_compute_address.elb_ip.address
+}
+
+output "ilb_ip" {
+  value = google_compute_address.ilb_ip.address
+}
+
+output "instance_group_name" {
+  value = google_compute_region_instance_group_manager.ftdv_igm.name
 }

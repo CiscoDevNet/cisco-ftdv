@@ -12,3 +12,7 @@ outside_ip_cidr_range       = "outside-ip-cidr-range"       # e.g., "10.115.2.0/
 
 # Diagnostic Configuration
 with_diagnostic = true # true if you want to enable diagnostic on FTDv
+
+
+# FTD-FMC Registration
+ftd_reg_via_public_ip  = false             # true or false - for FMC-FTD registration

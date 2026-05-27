@@ -468,8 +468,9 @@ class FirepowerManagementCenter:
           Raises:
           """
           try:
-               if nic_name != 'GigabitEthernet0/0' and nic_name != 'GigabitEthernet0/1':
-                    print("Warning - nic name must be GigabitEthernet0/0 or GigabitEthernet0/1. "
+               valid_nics = {'Ethernet0/0', 'Ethernet0/1', 'GigabitEthernet0/0', 'GigabitEthernet0/1'}
+               if nic_name not in valid_nics:
+                    print("Warning - nic name must be one of " + ", ".join(sorted(valid_nics)) + ". "
                                    "The argument name was " + nic_name)
                device_id = self.get_device_id_by_name(device_name)
                api_path = "/api/fmc_config/v1/domain/e276abec-e0f2-11e3-8169-6d9ed49b625f/devices/devicerecords/" + device_id + "/physicalinterfaces"

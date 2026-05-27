@@ -207,10 +207,7 @@ variable "cluster_grp_name" {
 }
 
 variable "with_diagnostic" {
-  validation {
-    condition     = var.with_diagnostic == true || var.with_diagnostic == false
-    error_message = "With diagnostic must be a boolean."
-  }
+  type = bool
 }
 
 variable "mgmt_vpc_name" {
@@ -641,4 +638,58 @@ module "north_south" {
 
   depends_on = [resource.time_sleep.wait_for_function]
 
+}
+
+# Outputs
+
+output "elb_name" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].elb_name : null
+}
+
+output "ilb_name" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].ilb_name : null
+}
+
+output "ilb_in_name" {
+  value = var.type_of_deployment == "east_west" ? module.east_west[0].ilb_in_name : null
+}
+
+output "ilb_out_name" {
+  value = var.type_of_deployment == "east_west" ? module.east_west[0].ilb_out_name : null
+}
+
+output "instance_group_name" {
+  value = var.type_of_deployment == "north_south" ? try(module.north_south[0].instance_group_name, null) : try(module.east_west[0].instance_group_name, null)
+}
+
+output "elb_ip" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].elb_ip : null
+}
+
+output "ilb_ip" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].ilb_ip : null
+}
+
+output "ilb_in_ip" {
+  value = var.type_of_deployment == "east_west" ? module.east_west[0].ilb_in_ip : null
+}
+
+output "ilb_out_ip" {
+  value = var.type_of_deployment == "east_west" ? module.east_west[0].ilb_out_ip : null
+}
+
+output "outside_nat_router" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].outside_nat_router : null
+}
+
+output "outside_nat" {
+  value = var.type_of_deployment == "north_south" ? module.north_south[0].outside_nat : null
+}
+
+output "scale_out_function_name" {
+  value = module.ftdv_cluster_function.scale_out_function_name
+}
+
+output "scale_in_function_name" {
+  value = module.ftdv_cluster_function.scale_in_function_name
 }

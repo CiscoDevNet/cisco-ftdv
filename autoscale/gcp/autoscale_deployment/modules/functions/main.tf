@@ -113,7 +113,7 @@ variable "nat_id" {
 }
 
 variable "grp_id" {
-  description = "Group ID."
+  description = "Device Group Name."
   validation {
     condition     = length(var.grp_id) > 0
     error_message = "Group ID cannot be empty."
@@ -128,20 +128,10 @@ variable "policy_id" {
   }
 }
 
-variable "ftdv_password" {
-  description = "Password for FTDv access."
-  validation {
-    condition     = length(var.ftdv_password) >= 8
-    error_message = "Password must be at least 8 characters long."
-  }
-}
-
-variable "ssh_using_external_ip" {
-  description = "Indicates whether SSH is using an external IP."
-  validation {
-    condition     = var.ssh_using_external_ip == "True" || var.ssh_using_external_ip == "False"
-    error_message = "Please provide a valid string value ('True' or 'False')."
-  }
+variable "ftd_reg_via_public_ip" {
+  description = "Whether FTDv should register to FMC using its public IP (also routes Cloud Function egress via the public/NAT path)."
+  type        = bool
+  default     = false
 }
 
 variable "license_caps" {
@@ -182,6 +172,10 @@ variable "health_check_port" {
     condition     = can(regex("^[0-9]+$", var.health_check_port))
     error_message = "Please provide a valid port number."
   }
+}
+
+locals {
+  default_ftdv_password = "th1S_w!ll_Be_C#@nged"
 }
 
 resource "google_storage_bucket" "ftdv_bucket" {
@@ -228,6 +222,7 @@ resource "google_logging_project_sink" "insert_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.insert.name}"
   filter                 = "(resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.insert\" AND protoPayload.resourceName:\"${var.resource_name_prefix}\" AND operation.last = true) OR (resource.type = \"cloud_function\" AND resource.labels.function_name = \"${var.resource_name_prefix}-ftdv-scaleout-action\" AND textPayload:\"Second Attempt\")"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.insert]
 }
 
 resource "google_pubsub_topic_iam_binding" "insert" {
@@ -250,6 +245,7 @@ resource "google_logging_project_sink" "delete_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.delete.name}"
   filter                 = "resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.delete\" AND protoPayload.resourceName:\"${var.resource_name_prefix}\" AND operation.first=true"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.delete]
 }
 
 resource "google_pubsub_topic_iam_binding" "delete" {
@@ -282,8 +278,8 @@ resource "google_cloudfunctions_function" "scaleout_action" {
     NAT_ID                 = var.nat_id
     GRP_ID                 = var.grp_id
     POLICY_ID              = var.policy_id
-    FTDV_PASSWORD          = var.ftdv_password
-    SSH_USING_EXTERNAL_IP  = var.ssh_using_external_ip
+    FTDV_PASSWORD          = local.default_ftdv_password
+    FTD_REG_VIA_PUBLIC_IP  = var.ftd_reg_via_public_ip
     LICENSE_CAPS           = var.license_caps
     INSTANCE_PREFIX_IN_FMC = var.instance_prefix_in_fmc
     OUTSIDE_GW_NAME        = var.outside_gw_name
@@ -306,7 +302,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.insert.id
@@ -336,9 +332,18 @@ resource "google_cloudfunctions_function" "scalein_action" {
   }
 
   vpc_connector                 = var.vpc_connector_name
-  vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+  vpc_connector_egress_settings = var.ftd_reg_via_public_ip ? "ALL_TRAFFIC" : "PRIVATE_RANGES_ONLY"
   event_trigger {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.delete.id
   }
+}
+
+# Outputs
+output "scale_out_function_name" {
+  value = google_cloudfunctions_function.scaleout_action.name
+}
+
+output "scale_in_function_name" {
+  value = google_cloudfunctions_function.scalein_action.name
 }
