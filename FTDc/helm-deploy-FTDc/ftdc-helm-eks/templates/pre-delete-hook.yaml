@@ -1,0 +1,276 @@
+# Copyright (c) 2026 Cisco Systems Inc or its affiliates.
+#
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pre-delete-sa
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pre-delete-role
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/scale"]
+  verbs: ["get", "list", "delete", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pre-delete-rolebinding
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pre-delete-role
+subjects:
+- kind: ServiceAccount
+  name: pre-delete-sa
+  namespace: {{ .Values.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pre-delete-job
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    spec:
+      serviceAccountName: pre-delete-sa
+      restartPolicy: Never
+      containers:
+      - name: pre-delete
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          
+          # Set app name from values
+          APP_NAME="{{ .Values.ftdc.app_name }}"
+          
+          echo "Starting FTDc cleanup process..."
+          
+          # Get all pods with ${APP_NAME} prefix and their runtime information
+          echo "=========================================="
+          echo "Collecting runtime information for ${APP_NAME} pods..."
+          echo "=========================================="
+          
+          NAMESPACE="{{ .Values.namespace }}"
+          FTDC_PODS=$(kubectl get pods -n $NAMESPACE --no-headers 2>/dev/null | grep "^${APP_NAME}" | awk '{print $1}')
+          
+          if [ -z "$FTDC_PODS" ]; then
+            echo "No pods found with prefix '${APP_NAME}'"
+          else
+            echo "Found the following ${APP_NAME} pods:"
+            echo "$FTDC_PODS"
+            echo ""
+            
+            # Get detailed runtime information for each pod
+            for pod in $FTDC_PODS; do
+              echo "----------------------------------------"
+              echo "Pod: $pod"
+              echo "----------------------------------------"
+              
+              # Get pod start time and calculate runtime
+              START_TIME=$(kubectl get pod $pod -n $NAMESPACE -o jsonpath='{.status.startTime}' 2>/dev/null)
+              CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+              
+              if [ -n "$START_TIME" ]; then
+                echo "Start Time: $START_TIME"
+                echo "Current Time: $CURRENT_TIME"
+                
+                # Calculate runtime in seconds
+                START_EPOCH=$(date -d "$START_TIME" +%s 2>/dev/null || echo "0")
+                CURRENT_EPOCH=$(date -d "$CURRENT_TIME" +%s 2>/dev/null || echo "0")
+                
+                if [ "$START_EPOCH" != "0" ] && [ "$CURRENT_EPOCH" != "0" ]; then
+                  RUNTIME_SECONDS=$((CURRENT_EPOCH - START_EPOCH))
+                  RUNTIME_MINUTES=$((RUNTIME_SECONDS / 60))
+                  RUNTIME_HOURS=$((RUNTIME_MINUTES / 60))
+                  RUNTIME_DAYS=$((RUNTIME_HOURS / 24))
+                  
+                  echo "Runtime: ${RUNTIME_DAYS}d ${RUNTIME_HOURS}h ${RUNTIME_MINUTES}m ${RUNTIME_SECONDS}s"
+                fi
+              fi
+              
+              # Get pod status
+              POD_STATUS=$(kubectl get pod $pod -n $NAMESPACE -o jsonpath='{.status.phase}' 2>/dev/null)
+              echo "Status: $POD_STATUS"
+              
+              # Get pod restarts
+              RESTARTS=$(kubectl get pod $pod -n $NAMESPACE -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null)
+              echo "Restarts: ${RESTARTS:-0}"
+              
+              echo ""
+            done
+          fi
+          
+          echo "=========================================="
+          echo "Runtime information collection completed"
+          echo "=========================================="
+          
+          # Function to retry commands
+          retry_command() {
+            local max_attempts=3
+            local attempt=1
+            local delay=5
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts: $@"
+              if "$@"; then
+                return 0
+              fi
+              echo "Command failed, waiting ${delay}s before retry..."
+              sleep $delay
+              attempt=$((attempt + 1))
+            done
+            echo "Command failed after $max_attempts attempts"
+            return 1
+          }
+          
+          # Get all deployments with ${APP_NAME} prefix
+          echo "Finding all deployments with ${APP_NAME} prefix..."
+          FTDC_DEPLOYMENTS=$(kubectl get deployments -n $NAMESPACE --no-headers 2>/dev/null | grep "^${APP_NAME}" | awk '{print $1}')
+          
+          if [ -z "$FTDC_DEPLOYMENTS" ]; then
+            echo "No deployments found with prefix '${APP_NAME}'"
+          else
+            # Scale down all ${APP_NAME} deployments
+            for deployment in $FTDC_DEPLOYMENTS; do
+              echo "Scaling down deployment: $deployment"
+              retry_command kubectl scale deployment $deployment --replicas=0 -n $NAMESPACE || echo "Warning: Failed to scale $deployment"
+            done
+            
+            # Wait for all ${APP_NAME} pods to terminate
+            echo "Waiting for ${APP_NAME} pods to terminate..."
+            for pod in $FTDC_PODS; do
+              echo "Deleting a pod: $pod"
+              kubectl wait --for=delete pod/$pod -n $NAMESPACE --timeout=180s 2>/dev/null || echo "Warning: Pod $pod did not terminate in time"
+            done
+            
+            # Delete all ${APP_NAME} deployments
+            for deployment in $FTDC_DEPLOYMENTS; do
+              echo "Deleting deployment: $deployment"
+              retry_command kubectl delete deployment $deployment -n $NAMESPACE --wait=true --timeout=60s || echo "Warning: Failed to delete $deployment"
+            done
+          fi
+          
+          # Verify cleanup
+          echo "Verifying cleanup..."
+          REMAINING_PODS=$(kubectl get pods -n $NAMESPACE --no-headers 2>/dev/null | grep "^${APP_NAME}" | wc -l)
+          
+          echo "Remaining ${APP_NAME} pods: $REMAINING_PODS"
+          
+          if [ $REMAINING_PODS -eq 0 ]; then
+            echo "SUCCESS: All ${APP_NAME} pods and deployments deleted successfully"
+            exit 0
+          else
+            echo "WARNING: Some pods may still be terminating"
+            exit 0
+          fi
+
+---
+# Cleanup job to delete persistent volume content on worker nodes
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cleanup-persistent-storage
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "5"  # Run after pod deletion (weight 0)
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        ftdc-node: {{ .Values.worker_node1.label }}
+      containers:
+      - name: cleanup-storage
+        image: busybox:latest
+        securityContext:
+          privileged: true
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          LINA_PATH="{{ .Values.worker_nodes.persistence.lina.hostPath }}"
+          NGFW_PATH="{{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}"
+          
+          echo "=========================================="
+          echo "Cleaning up persistent storage"
+          echo "=========================================="
+          
+          # Cleanup lina and ngfw paths
+          echo "Target path: $LINA_PATH and $NGFW_PATH"
+          if [ -d "$LINA_PATH" ] || [ -d "$NGFW_PATH" ]; then
+            echo "Directory exists. Listing contents before cleanup:"
+            ls -la "$LINA_PATH" || echo "Unable to list directory"
+            ls -la "$NGFW_PATH" || echo "Unable to list directory"
+            
+            echo "Deleting all contents in $LINA_PATH..."
+            rm -rf "$LINA_PATH"/* "$LINA_PATH"/.[!.]* "$LINA_PATH"/..?* 2>/dev/null || true
+            echo "Deleting all contents in $NGFW_PATH..."
+            rm -rf "$NGFW_PATH"/* "$NGFW_PATH"/.[!.]* "$NGFW_PATH"/..?* 2>/dev/null || true
+            
+            echo "Cleanup completed. Verifying:"
+            ls -la "$LINA_PATH" || echo "Directory is now empty or doesn't exist"
+            ls -la "$NGFW_PATH" || echo "Directory is now empty or doesn't exist"
+            echo "SUCCESS: Persistent storage cleaned at $LINA_PATH and $NGFW_PATH"
+          else
+            echo "Directory $LINA_PATH or $NGFW_PATH does not exist. Nothing to clean."
+          fi
+          
+          exit 0
+        volumeMounts:
+        - name: lina-path
+          mountPath: {{ .Values.worker_nodes.persistence.lina.hostPath }}
+        - name: ngfw-path
+          mountPath: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
+      volumes:
+      - name: lina-path
+        hostPath:
+          path: {{ .Values.worker_nodes.persistence.lina.hostPath }}
+          type: DirectoryOrCreate
+      - name: ngfw-path
+        hostPath:
+          path: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+

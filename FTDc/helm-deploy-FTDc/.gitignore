@@ -1,0 +1,13 @@
+# Secrets files - NEVER commit these
+secrets.yaml
+secrets-*.yaml
+*-secrets.yaml
+.secrets/
+
+# Local override files
+values-local.yaml
+values-dev.yaml
+values-prod.yaml
+
+# Helm package artifacts
+*.tgz
