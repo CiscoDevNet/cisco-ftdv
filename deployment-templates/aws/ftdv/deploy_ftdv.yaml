@@ -58,6 +58,22 @@ Parameters:
     Type : String
     Default: ''
     Description: Day 0 configuration (leave empty to use default)
+  InsideRouteTableId:
+    Type: String
+    Description: Route table ID for the inside subnet (from infra stack)
+    Default: ''
+  OutsideRouteTableId:
+    Type: String
+    Description: Route table ID for the outside subnet (from infra stack)
+    Default: ''
+  InsideSubnetCidr:
+    Type: String
+    Description: CIDR block of the inside subnet (for cross-subnet routing)
+    Default: ''
+  OutsideSubnetCidr:
+    Type: String
+    Description: CIDR block of the outside subnet (for cross-subnet routing)
+    Default: ''
   InstanceMetadataServiceVersion:
     Description: Select IMDS version to be used by the instances
     Type: String
@@ -70,6 +86,16 @@ Parameters:
 Conditions:
   CreateDiag: !Equals [!Ref DiagOff, 'false']
   UseDefaultDay0Config: !Equals [!Ref Day0Config, '']
+  HasInsideRouteTable:
+    !Not [!Equals [!Ref InsideRouteTableId, '']]
+  HasOutsideRouteTable:
+    !Not [!Equals [!Ref OutsideRouteTableId, '']]
+  HasDataPlaneRouting:
+    !And
+      - !Condition HasInsideRouteTable
+      - !Condition HasOutsideRouteTable
+      - !Not [!Equals [!Ref InsideSubnetCidr, '']]
+      - !Not [!Equals [!Ref OutsideSubnetCidr, '']]
   EnableIMDSv2:
     Fn::Equals:
       - !Ref InstanceMetadataServiceVersion
@@ -190,6 +216,22 @@ Resources:
               }
           - !Ref Day0Config
 
+  InsideToOutsideRoute:
+    Type: AWS::EC2::Route
+    Condition: HasDataPlaneRouting
+    DependsOn: FTDv
+    Properties:
+      RouteTableId: !Ref InsideRouteTableId
+      DestinationCidrBlock: !Ref OutsideSubnetCidr
+      NetworkInterfaceId: !Ref Inside
+  OutsideToInsideRoute:
+    Type: AWS::EC2::Route
+    Condition: HasDataPlaneRouting
+    DependsOn: FTDv
+    Properties:
+      RouteTableId: !Ref OutsideRouteTableId
+      DestinationCidrBlock: !Ref InsideSubnetCidr
+      NetworkInterfaceId: !Ref Outside
 Outputs:
   FtdvId:
     Description: FTDv Instance ID

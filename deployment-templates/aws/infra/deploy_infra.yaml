@@ -175,41 +175,55 @@ Resources:
           - 4
           - 64
       SubnetId: !Ref OutsideSubnet
-  PublicRouteTable:
+  MgmtRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${Prefix}-public-rt
-  RouteToInternet:
+          Value: !Sub ${Prefix}-mgmt-rt
+  MgmtRouteToInternet:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
-      RouteTableId: !Ref PublicRouteTable
-  RouteToInternetIpv6:
+      RouteTableId: !Ref MgmtRouteTable
+  MgmtRouteToInternetIpv6:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
     Properties:
       DestinationIpv6CidrBlock: ::/0
       GatewayId: !Ref InternetGateway
-      RouteTableId: !Ref PublicRouteTable
-  PublicMgmtSubnetRouteTable:
+      RouteTableId: !Ref MgmtRouteTable
+  MgmtSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref MgmtRouteTable
       SubnetId: !Ref MgmtSubnet
-  PublicInsideSubnetRouteTable:
+  InsideRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-inside-rt
+  InsideSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref InsideRouteTable
       SubnetId: !Ref InsideSubnet
-  PublicOutsideSubnetRouteTable:
+  OutsideRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-outside-rt
+  OutsideSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref OutsideRouteTable
       SubnetId: !Ref OutsideSubnet
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -309,8 +323,14 @@ Outputs:
     Description: The ID of the Internet Gateway
     Value: !Ref InternetGateway
   RouteTableId:
-    Description: The ID of the public route table
-    Value: !Ref PublicRouteTable    
+    Description: The ID of the management route table
+    Value: !Ref MgmtRouteTable
+  InsideRouteTableId:
+    Description: The ID of the inside data-plane route table
+    Value: !Ref InsideRouteTable
+  OutsideRouteTableId:
+    Description: The ID of the outside data-plane route table
+    Value: !Ref OutsideRouteTable
   MgmtIpv6Cidr:
     Description: The IPv6 CIDR block for the Management subnet
     Value: !GetAtt MgmtSubnet.Ipv6CidrBlock    
