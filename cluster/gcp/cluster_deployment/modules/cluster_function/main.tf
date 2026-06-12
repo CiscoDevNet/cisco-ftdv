@@ -103,6 +103,7 @@ resource "google_logging_project_sink" "insert_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.insert.name}"
   filter                 = "(resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.insert\" AND operation.last = true AND protoPayload.resourceName:\"${var.resource_name_prefix}\")"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.insert]
 }
 
 # Create log sink to capture instance deletion events
@@ -111,6 +112,7 @@ resource "google_logging_project_sink" "delete_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.delete.name}"
   filter                 = "resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.delete\" AND protoPayload.resourceName:\"${var.resource_name_prefix}\" AND operation.first=true"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.delete]
 }
 
 # Grant publisher permissions for the insert topic
