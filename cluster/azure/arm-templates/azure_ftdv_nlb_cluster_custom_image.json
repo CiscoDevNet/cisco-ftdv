@@ -147,10 +147,10 @@
         "allowedValues": [
             "bios",
             "uefi",
-            "uefi_secure"
+            "uefi_secureboot"
         ],
         "metadata": {
-            "description": "Boot mode for the virtual machine (bios: Standard BIOS boot, uefi: UEFI boot with Trusted Launch, uefi_secure: UEFI boot with Trusted Launch and Secure Boot enabled)"
+            "description": "Boot mode for the virtual machine (bios: Standard BIOS boot, uefi: UEFI boot with Trusted Launch, uefi_secureboot: UEFI boot with Trusted Launch and Secure Boot enabled)"
         }
       },
       "interfaceNamePrefix": {
@@ -412,8 +412,8 @@
       "insideNicInterface":"[concat(parameters('interfaceNamePrefix'),'0/0')]",
       "outsideNicInterface":"[concat(parameters('interfaceNamePrefix'),'0/1')]",
       "cclNicInterface":"[concat(parameters('interfaceNamePrefix'),' 0/2')]",
-      "isUefi": "[or(equals(parameters('bootMode'), 'uefi'), equals(parameters('bootMode'), 'uefi_secure'))]",
-      "isUefiSecure": "[equals(parameters('bootMode'), 'uefi_secure')]",
+      "isUefi": "[or(equals(parameters('bootMode'), 'uefi'), equals(parameters('bootMode'), 'uefi_secureboot'))]",
+      "isUefiSecure": "[equals(parameters('bootMode'), 'uefi_secureboot')]",
       "securityType": "[if(variables('isUefi'), 'TrustedLaunch', 'Standard')]",
       "secureBoot": "[if(variables('isUefiSecure'), 'true', 'false')]",
       "vTpm": "[if(variables('isUefi'), 'true', 'false')]",
