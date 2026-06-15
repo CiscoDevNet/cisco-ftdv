@@ -50,6 +50,12 @@
     "imageId": {
       "value": "/subscriptions/f160cf7e-ae69-4e9f-8ad0-b434b9a63755/resourceGroups/blr-virtual-images-rg/providers/Microsoft.Compute/galleries/virtBlrImgGallery/images/ftdv/versions/2.376.730108901"
     },
+    "bootMode": {
+      "value": "bios"
+    },
+    "interfaceNamePrefix": {
+      "value": "GigabitEthernet"
+    },
     "vmSize": {
       "value": "Standard_D3_v2"
     },

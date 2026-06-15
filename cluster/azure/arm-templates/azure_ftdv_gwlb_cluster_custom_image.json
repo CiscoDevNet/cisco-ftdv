@@ -120,6 +120,29 @@
             "description": "FTDv image resource ID."
         }
       },
+      "bootMode": {
+        "type": "string",
+        "defaultValue": "bios",
+        "allowedValues": [
+            "bios",
+            "uefi",
+            "uefi_secureboot"
+        ],
+        "metadata": {
+            "description": "Boot mode for the virtual machine (bios: Standard BIOS boot, uefi: UEFI boot with Trusted Launch, uefi_secureboot: UEFI boot with Trusted Launch and Secure Boot enabled)"
+        }
+      },
+      "interfaceNamePrefix": {
+        "type": "string",
+        "defaultValue": "GigabitEthernet",
+        "allowedValues": [
+            "GigabitEthernet",
+            "Ethernet"
+        ],
+        "metadata": {
+            "description": "Prefix used in FMC interface names. Use GigabitEthernet for releases below 10.0 and Ethernet for 10.0+."
+        }
+      },
       "vmSize" : {
         "type" : "string",
         "defaultValue" : "Standard_F16s_v2",
@@ -364,6 +387,14 @@
       "externalTunnelPortNumber": 2001,
       "externalTunnelSegmentId": 801,
       "tunnelPortRange":       "[concat(variables('internalTunnelPortNumber'),'-',variables('externalTunnelPortNumber'))]",
+      "outsideNicInterface": "[concat(parameters('interfaceNamePrefix'),'0/0')]",
+      "cclNicInterface": "[concat(parameters('interfaceNamePrefix'),' 0/1')]",
+      "isUefi": "[or(equals(parameters('bootMode'), 'uefi'), equals(parameters('bootMode'), 'uefi_secureboot'))]",
+      "isUefiSecure": "[equals(parameters('bootMode'), 'uefi_secureboot')]",
+      "securityType": "[if(variables('isUefi'), 'TrustedLaunch', 'Standard')]",
+      "secureBoot": "[if(variables('isUefiSecure'), 'true', 'false')]",
+      "vTpm": "[if(variables('isUefi'), 'true', 'false')]",
+      "securityProfileBlock": "[if(variables('isUefi'), json(concat('{','\"securityType\": \"', variables('securityType'), '\",','\"uefiSettings\": {','\"secureBootEnabled\": ', toLower(variables('secureBoot')), ',','\"vTpmEnabled\": ', toLower(variables('vTpm')),'}','}')), json('null'))]",
       "customData": "[concat('{\"AdminPassword\":\"', parameters('ftdAdminUserPassword'), '\", \"Hostname\": \"ftdvcluster\", \"FmcIp\": \"DONTRESOLVE\", \"FmcRegKey\":\"1234\", \"FmcNatId\":\"5678\", \"FirewallMode\":\"routed\", \"Diagnostic\":\"OFF\", \"Cluster\":{\"CclSubnetRange\": \"', parameters('cclSubnetStartAddr'), ' ', parameters('cclSubnetEndAddr'), '\", \"ClusterGroupName\":\"', parameters('clusterGroupName'), '\", \"EncapsulationType\":\"vxlan\", \"InternalPort\":\"', variables('internalTunnelPortNumber'), '\",\"ExternalPort\":\"', variables('externalTunnelPortNumber'), '\",\"InternalSegId\":\"', variables('internalTunnelSegmentId'), '\",\"ExternalSegId\":\"', variables('externalTunnelSegmentId'), '\",\"HealthProbePort\":\"', parameters('healthCheckPortNumber'), '\",\"GatewayLoadBalancerIP\":\"', parameters('gatewayLoadBalancerIP'), '\" }}')]"
     },
     "resources": [
@@ -531,9 +562,6 @@
         "location": "[resourceGroup().location]",
         "sku": {
             "name": "Standard_LRS"
-        },
-        "properties": {
-            "minimumTlsVersion": "TLS1_2"
         }
       },
         {
@@ -759,11 +787,11 @@
               },
               {
                 "name": "OUTSIDE_NIC_INTERFACE",
-                "value": "GigabitEthernet0/0"
+                "value": "[variables('outsideNicInterface')]"
               },
               {
                 "name": "CCL_NIC_INTERFACE",
-                "value": "GigabitEthernet 0/1"
+                "value": "[variables('cclNicInterface')]"
               },
               {
                 "name": "OUTSIDE_NIC_NAME",
@@ -1058,6 +1086,7 @@
               "adminPassword": "[parameters('ftdVmManagementUserPassword')]",
               "customData": "[base64(variables('customData'))]"
             },
+            "securityProfile": "[variables('securityProfileBlock')]",
 		     	"diagnosticsProfile": {
               "bootDiagnostics": {
                 "enabled": true,
