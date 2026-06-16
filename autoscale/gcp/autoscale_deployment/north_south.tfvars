@@ -18,14 +18,15 @@ zone                   = "b" # Deployment zone (comma separated alphabets, 3 at 
 
 # External Load Balancer Configuration
 elb_port_name           = "tcp"
-elb_protocol            = "TCP"
-elb_ip_protocol         = "TCP"
+elb_protocol            = "UNSPECIFIED"
+elb_ip_protocol         = "L3_DEFAULT"
 elb_timeout_sec         = 5
 elb_unhealthy_threshold = 2
-elb_fe_ports            = ["80", "22"]
+elb_fe_ports            = ["80", "22"] # Set to "all" to enable all ports
 
 # Internal Load Balancer Configuration
-ilb_protocol             = "TCP"
+ilb_ip_protocol          = "L3_DEFAULT"
+ilb_protocol             = "UNSPECIFIED"
 ilb_draining_timeout_sec = 60
 ilb_check_interval_sec   = 10
 ilb_timeout_sec          = 5

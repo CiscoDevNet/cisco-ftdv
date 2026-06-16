@@ -235,7 +235,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb" {
   name                  = "${var.resource_name_prefix}-ftdv-fr-ilb"
   region                = var.region
   all_ports             = true
-  ip_protocol           = contains(["TCP", "UDP"], var.ilb_backend_protocol) ? var.ilb_backend_protocol : var.ilb_frontend_protocol
+  ip_protocol           = var.ilb_frontend_protocol
   load_balancing_scheme = "INTERNAL"
   ip_address            = google_compute_address.ilb_ip.self_link
   backend_service       = google_compute_region_backend_service.ftdv_ilb.self_link
@@ -280,10 +280,10 @@ resource "google_compute_region_backend_service" "ftdv_elb" {
 }
 
 resource "google_compute_forwarding_rule" "ftdv_fr_elb1" {
-  count = var.elb_front_end_ports == "all" ? 0 : 1
+  count = var.elb_front_end_ports == "all" || var.elb_frontend_protocol == "L3_DEFAULT" ? 0 : 1
   name                  = "${var.resource_name_prefix}-ftdv-fr-elb"
   region                = var.region
-  ip_protocol           = contains(["TCP", "UDP"], var.elb_backend_protocol) ? var.elb_backend_protocol : var.elb_frontend_protocol
+  ip_protocol           = var.elb_frontend_protocol
   load_balancing_scheme = "EXTERNAL"
   ip_address            = google_compute_address.elb_ip.self_link
   backend_service       = google_compute_region_backend_service.ftdv_elb.self_link
@@ -292,7 +292,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_elb1" {
 }
 
 resource "google_compute_forwarding_rule" "ftdv_fr_elb2" {
-  count = var.elb_front_end_ports == "all" ? 1 : 0
+  count = var.elb_front_end_ports == "all" || var.elb_frontend_protocol == "L3_DEFAULT" ? 1 : 0
 
   name                  = "${var.resource_name_prefix}-ftdv-fr-elb"
   region                = var.region

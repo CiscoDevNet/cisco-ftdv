@@ -103,10 +103,18 @@ variable "elb_port_name" {
 }
 
 variable "elb_protocol" {
-  description = "Protocol for the external LB (e.g., TCP)."
+  description = "Protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+  type        = string
   validation {
-    condition     = length(var.elb_protocol) > 2
-    error_message = "Please provide a valid LB protocol."
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_protocol)
+    error_message = "Please provide a valid ELB backend protocol (TCP, UDP, or UNSPECIFIED)."
+  }
+  validation {
+    condition = (
+      (var.elb_ip_protocol == "L3_DEFAULT" && var.elb_protocol == "UNSPECIFIED") ||
+      (var.elb_ip_protocol != "L3_DEFAULT" && var.elb_protocol != "UNSPECIFIED")
+    )
+    error_message = "When ELB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
 }
 
@@ -129,23 +137,51 @@ variable "elb_unhealthy_threshold" {
 }
 
 variable "elb_ip_protocol" {
-  description = "IP protocol used by the external LB."
+  description = "IP protocol used by the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+  type        = string
   validation {
-    condition     = length(var.elb_ip_protocol) > 2
-    error_message = "Please provide a valid IP protocol name."
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_ip_protocol)
+    error_message = "Please provide a valid ELB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
 
 variable "elb_fe_ports" {
-  description = "Frontend ports for the external load balancer."
-  type        = list(string)
+  description = "Frontend ports for the external load balancer (or \"all\" to enable all ports)."
+  type        = any
+  validation {
+    condition = (
+      var.elb_fe_ports == "all" ||
+      (
+        can(tolist(var.elb_fe_ports)) &&
+        length(tolist(var.elb_fe_ports)) > 0
+      )
+    )
+    error_message = "Set elb_fe_ports to \"all\" or provide a non-empty list of ports."
+  }
+}
+
+variable "ilb_ip_protocol" {
+  description = "IP protocol used by the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+  type        = string
+  validation {
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_ip_protocol)
+    error_message = "Please provide a valid ILB frontend protocol (TCP, UDP, or L3_DEFAULT)."
+  }
 }
 
 variable "ilb_protocol" {
-  description = "Protocol for the internal LB."
+  description = "Protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+  type        = string
   validation {
-    condition     = length(var.ilb_protocol) > 2
-    error_message = "Please provide a valid LB protocol."
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_protocol)
+    error_message = "Please provide a valid ILB backend protocol (TCP, UDP, or UNSPECIFIED)."
+  }
+  validation {
+    condition = (
+      (var.ilb_ip_protocol == "L3_DEFAULT" && var.ilb_protocol == "UNSPECIFIED") ||
+      (var.ilb_ip_protocol != "L3_DEFAULT" && var.ilb_protocol != "UNSPECIFIED")
+    )
+    error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
 }
 
@@ -503,6 +539,7 @@ module "ftdv_autoscale" {
   elb_ip_protocol            = var.elb_ip_protocol
   elb_fe_ports               = var.elb_fe_ports
   ilb_protocol               = var.ilb_protocol
+  ilb_ip_protocol            = var.ilb_ip_protocol
   ilb_draining_timeout_sec   = var.ilb_draining_timeout_sec
   health_check_port          = var.health_check_port
   ilb_check_interval_sec     = var.ilb_check_interval_sec

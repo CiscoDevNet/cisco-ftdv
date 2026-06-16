@@ -225,7 +225,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb_inside" {
   name                  = "${var.resource_name_prefix}-ftdv-fr-ilb-inside"
   region                = var.region
   load_balancing_scheme = "INTERNAL"
-  ip_protocol           = contains(["TCP", "UDP"], var.ilb_backend_protocol) ? var.ilb_backend_protocol : var.ilb_frontend_protocol
+  ip_protocol           = var.ilb_frontend_protocol
   all_ports             = true
   ip_address            = google_compute_address.ftdv_ilb_ip_inside.address
   backend_service       = google_compute_region_backend_service.ftdv_ilb_inside.id
@@ -271,7 +271,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb_outside" {
   name                  = "${var.resource_name_prefix}-ftdv-fr-ilb-outside"
   region                = var.region
   load_balancing_scheme = "INTERNAL"
-  ip_protocol           = contains(["TCP", "UDP"], var.ilb_backend_protocol) ? var.ilb_backend_protocol : var.ilb_frontend_protocol
+  ip_protocol           = var.ilb_frontend_protocol
   all_ports             = true
   ip_address            = google_compute_address.ftdv_ilb_ip_outside.address
   backend_service       = google_compute_region_backend_service.ftdv_ilb_outside.id
