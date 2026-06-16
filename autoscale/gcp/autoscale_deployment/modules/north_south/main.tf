@@ -104,14 +104,6 @@ variable "elb_protocol" {
   }
 }
 
-variable "elb_protocol_name" {
-  description = "Protocol name for the external LB."
-  validation {
-    condition     = can(regex("^[A-Za-z0-9-]+$", var.elb_protocol_name))
-    error_message = "Protocol name can only include letters, numbers, or dashes."
-  }
-}
-
 variable "elb_timeout_sec" {
   description = "Timeout for the external LB in seconds."
   type        = number
@@ -148,14 +140,6 @@ variable "ilb_protocol" {
   validation {
     condition     = length(var.ilb_protocol) > 2
     error_message = "Please provide a valid LB protocol."
-  }
-}
-
-variable "ilb_protocol_name" {
-  description = "Protocol name for the internal LB."
-  validation {
-    condition     = can(regex("^[A-Za-z0-9-]+$", var.ilb_protocol_name))
-    error_message = "Protocol name can only include letters, numbers, or dashes."
   }
 }
 
