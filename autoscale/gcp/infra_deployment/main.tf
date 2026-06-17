@@ -105,6 +105,12 @@ variable "outside_ip_cidr_range" {
   type        = string
 }
 
+variable "ftd_reg_via_public_ip" {
+  description = "Whether Cloud Functions and FTDv reach FMC via public IPs (enables management NAT path)."
+  type        = bool
+  default     = false
+}
+
 ##################################################
 # VPC and Subnet Resources
 
@@ -263,4 +269,111 @@ resource "google_vpc_access_connector" "connector" {
   max_instances = 10
   min_instances = 2
 }
+
+# Create a static Public Address to assign to NAT GW
+resource "google_compute_address" "mgmt_gw_public_ip" {
+  count  = var.ftd_reg_via_public_ip ? 1 : 0
+  name   = "${var.resource_name_prefix}-mgmt-gw-public-ip"
+  region = var.region
+}
+
+# Management NAT Router
+resource "google_compute_router" "mgmt_nat_router" {
+  count   = var.ftd_reg_via_public_ip ? 1 : 0
+  name    = "${var.resource_name_prefix}-mgmt-nat-router"
+  network = google_compute_network.mgmt_vpc.self_link
+  region  = var.region
+}
+
+# Management NAT Gateway configuration
+resource "google_compute_router_nat" "mgmt_nat" {
+  count                              = var.ftd_reg_via_public_ip ? 1 : 0
+  name                               = "${var.resource_name_prefix}-mgmt-nat"
+  router                             = google_compute_router.mgmt_nat_router[0].name
+  region                             = var.region
+  nat_ip_allocate_option             = "MANUAL_ONLY"
+  nat_ips                            = [google_compute_address.mgmt_gw_public_ip[0].self_link]
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+## VPC and Subnet Outputs
+output "mgmt_vpc_name" {
+  value = google_compute_network.mgmt_vpc.name
+}
+
+output "inside_vpc_name" {
+  value = google_compute_network.inside_vpc.name
+}
+
+output "outside_vpc_name" {
+  value = google_compute_network.outside_vpc.name
+}
+
+output "diag_vpc_name" {
+  value = var.with_diagnostic ? google_compute_network.diag_vpc[0].name : null
+}
+
+output "mgmt_subnet_name" {
+  value = google_compute_subnetwork.mgmt_subnet.name
+}
+
+output "inside_subnet_name" {
+  value = google_compute_subnetwork.inside_subnet.name
+}
+
+output "outside_subnet_name" {
+  value = google_compute_subnetwork.outside_subnet.name
+}
+
+output "diag_subnet_name" {
+  value = var.with_diagnostic ? google_compute_subnetwork.diag_subnet[0].name : null
+}
+
+##VPC Connector and NAT GW, Router Outputs
+output "vpc_connector_name" {
+  value = google_vpc_access_connector.connector.name
+}
+
+output "mgmt_nat_ip" {
+  value = var.ftd_reg_via_public_ip && length(google_compute_address.mgmt_gw_public_ip) > 0 ? google_compute_address.mgmt_gw_public_ip[0].address : null
+}
+
+output "mgmt_nat_router" {
+  value = var.ftd_reg_via_public_ip && length(google_compute_router.mgmt_nat_router) > 0 ? google_compute_router.mgmt_nat_router[0].name : null
+}
+
+##Firewall Rule Outputs
+output "mgmt_firewall_rule_name" {
+  description = "Name of the management firewall rule"
+  value       = google_compute_firewall.mgmt_firewall.name
+}
+
+output "inside_firewall_rule_name" {
+  description = "Name of the inside firewall rule"
+  value       = google_compute_firewall.inside_firewall.name
+}
+
+output "outside_firewall_rule_name" {
+  description = "Name of the outside firewall rule"
+  value       = google_compute_firewall.outside_firewall.name
+}
+
+output "diag_firewall_rule_name" {
+  description = "Name of the diagnostic firewall rule"
+  value       = var.with_diagnostic ? google_compute_firewall.diag_firewall[0].name : null
+}
+
+output "inside_hc_firewall_rule_name" {
+  description = "Name of the inside health check firewall rule"
+  value       = google_compute_firewall.hc_firewall_inside.name
+}
+
+output "outside_hc_firewall_rule_name" {
+  description = "Name of the outside health check firewall rule"
+  value       = google_compute_firewall.hc_firewall_outside.name
+}
+
+
+
+
 

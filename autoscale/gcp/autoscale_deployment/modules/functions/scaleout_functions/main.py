@@ -34,6 +34,33 @@ with warnings.catch_warnings():
      import paramiko
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+def _extract_ips_from_instance(response):
+     """Return (ssh_ip, reg_ip) derived from the instance's management NIC."""
+     mgmt_interface = response['networkInterfaces'][2]
+     ssh_ip = mgmt_interface['networkIP']
+     if os.getenv('FTD_REG_VIA_PUBLIC_IP', 'false').lower() != 'true':
+          return ssh_ip, ssh_ip
+     for access_cfg in mgmt_interface.get('accessConfigs', []):
+          nat_ip = access_cfg.get('natIP')
+          if nat_ip:
+               return ssh_ip, nat_ip
+     raise KeyError("External IP not found on management interface for registration")
+
+
+def _lookup_instance_ips(project_id, zone, instance_name):
+     api = discovery.build('compute', 'v1', cache_discovery=False)
+     response = api.instances().get(project=project_id, zone=zone, instance=instance_name).execute()
+     return _extract_ips_from_instance(response)
+
+
+def _parse_retry_payload(log_entry):
+     text_payload = log_entry.get('textPayload', '')
+     if not text_payload.startswith("Second Attempt "):
+          raise KeyError("Retry payload missing")
+     payload = text_payload[len("Second Attempt "):].replace("'", "\"")
+     return json.loads(payload)
+
 def scale_out(event, context):
      """Triggered from a message on a Cloud Pub/Sub topic.
      Args:
@@ -56,9 +83,10 @@ def scale_out(event, context):
      log_entry = json.loads(data_buffer)
 
 
+     ftd_reg_ip = None
+     info_dict = {}
+
      try:
-          #First run, Info from logs
-          #To get the Instance Name
           resourceName = log_entry['protoPayload']['resourceName']
           pos = resourceName.find("instances/")
           instanceName = resourceName[pos+len("instances/"):]
@@ -68,51 +96,33 @@ def scale_out(event, context):
           region = zone[:-2]
           api = discovery.build('compute', 'v1',cache_discovery=False)
           response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
-          
-          # mgmt ip -> nic2
-          if  eval(os.getenv('SSH_USING_EXTERNAL_IP')) is False:
-               #internal ip
-               ssh_ip = response['networkInterfaces'][2]['networkIP']
-          else:
-               # this will fetch external ip, when FMCv is on other platform
-               #external ip
-               ssh_ip = response['networkInterfaces'][2]['accessConfigs'][0]['natIP'] #external
+          ssh_ip, ftd_reg_ip = _extract_ips_from_instance(response)
 
-          print("FTDv Name: "+instanceName+ " IP for Login: "+ssh_ip)
+          print("FTDv Name: "+instanceName+ " IP for Functions to Login: "+ssh_ip)
+          print("FTDv Name: "+instanceName+ " IP for Registration to FMCv: "+ftd_reg_ip)
 
-          info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone, "region": region}
+          info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone, "region": region, "ftd_reg_ip": ftd_reg_ip}
           first_run_flag = True
-     except:
-          prev_info = log_entry['textPayload']
-          # Extracting the Dict part from string
-          prev_info = prev_info[len("Second Attempt "):]
-          #making json acceptable format
-          prev_info = prev_info.replace("'", "\"")
-          prev_info = json.loads(prev_info)
+     except Exception:
+          prev_info = _parse_retry_payload(log_entry)
           count = prev_info["count"] + 1
-          print("Function retriggered count: "+str(count))
-
-     if count > MAX_RETRIES_COUNT:
-          print("Number of retries exceeded "+str(MAX_RETRIES_COUNT))
-          return
-          
-     try:
-          prev_info = log_entry['textPayload']
-          # Extracting the Dict part from string
-          prev_info = prev_info[len("Second Attempt "):]
-          #making json acceptable format
-          prev_info = prev_info.replace("'", "\"")
-          prev_info = json.loads(prev_info)
-
           instanceName = prev_info["instanceName"]
-          ssh_ip = prev_info["ssh_ip"]
           instance_suffix = prev_info["instance_suffix"]
           project_id = prev_info["project_id"]
           zone = prev_info["zone"]
           region = prev_info["region"]
-          print("Function(retriggered) for "+ instanceName)
-     except:
+          print("Function retriggered count: "+str(count))
+          ssh_ip, ftd_reg_ip = _lookup_instance_ips(project_id, zone, instanceName)
+          info_dict = {"Retry_function":"yes", "ssh_ip":ssh_ip,"instance_suffix":instance_suffix, "project_id": project_id, "count": count, "instanceName":instanceName, "zone":zone, "region": region, "ftd_reg_ip": ftd_reg_ip}
+
+     if count > MAX_RETRIES_COUNT:
+          print("Number of retries exceeded "+str(MAX_RETRIES_COUNT))
+          return
+
+     if first_run_flag:
           print("First run of function")
+     else:
+          print("Function(retriggered) for "+ instanceName)
      
      fmc_ip = os.getenv('FMC_IP')
      reg_id = os.getenv('REG_ID')
@@ -193,7 +203,7 @@ def scale_out(event, context):
           print("FMCv version needs to be upgraded.")
           return
 
-     fmc.register_ftdv(vm_name=vm_name, mgmtip=ssh_ip, reg_id=reg_id, nat_id=nat_id, policy_id=policy_id, grp_id=grp_id)
+     fmc.register_ftdv(vm_name=vm_name, mgmtip=ftd_reg_ip, reg_id=reg_id, nat_id=nat_id, policy_id=policy_id, grp_id=grp_id)
 
      minutes = 3
      if (time.time() - start_time) <= timeout_time:
@@ -228,7 +238,7 @@ def scale_out(event, context):
      time.sleep(150)
      
      if (time.time() - start_time) <= timeout_time:
-          nic0 = "GigabitEthernet0/0"
+          nic0 = "Ethernet0/0"
           nic_id = fmc.get_nic_id_by_name(vm_name, nic0)
           for i in range(20):
                if nic_id == None:
@@ -242,7 +252,7 @@ def scale_out(event, context):
           return
 
      if nic_id == None:
-          print("Could not fetch NIC ID for FTDv:{}".format(vm_name))
+          print("ERROR: Could not fetch NIC ID for FTDv:{}".format(vm_name))
           print("Deleting Instance {}".format(instanceName))
           api = discovery.build('compute', 'v1',cache_discovery=False)
           response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
@@ -276,8 +286,8 @@ def scale_out(event, context):
           print("Created OUTSIDE_GW object in FMCv")
      
      print("Configuring Interfaces")
-     fmc.configure_nic_dhcp(vm_name, 'GigabitEthernet0/0', "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
-     fmc.configure_nic_dhcp(vm_name, 'GigabitEthernet0/1', "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
+     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/0', "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
+     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/1', "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
      
      print("Adding Static Routes")
      fmc.create_static_network_route(vm_name, 'outside', 'any-ipv4', os.getenv("OUTSIDE_GW_NAME"), metric=1)

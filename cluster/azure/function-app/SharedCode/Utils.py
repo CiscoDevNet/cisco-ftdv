@@ -108,37 +108,53 @@ class FMC:
             if r: r.close()
             return r
 
-    def rest_put(self, url, put_data):
+    def rest_put(self, url, put_data, max_retries=3, retry_delay=20):
         """
         Purpose:    Issue REST put to specific url with the put_data provided
-        Parameters: url, put data
+        Parameters: url, put data, max_retries (default 3), retry_delay in seconds (default 20)
         Returns:    This function will return 'r' which is the response from the put:
                     r.text is the text response (r.json() is a python dict version of the json response)
                     r.status_code = 2xx on success
         Raises:
         """
-        if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
-            log.debug("Getting a new authToken")
-            self.getFmcAuthToken()
-        try:
-            # REST call with SSL verification turned off:
-            log.info("Request: " + url)
-            log.info("Put_data: " + str(put_data))
-            r = requests.put(url, data=json.dumps(put_data), headers=self.headers, verify=False)
-            status_code = r.status_code
-            resp = r.text
-            log.info("Response status_code: " + str(status_code))
-            log.info("Response body: " + str(resp))
-            if status_code == 200:
-                pass
-            else:
-                r.raise_for_status()
-                raise Exception("Error occurred in put -->" + resp)
-        except requests.exceptions.HTTPError as err:
-            raise Exception("Error in connection --> "+str(err))
-        finally:
-            if r: r.close()
+        retryable_status_codes = [502, 503, 504]
+        r = None
+        
+        for attempt in range(max_retries + 1):
+            if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
+                log.debug("Getting a new authToken")
+                self.getFmcAuthToken()
+            try:
+                # REST call with SSL verification turned off:
+                log.info("Request: " + url)
+                log.info("Put_data: " + str(put_data))
+                r = requests.put(url, data=json.dumps(put_data), headers=self.headers, verify=False)
+                status_code = r.status_code
+                resp = r.text
+                log.info("Response status_code: " + str(status_code))
+                log.info("Response body: " + str(resp))
+                
+                if status_code == 200:
+                    pass
+                elif status_code in retryable_status_codes and attempt < max_retries:
+                    log.warning("util:::: Received {} error, retrying in {} seconds (attempt {}/{})".format(
+                        status_code, retry_delay, attempt + 1, max_retries))
+                    if r: r.close()
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    r.raise_for_status()
+                    raise Exception("Error occurred in put -->" + resp)
+            except requests.exceptions.HTTPError as err:
+                if r and r.status_code in retryable_status_codes and attempt < max_retries:
+                    log.warning("util:::: HTTP error {}, retrying in {} seconds (attempt {}/{})".format(
+                        r.status_code, retry_delay, attempt + 1, max_retries))
+                    if r: r.close()
+                    time.sleep(retry_delay)
+                    continue
+                raise Exception("Error in connection --> "+str(err))
             return r
+        return r
 
     def rest_delete(self, url):
         """

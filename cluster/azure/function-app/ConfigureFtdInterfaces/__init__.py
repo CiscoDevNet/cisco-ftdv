@@ -142,6 +142,8 @@ def main(req: func.HttpRequest):
     
         if not (200 <= r.status_code <= 300):
             log.error("ConfigureFtdInterfaces:::: Failed to configure inside interface")
+            if r.status_code in [502, 503, 504]:
+                log.error("ConfigureFtdInterfaces:::: FMC API timeout error ({}) after all retries exhausted".format(r.status_code))
             log.info("ConfigureFtdInterfaces::::  Configure inside interface status - {}".format(r.content))
             return func.HttpResponse("Failed to configure inside interface", status_code=400) 
     
@@ -174,6 +176,8 @@ def main(req: func.HttpRequest):
     
     if not (200 <= r.status_code <= 300):
         log.error("ConfigureFtdInterfaces:::: Failed to configure outside interface")
+        if r.status_code in [502, 503, 504]:
+            log.error("ConfigureFtdInterfaces:::: FMC API timeout error ({}) after all retries exhausted".format(r.status_code))
         log.info("ConfigureFtdInterfaces::::  Configure outside interface status - {}".format(r.content))
         return func.HttpResponse("Failed to configure outside interface",status_code=400) 
 

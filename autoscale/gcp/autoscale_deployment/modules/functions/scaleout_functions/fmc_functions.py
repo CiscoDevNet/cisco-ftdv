@@ -200,12 +200,15 @@ class FirepowerManagementCenter:
           try:
                vm_policy_id = self.get_access_policy_id_by_name(policy_id)
           except Exception as e:
-               print("Access Policy doesnot exist")
+               print("Access Policy does not exist")
                return None
           else:
                if vm_policy_id is not None:
                     print("Registering FTDv: " + vm_name + " to FMCv with policy id: " + vm_policy_id)
                     grp_id = self.get_device_grp_id_by_name(grp_id)
+                    ## raise Exception if Device Group ID does not exist
+                    if grp_id is None:
+                         raise Exception("Device Group does not exist, please create..")
                     r = self.register_device(vm_name, mgmtip, vm_policy_id, reg_id, nat_id, grp_id)
                     if 'type' in r.json():
                          if r.json()['type'] == 'Device':
@@ -358,9 +361,10 @@ class FirepowerManagementCenter:
           Returns:    Nic Id, None
           Raises:
           """
-          if nic_name != 'GigabitEthernet0/0' and nic_name != 'GigabitEthernet0/1':
-               print("Warning - nic name must be GigabitEthernet0/0 or GigabitEthernet0/1. "
-                              "The argument name was " + nic_name)
+          valid_nics = {'Ethernet0/0', 'Ethernet0/1', 'GigabitEthernet0/0', 'GigabitEthernet0/1'}
+          if nic_name not in valid_nics:
+               print("Warning - nic name must be one of " + ", ".join(sorted(valid_nics)) + ". "
+                              "The nic name found was " + nic_name)
           device_id = self.get_device_id_by_name(device_name)
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords/" + device_id + "/physicalinterfaces"
           url = self.server + api_path + '?offset=0&limit=10000'
@@ -398,6 +402,9 @@ class FirepowerManagementCenter:
           device_id = self.get_device_id_by_name(device_name)
           nic_id = self.get_nic_id_by_name(device_name, nic)
           zone_id = self.get_security_objectid_by_name(zone)
+
+          if zone_id is None:
+               raise Exception(f"Security Zone {zone} does not exist, please create!")
 
           if nic_id != None:
                api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords/" + \

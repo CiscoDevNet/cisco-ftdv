@@ -103,6 +103,7 @@ resource "google_logging_project_sink" "insert_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.insert.name}"
   filter                 = "(resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.insert\" AND operation.last = true AND protoPayload.resourceName:\"${var.resource_name_prefix}\")"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.insert]
 }
 
 # Create log sink to capture instance deletion events
@@ -111,6 +112,7 @@ resource "google_logging_project_sink" "delete_sink" {
   destination            = "pubsub.googleapis.com/projects/${var.project_id}/topics/${google_pubsub_topic.delete.name}"
   filter                 = "resource.type = \"gce_instance\" AND protoPayload.methodName = \"v1.compute.instances.delete\" AND protoPayload.resourceName:\"${var.resource_name_prefix}\" AND operation.first=true"
   unique_writer_identity = false
+  depends_on             = [google_pubsub_topic.delete]
 }
 
 # Grant publisher permissions for the insert topic
@@ -143,6 +145,7 @@ resource "google_cloudfunctions_function" "scaleout_action" {
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_cluster_scaleout_action_object.name
   timeout               = 540
+  min_instances         = 0
   max_instances         = 16
   ingress_settings      = "ALLOW_ALL"
 
@@ -194,7 +197,8 @@ resource "google_cloudfunctions_function" "scalein_action" {
   source_archive_bucket = google_storage_bucket.ftdv_bucket.id
   source_archive_object = google_storage_bucket_object.ftdv_cluster_scalein_action_object.name
   timeout               = 540
-  max_instances         = 1
+  min_instances         = 0
+  max_instances         = 16
   ingress_settings      = "ALLOW_ALL"
 
   environment_variables = {
@@ -215,4 +219,13 @@ resource "google_cloudfunctions_function" "scalein_action" {
     event_type = "google.pubsub.topic.publish"
     resource   = google_pubsub_topic.delete.id
   }
+}
+
+# Outputs
+output "scale_out_function_name" {
+  value = google_cloudfunctions_function.scaleout_action.name
+}
+
+output "scale_in_function_name" {
+  value = google_cloudfunctions_function.scalein_action.name
 }
