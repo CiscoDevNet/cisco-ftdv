@@ -1,0 +1,111 @@
+# Copyright (c) 2026 Cisco Systems Inc or its affiliates.
+#
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Default values for helm-deploy-FTDc.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Namespace for all resources (except MetalLB resources which stay in metallb-system)
+namespace: "default"
+
+ftdc:
+  repository: "localhost:5000/ftdc_10.0.0.143"
+  app_name: "ftdc"
+  cpus: 4
+  # Memory in MB
+  memory: 8192
+  # /dev/shm size (shared memory) - default 128Mi, increase if needed
+  shmSize: "128Mi"
+  
+  # Hugepages configuration
+  # Set hugepages to "auto" to calculate based on CPUs and number of interfaces
+  # Formula: (cpus * 128) + (numInterfaces * 64) Mi, rounded up to nearest 256Mi
+  # numInterfaces is auto-calculated from worker_nodes.cni.macvlan.networks or worker_nodes.cni.sriov.networks
+  # Or specify a fixed value like "512Mi", "1Gi", "2Gi"
+  hugepages: "auto"
+
+worker_nodes:
+
+  # CNI Configuration
+  cni:
+    # Set to "sriov" to use SR-IOV CNI, or "macvlan" for macvlan (default)
+    type: "macvlan"
+
+    # Macvlan CNI configuration (used when cni.type is "macvlan")
+    macvlan:
+      # List of macvlan networks to attach to the pod
+      # Each entry creates a network interface in the pod
+      networks:
+        - name: "macvlan-data1-bridge"    # NetworkAttachmentDefinition name
+          interface: "ens224"              # Host interface for macvlan
+        - name: "macvlan-data2-bridge"
+          interface: "ens256"
+        - name: "macvlan-data3-bridge"
+          interface: "ens161"
+
+    # SR-IOV CNI configuration (used when cni.type is "sriov")
+    sriov:
+      # List of SR-IOV networks to attach to the pod
+      # Each entry creates a network interface in the pod
+      # You can use the same network multiple times to get multiple VFs from the same PF
+      networks:
+        - name: "sriov-net-data1"      # SriovNetwork CRD name
+          resourceName: "intel.com/intel_sriov_ens7f0"  # Must match SriovNetworkNodePolicy resourceName
+        - name: "sriov-net-data2"
+          resourceName: "intel.com/intel_sriov_ens7f1"
+        # Example: Add more interfaces as needed
+        # - name: "sriov-net-data3"
+        #   resourceName: "intel.com/intel_sriov_ens7f0"  # Can reuse same PF for multiple VFs
+      # 
+      # Example: 3 VFs from same PF (ens7f0)
+      # networks:
+      #   - name: "sriov-net-ens7f0"
+      #     resourceName: "intel.com/intel_sriov_ens7f0"
+      #   - name: "sriov-net-ens7f0"
+      #     resourceName: "intel.com/intel_sriov_ens7f0"
+      #   - name: "sriov-net-ens7f0"
+      #     resourceName: "intel.com/intel_sriov_ens7f0"
+      # This generates:
+      #   annotation: k8s.v1.cni.cncf.io/networks: sriov-net-ens7f0, sriov-net-ens7f0, sriov-net-ens7f0
+      #   resources: intel.com/intel_sriov_ens7f0: '3'
+
+  # Persistent Volume Configuration
+  # NOTE: helm upgrade to a new FTDc image version over exisitng persistent volume mounts is not supported.
+  persistence:
+    # Lina persistent volume for pod private data
+    lina:
+      enabled: true
+      storageClass: "lina-storage"
+      size: "1Gi"
+      # Host path on worker nodes - must exist or be creatable
+      hostPath: "/home/ubuntu/lina-path"
+      accessMode: "ReadWriteMany"
+
+    # NGFW persistent volume
+    # Enabling this retains FTDc state on pod restart/replacement
+    ngfw:
+      enabled: true
+      storageClass: "ngfw-storage"
+      size: "5Gi"
+      # Host path on worker nodes - must exist or be creatable
+      hostPath: "/home/ubuntu/ngfw-path"
+      accessMode: "ReadWriteMany"
+
+worker_node1:
+  name: "k8s-worker1"
+  ip: "10.10.3.4"
+  iface_name: "ens192"
+

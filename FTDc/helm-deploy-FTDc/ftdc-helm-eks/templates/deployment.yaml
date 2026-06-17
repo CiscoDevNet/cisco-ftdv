@@ -1,0 +1,301 @@
+# Copyright (c) 2026 Cisco Systems Inc or its affiliates.
+#
+# All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: interface-config
+data:
+  interface-config: |-
+{{ include "ftdc.interface-config" . | indent 4 }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: day0
+data:
+  day0.json: |-
+{{ .Files.Get "day0.json" | indent 4 }}
+
+
+---
+
+{{- if .Values.worker_nodes.persistence.lina.enabled }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lina-pv
+spec:
+  capacity:
+    storage: {{ .Values.worker_nodes.persistence.lina.size }}
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.lina.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.worker_nodes.persistence.lina.storageClass }}
+  hostPath:
+    path: {{ .Values.worker_nodes.persistence.lina.hostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+
+---
+
+{{- if .Values.worker_nodes.persistence.lina.enabled }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: lina-pvc
+spec:
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.lina.accessMode }}
+  storageClassName: {{ .Values.worker_nodes.persistence.lina.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.worker_nodes.persistence.lina.size }}
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ngfw-pv
+spec:
+  capacity:
+    storage: {{ .Values.worker_nodes.persistence.ngfw.size }}
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.ngfw.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.worker_nodes.persistence.ngfw.storageClass }}
+  hostPath:
+    path: {{ .Values.worker_nodes.persistence.ngfw.hostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: ngfw-pvc
+spec:
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.ngfw.accessMode }}
+  storageClassName: {{ .Values.worker_nodes.persistence.ngfw.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.worker_nodes.persistence.ngfw.size }}
+{{- end }}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.ftdc.app_name }}
+  labels:
+    app: FTDC_PRIMARY
+    tier: ftdvc
+    role: primary
+spec:
+  replicas: {{ .Values.replicas | default 1 }}
+  {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      app: FTDC_PRIMARY
+  template:
+    metadata:
+      annotations:
+        {{- if eq .Values.worker_nodes.cni.type "sriov" }}
+        k8s.v1.cni.cncf.io/networks: {{ range $i, $net := .Values.worker_nodes.cni.sriov.networks }}{{- if $i }}, {{ end }}{{ $net.name }}{{ end }}
+        {{- else }}
+        k8s.v1.cni.cncf.io/networks: {{ range $i, $net := .Values.worker_nodes.cni.macvlan.networks }}{{- if $i }}, {{ end }}{{ $net.name }}{{ end }}
+        {{- end }}
+      labels:
+        app: FTDC_PRIMARY
+        role: primary
+    spec:
+      nodeSelector:
+        ftdc-node: {{ .Values.worker_node1.label }}
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.ftdc.shmSize | default "128Mi" }}
+      - name:  modulepath
+        hostPath:
+          path: /lib/modules
+      - name: local
+        hostPath:
+          path: /local/configvol
+      - name: day0
+        configMap:
+          name: day0
+          optional: true
+          items:
+          - key: day0.json
+            path: day0.json
+      - name: interface-config
+        configMap:
+          name: interface-config
+          optional: true
+          items:
+          - key: interface-config
+            path: interface-config
+      {{- if eq .Values.worker_nodes.cni.type "sriov" }}
+      - name: pci-bus
+        hostPath:
+          path: /sys/bus/pci
+          type: Directory
+      - name: vfio
+        hostPath:
+          path: /dev/vfio
+          type: Directory
+      {{- end }}
+      - name: persistent-storage
+        persistentVolumeClaim:
+          claimName: lina-pvc
+      {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
+      - name: ngfw-storage
+        persistentVolumeClaim:
+          claimName: ngfw-pvc
+      {{- end }}
+      containers:
+      - name: ftdc
+        image: {{ .Values.ftdc.repository }}
+        stdin: true
+        tty: true
+        securityContext:
+          capabilities:
+                add: ["SYS_RESOURCE", "SYS_ADMIN", "NET_ADMIN", "NET_RAW"]
+          privileged: true
+        ports:
+        - name: ssh
+          containerPort: 22
+          protocol: TCP
+        - name: https
+          containerPort: 8305
+          protocol: TCP
+        - name: fmc-reg
+          containerPort: 8302
+          protocol: TCP
+        - name: snmp
+          containerPort: 161
+          protocol: UDP
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - -x
+            - lina
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/lina_ready
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 5
+        env:
+        - name: FTDC_CPUS
+          value: {{ .Values.ftdc.cpus | quote }}
+        - name: FTDC_MEMORY
+          value: {{ .Values.ftdc.memory | quote }}
+        volumeMounts:
+          - name: dshm
+            mountPath: /dev/shm
+          - name: modulepath
+            mountPath: /lib/modules
+          - name: local
+            mountPath: /config
+          - name: interface-config
+            mountPath: /mnt/disk0/interface-config
+          - name: day0
+            mountPath: /mnt/disk0/day0.json
+            subPath: day0.json
+          - name: persistent-storage
+            mountPath: /mnt/disk0/.private
+          {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
+          - name: ngfw-storage
+            mountPath: /ftd/app_data/Volume/root2
+          {{- end }}
+          {{- if eq .Values.worker_nodes.cni.type "sriov" }}
+          - name: pci-bus
+            mountPath: /sys/bus/pci
+          - name: vfio
+            mountPath: /dev/vfio
+          {{- end }}
+        resources:
+          limits:
+            hugepages-2Mi: {{ include "ftdc.hugepages" . }}
+            memory: {{ .Values.ftdc.memory }}Mi
+            cpu: {{ .Values.ftdc.cpus }}
+            {{- if eq .Values.worker_nodes.cni.type "sriov" }}
+            {{- $resourceCounts := dict }}
+            {{- range .Values.worker_nodes.cni.sriov.networks }}
+            {{- $count := get $resourceCounts .resourceName | default 0 | int }}
+            {{- $resourceCounts = set $resourceCounts .resourceName (add $count 1) }}
+            {{- end }}
+            {{- range $resource, $count := $resourceCounts }}
+            {{ $resource }}: '{{ $count }}'
+            {{- end }}
+            {{- end }}
+          requests:
+            hugepages-2Mi: {{ include "ftdc.hugepages" . }}
+            memory: {{ .Values.ftdc.memory }}Mi
+            cpu: {{ .Values.ftdc.cpus }}
+            {{- if eq .Values.worker_nodes.cni.type "sriov" }}
+            {{- $resourceCounts := dict }}
+            {{- range .Values.worker_nodes.cni.sriov.networks }}
+            {{- $count := get $resourceCounts .resourceName | default 0 | int }}
+            {{- $resourceCounts = set $resourceCounts .resourceName (add $count 1) }}
+            {{- end }}
+            {{- range $resource, $count := $resourceCounts }}
+            {{ $resource }}: '{{ $count }}'
+            {{- end }}
+            {{- end }}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+                 - /bin/bash
+                 - -c
+                 - |
+                   LOG=/mnt/disk0/.private/prestop.log
+                   echo "$(date): PreStop hook started" >> $LOG
+                   PID=$(pgrep -x lina_monitor)
+                   echo "$(date): lina_monitor PID=$PID" >> $LOG
+                   if [[ -n "$PID" ]]; then
+                      echo "$(date): killing lina_monitor $PID" >> $LOG
+                      kill -SIGTERM $PID
+                      while kill -0 $PID 2>/dev/null; do sleep 1; done
+                      echo "$(date): lina_monitor cleanup complete" >> $LOG
+                   else
+                      echo "$(date): lina_monitor not found" >> $LOG
+                   fi
+                   echo "$(date): PreStop hook finished" >> $LOG
+

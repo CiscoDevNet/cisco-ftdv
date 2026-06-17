@@ -1,0 +1,15 @@
+{
+    "EULA": "accept",
+    "Hostname": "cisco-ftdc",
+    "AdminPassword": "c0mpleX@1209",
+    "FirewallMode": "routed",
+    "DNS1": "208.67.222.222",
+    "Diagnostic": "OFF",
+    "IPv4Mode": "DHCP",
+    "IPv4Addr": "",
+    "IPv4Mask": "",
+    "IPv4Gw": "",
+    "FmcIp": "DONTRESOLVE",
+    "FmcRegKey": "docker",
+    "FmcNatId": "docker"
+}

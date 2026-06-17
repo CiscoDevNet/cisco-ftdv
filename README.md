@@ -1,3 +1,10 @@
+# Cisco Secure Firewall Threat Defense Container (FTDc)
+From Secure Firewall version 10.0, Firewall Threat Defense container (FTDc) can be deployed in open source Docker, Kubernetes, and Amazon Elastic Kubernetes Service (EKS) environments.
+
+### Resources
+
+* FTDc 10.0: [Code](FTDc/)     |     [README](FTDc/Readme.md)     |     [Deployment/Configuration Guide](https://www.cisco.com/c/en/us/td/docs/security/firepower/quick_start/ftdc/ftd-container-getting-started-guide/m_ftdc_overview.html)
+
 # Cisco Secure Firewall Threat Defense Virtual (formerly FTDv/NGFWv) 
 ## Threat Defense Virtual Autoscaling
 
