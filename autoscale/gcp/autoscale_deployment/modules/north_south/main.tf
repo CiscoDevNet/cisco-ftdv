@@ -96,17 +96,17 @@ variable "elb_port_name" {
   }
 }
 
-variable "elb_protocol" {
-  description = "Protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+variable "elb_backend_protocol" {
+  description = "Backend protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_protocol)
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_backend_protocol)
     error_message = "Please provide a valid ELB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
   validation {
     condition = (
-      (var.elb_ip_protocol == "L3_DEFAULT" && var.elb_protocol == "UNSPECIFIED") ||
-      (var.elb_ip_protocol != "L3_DEFAULT" && var.elb_protocol != "UNSPECIFIED")
+      (var.elb_frontend_protocol == "L3_DEFAULT" && var.elb_backend_protocol == "UNSPECIFIED") ||
+      (var.elb_frontend_protocol != "L3_DEFAULT" && var.elb_backend_protocol != "UNSPECIFIED")
     )
     error_message = "When ELB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
@@ -130,11 +130,11 @@ variable "elb_unhealthy_threshold" {
   }
 }
 
-variable "elb_ip_protocol" {
-  description = "IP protocol used by the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+variable "elb_frontend_protocol" {
+  description = "Frontend protocol used by the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_ip_protocol)
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_frontend_protocol)
     error_message = "Please provide a valid ELB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
@@ -158,27 +158,27 @@ locals {
   elb_fe_ports_list = var.elb_fe_ports == "all" ? null : tolist(var.elb_fe_ports)
 }
 
-variable "ilb_protocol" {
-  description = "Protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+variable "ilb_backend_protocol" {
+  description = "Backend protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_protocol)
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_backend_protocol)
     error_message = "Please provide a valid ILB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
   validation {
     condition = (
-      (var.ilb_ip_protocol == "L3_DEFAULT" && var.ilb_protocol == "UNSPECIFIED") ||
-      (var.ilb_ip_protocol != "L3_DEFAULT" && var.ilb_protocol != "UNSPECIFIED")
+      (var.ilb_frontend_protocol == "L3_DEFAULT" && var.ilb_backend_protocol == "UNSPECIFIED") ||
+      (var.ilb_frontend_protocol != "L3_DEFAULT" && var.ilb_backend_protocol != "UNSPECIFIED")
     )
     error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
 }
 
-variable "ilb_ip_protocol" {
-  description = "IP protocol used by the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+variable "ilb_frontend_protocol" {
+  description = "Frontend protocol used by the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_ip_protocol)
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_frontend_protocol)
     error_message = "Please provide a valid ILB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
@@ -503,8 +503,8 @@ resource "google_compute_region_autoscaler" "ftdv_autoscaler" {
 resource "google_compute_region_backend_service" "ftdv_backend_service_elb" {
   name                  = "${var.resource_name_prefix}-ftdv-backend-service-elb"
   region                = var.region
-  port_name             = var.elb_protocol == "UNSPECIFIED" ? null : var.elb_port_name
-  protocol              = var.elb_protocol
+  port_name             = var.elb_backend_protocol == "UNSPECIFIED" ? null : var.elb_port_name
+  protocol              = var.elb_backend_protocol
   load_balancing_scheme = "EXTERNAL"
 
   backend {
@@ -529,13 +529,13 @@ resource "google_compute_region_health_check" "ftdv_hc_elb" {
 
 resource "google_compute_forwarding_rule" "ftdv_fr_elb" {
   count = (
-    var.elb_ip_protocol == "L3_DEFAULT" ||
+    var.elb_frontend_protocol == "L3_DEFAULT" ||
     var.elb_fe_ports == "all"
   ) ? 0 : 1
   name                  = "${var.resource_name_prefix}-ftdv-fr-elb"
   region                = var.region
   load_balancing_scheme = "EXTERNAL"
-  ip_protocol           = var.elb_ip_protocol
+  ip_protocol           = var.elb_frontend_protocol
   ports                 = local.elb_fe_ports_list
   backend_service       = google_compute_region_backend_service.ftdv_backend_service_elb.id
   ip_address            = google_compute_address.ftdv_elb_ip.address
@@ -543,13 +543,13 @@ resource "google_compute_forwarding_rule" "ftdv_fr_elb" {
 
 resource "google_compute_forwarding_rule" "ftdv_fr_elb_all" {
   count = (
-    var.elb_ip_protocol == "L3_DEFAULT" ||
+    var.elb_frontend_protocol == "L3_DEFAULT" ||
     var.elb_fe_ports == "all"
   ) ? 1 : 0
   name                  = "${var.resource_name_prefix}-ftdv-fr-elb"
   region                = var.region
   load_balancing_scheme = "EXTERNAL"
-  ip_protocol           = var.elb_ip_protocol
+  ip_protocol           = var.elb_frontend_protocol
   all_ports             = true
   backend_service       = google_compute_region_backend_service.ftdv_backend_service_elb.id
   ip_address            = google_compute_address.ftdv_elb_ip.address
@@ -564,7 +564,7 @@ resource "google_compute_address" "ftdv_elb_ip" {
 resource "google_compute_region_backend_service" "ftdv_backend_service_ilb" {
   name                  = "${var.resource_name_prefix}-ftdv-backend-service-ilb"
   region                = var.region
-  protocol              = var.ilb_protocol
+  protocol              = var.ilb_backend_protocol
   load_balancing_scheme = "INTERNAL"
   backend {
     group          = google_compute_region_instance_group_manager.ftdv_instance_group.instance_group
@@ -593,7 +593,7 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb" {
   region                = var.region
   load_balancing_scheme = "INTERNAL"
   all_ports             = true
-  ip_protocol           = var.ilb_ip_protocol
+  ip_protocol           = var.ilb_frontend_protocol
   backend_service       = google_compute_region_backend_service.ftdv_backend_service_ilb.id
   ip_address            = google_compute_address.ftdv_ilb_ip.address
   network               = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"

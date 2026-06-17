@@ -102,17 +102,17 @@ variable "elb_port_name" {
   }
 }
 
-variable "elb_protocol" {
-  description = "Protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+variable "elb_backend_protocol" {
+  description = "Backend protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_protocol)
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_backend_protocol)
     error_message = "Please provide a valid ELB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
   validation {
     condition = (
-      (var.elb_ip_protocol == "L3_DEFAULT" && var.elb_protocol == "UNSPECIFIED") ||
-      (var.elb_ip_protocol != "L3_DEFAULT" && var.elb_protocol != "UNSPECIFIED")
+      (var.elb_frontend_protocol == "L3_DEFAULT" && var.elb_backend_protocol == "UNSPECIFIED") ||
+      (var.elb_frontend_protocol != "L3_DEFAULT" && var.elb_backend_protocol != "UNSPECIFIED")
     )
     error_message = "When ELB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
@@ -136,11 +136,11 @@ variable "elb_unhealthy_threshold" {
   }
 }
 
-variable "elb_ip_protocol" {
-  description = "IP protocol used by the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+variable "elb_frontend_protocol" {
+  description = "Frontend protocol used by the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_ip_protocol)
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_frontend_protocol)
     error_message = "Please provide a valid ELB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
@@ -160,26 +160,26 @@ variable "elb_fe_ports" {
   }
 }
 
-variable "ilb_ip_protocol" {
-  description = "IP protocol used by the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
+variable "ilb_frontend_protocol" {
+  description = "Frontend protocol used by the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_ip_protocol)
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_frontend_protocol)
     error_message = "Please provide a valid ILB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
 
-variable "ilb_protocol" {
-  description = "Protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+variable "ilb_backend_protocol" {
+  description = "Backend protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_protocol)
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_backend_protocol)
     error_message = "Please provide a valid ILB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
   validation {
     condition = (
-      (var.ilb_ip_protocol == "L3_DEFAULT" && var.ilb_protocol == "UNSPECIFIED") ||
-      (var.ilb_ip_protocol != "L3_DEFAULT" && var.ilb_protocol != "UNSPECIFIED")
+      (var.ilb_frontend_protocol == "L3_DEFAULT" && var.ilb_backend_protocol == "UNSPECIFIED") ||
+      (var.ilb_frontend_protocol != "L3_DEFAULT" && var.ilb_backend_protocol != "UNSPECIFIED")
     )
     error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
@@ -533,13 +533,13 @@ module "ftdv_autoscale" {
   min_ftd_replicas           = var.min_ftd_replicas
   max_ftd_replicas           = var.max_ftd_replicas
   elb_port_name              = var.elb_port_name
-  elb_protocol               = var.elb_protocol
+  elb_backend_protocol       = var.elb_backend_protocol
   elb_timeout_sec            = var.elb_timeout_sec
   elb_unhealthy_threshold    = var.elb_unhealthy_threshold
-  elb_ip_protocol            = var.elb_ip_protocol
+  elb_frontend_protocol      = var.elb_frontend_protocol
   elb_fe_ports               = var.elb_fe_ports
-  ilb_protocol               = var.ilb_protocol
-  ilb_ip_protocol            = var.ilb_ip_protocol
+  ilb_backend_protocol       = var.ilb_backend_protocol
+  ilb_frontend_protocol      = var.ilb_frontend_protocol
   ilb_draining_timeout_sec   = var.ilb_draining_timeout_sec
   health_check_port          = var.health_check_port
   ilb_check_interval_sec     = var.ilb_check_interval_sec
