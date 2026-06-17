@@ -151,10 +151,6 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
   }
   EOT
 
-  labels = {
-    autostop = "false"
-  }
-
   scheduling {
     on_host_maintenance = "MIGRATE"
     automatic_restart   = true
@@ -199,7 +195,7 @@ resource "google_compute_region_autoscaler" "ftdv_autoscaler" {
 }
 
 resource "google_compute_region_backend_service" "ftdv_ilb_inside" {
-  name                  = "${var.resource_name_prefix}-ftdv-backend-service-ilb-inside"
+  name                  = "${var.resource_name_prefix}-ftdv-ilb-inside"
   region                = var.region
   protocol              = var.ilb_backend_protocol
   load_balancing_scheme = "INTERNAL"
@@ -245,7 +241,7 @@ resource "google_compute_address" "ftdv_ilb_ip_inside" {
 }
 
 resource "google_compute_region_backend_service" "ftdv_ilb_outside" {
-  name                  = "${var.resource_name_prefix}-ftdv-backend-service-ilb-outside"
+  name                  = "${var.resource_name_prefix}-ftdv-ilb-outside"
   region                = var.region
   protocol              = var.ilb_backend_protocol
   load_balancing_scheme = "INTERNAL"
@@ -288,4 +284,25 @@ resource "google_compute_address" "ftdv_ilb_ip_outside" {
   region       = var.region
   address_type = "INTERNAL"
   subnetwork   = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.outside_subnet_name}"
+}
+
+# Outputs
+output "ilb_in_name" {
+  value = google_compute_forwarding_rule.ftdv_fr_ilb_inside.name
+}
+
+output "ilb_out_name" {
+  value = google_compute_forwarding_rule.ftdv_fr_ilb_outside.name
+}
+
+output "ilb_in_ip" {
+  value = google_compute_address.ftdv_ilb_ip_inside.address
+}
+
+output "ilb_out_ip" {
+  value = google_compute_address.ftdv_ilb_ip_outside.address
+}
+
+output "instance_group_name" {
+  value = google_compute_region_instance_group_manager.ftdv_igm.name
 }

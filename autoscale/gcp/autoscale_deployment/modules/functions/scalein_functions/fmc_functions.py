@@ -32,6 +32,17 @@ class FirepowerManagementCenter:
           self.authTokenMaxAge = 15*60  # seconds - 30 minutes is the max without using refresh
           self.__config_url__ = '/api/fmc_config/v1/domain/'
 
+     def _ensure_session(self):
+          """Ensure auth token/domain UUID are present and not expired."""
+          needs_token = (
+               not self.headers or
+               'X-auth-access-token' not in self.headers or
+               not self.domain_uuid or
+               time.time() > self.authTokenMaxAge + self.authTokenTimestamp
+          )
+          if needs_token:
+               self.get_auth_token()
+
      def get_auth_token(self):
           """
           Purpose:    get a new REST authentication token
@@ -77,10 +88,8 @@ class FirepowerManagementCenter:
                     r.status_code = 2xx on success
           Raises:
           """
-          # if the token is too old then get another
-          if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
-               print("Getting a new authToken")
-               self.get_auth_token()
+          # ensure token is present/valid
+          self._ensure_session()
           try:
                print("Requesting(rest_get):" + str(url))
                r = requests.get(url, headers=self.headers, verify=False)
@@ -110,9 +119,7 @@ class FirepowerManagementCenter:
                     r.status_code = 2xx on success
           Raises:
           """
-          if time.time() > self.authTokenMaxAge + self.authTokenTimestamp:
-               print("Getting a new authToken")
-               self.get_auth_token()
+          self._ensure_session()
 
           try:
                print("Requesting(rest_delete):" + str(url))
@@ -140,6 +147,7 @@ class FirepowerManagementCenter:
           Returns:    Device Id
           Raises:
           """
+          self._ensure_session()
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords"
           url = self.server + api_path + '?offset=0&limit=10000'
           r = self.rest_get(url)
@@ -158,6 +166,7 @@ class FirepowerManagementCenter:
           Raises:
           """
           print("De-registering: " + name)
+          self._ensure_session()
           api_path = self.__config_url__+self.domain_uuid+"/devices/devicerecords/"
           dev_id = self.get_device_id_by_name(name)
           url = self.server + api_path + dev_id

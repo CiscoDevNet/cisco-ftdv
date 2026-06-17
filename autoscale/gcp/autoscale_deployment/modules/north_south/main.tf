@@ -47,6 +47,11 @@ variable "source_image_url" {
   }
 }
 
+variable "enable_secure_boot" {
+  description = "Enable Secure Boot for FTDv instances (supported from version 10.0 onwards)."
+  type        = bool
+}
+
 variable "cpu_utilization_target" {
   description = "Target CPU utilization for autoscale."
   type        = number
@@ -78,17 +83,8 @@ variable "max_ftd_replicas" {
   description = "Maximum number of FTD replicas to maintain."
   type        = number
   validation {
-    condition     = var.max_ftd_replicas > 0
-    error_message = "Max FTD replicas must be greater than 0."
-  }
-}
-
-variable "elb_port" {
-  description = "External Load Balancer port."
-  type        = number
-  validation {
-    condition     = var.elb_port > 0 && var.elb_port < 65536
-    error_message = "Please provide a valid port number (1-65535)."
+    condition     = var.max_ftd_replicas >= 0
+    error_message = "Max FTD replicas must be greater than or equal to 0."
   }
 }
 
@@ -172,11 +168,11 @@ variable "ilb_draining_timeout_sec" {
   }
 }
 
-variable "ilb_port" {
-  description = "Internal load balancer port."
+variable "health_check_port" {
+  description = "Port used by Google health checks (shared across ELB/ILB)."
   type        = number
   validation {
-    condition     = var.ilb_port > 0 && var.ilb_port < 65536
+    condition     = var.health_check_port > 0 && var.health_check_port < 65536
     error_message = "Please provide a valid port number (1-65535)."
   }
 }
@@ -216,14 +212,6 @@ variable "service_account_email" {
   }
 }
 
-variable "admin_password" {
-  description = "Password for admin access."
-  validation {
-    condition     = length(var.admin_password) >= 8
-    error_message = "Admin password must be at least 8 characters long."
-  }
-}
-
 variable "public_key" {
   description = "SSH public key for instance access."
   validation {
@@ -240,10 +228,10 @@ variable "outside_vpc_name" {
   }
 }
 
-variable "outside_subnetwork_name" {
+variable "outside_subnet_name" {
   description = "Subnet name for the outside VPC."
   validation {
-    condition     = length(var.outside_subnetwork_name) > 0
+    condition     = length(var.outside_subnet_name) > 0
     error_message = "Please provide a valid outside VPC subnet name."
   }
 }
@@ -256,10 +244,10 @@ variable "inside_vpc_name" {
   }
 }
 
-variable "inside_subnetwork_name" {
+variable "inside_subnet_name" {
   description = "Subnet name for the inside VPC."
   validation {
-    condition     = length(var.inside_subnetwork_name) > 0
+    condition     = length(var.inside_subnet_name) > 0
     error_message = "Please provide a valid inside VPC subnet name."
   }
 }
@@ -272,31 +260,27 @@ variable "mgmt_vpc_name" {
   }
 }
 
-variable "mgmt_subnetwork_name" {
+variable "mgmt_subnet_name" {
   description = "Subnet name for the management VPC."
   validation {
-    condition     = length(var.mgmt_subnetwork_name) > 0
+    condition     = length(var.mgmt_subnet_name) > 0
     error_message = "Please provide a valid management VPC subnet name."
   }
 }
 
 variable "diag_vpc_name" {
   description = "Name of the diagnostic VPC."
-  validation {
-    condition     = length(var.diag_vpc_name) > 0
-    error_message = "Diagnostic VPC name cannot be empty."
-  }
+  default      = null
+  nullable     = true
 }
 
-variable "diag_subnetwork_name" {
+variable "diag_subnet_name" {
   description = "Subnet name for the diagnostic VPC."
-  validation {
-    condition     = length(var.diag_subnetwork_name) > 0
-    error_message = "Please provide a valid diagnostic VPC subnet name."
-  }
+  default      = null
+  nullable     = true
 }
 
-variable "deploy_using_external_ip" {
+variable "assign_public_ip_to_mgmt" {
   description = "Indicates whether to deploy using an external IP."
   type        = bool
 }
@@ -340,10 +324,8 @@ variable "health_check_firewall_rule" {
 
 variable "diag_firewall_rule" {
   description = "Firewall rule for diagnostic traffic."
-  validation {
-    condition     = can(regex("^[A-Za-z0-9-_]+$", var.diag_firewall_rule))
-    error_message = "Firewall rule name can only include letters, numbers, dashes, or underscores."
-  }
+  default      = null
+  nullable     = true
 }
 
 variable "zone" {
@@ -354,6 +336,10 @@ variable "zone" {
     condition     = can(regex("^[a-z](,[a-z])*$", var.zone))
     error_message = "Please provide a valid zone or comma-separated list of zones."
   }
+}
+
+locals {
+  default_ftdv_password = "th1S_w!ll_Be_C#@nged"
 }
 
 resource "google_compute_instance_template" "ftdv_instance_template" {
@@ -386,20 +372,20 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.outside_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.outside_subnetwork_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.outside_subnet_name}"
   }
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnetwork_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
   }
 
   network_interface {
     network    = "projects/${var.project_id}/global/networks/${var.mgmt_vpc_name}"
-    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.mgmt_subnetwork_name}"
+    subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.mgmt_subnet_name}"
 
     dynamic "access_config" {
-      for_each = var.deploy_using_external_ip ? [1] : []
+      for_each = var.assign_public_ip_to_mgmt ? [1] : []
       content {
         network_tier = "PREMIUM"
       }
@@ -411,8 +397,14 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     for_each = var.with_diagnostic ? [1] : []
     content {
       network    = "projects/${var.project_id}/global/networks/${var.diag_vpc_name}"
-      subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.diag_subnetwork_name}"
+      subnetwork = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.diag_subnet_name}"
     }
+  }
+
+  shielded_instance_config {
+    enable_secure_boot          = var.enable_secure_boot
+    enable_vtpm                 = true
+    enable_integrity_monitoring = true
   }
 
   metadata = {
@@ -429,7 +421,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
           }
     EOF
       ,
-      var.admin_password,
+      local.default_ftdv_password,
       var.with_diagnostic ? "" : ",\n        \"Diagnostic\": \"OFF\""
     )
     ssh-keys = var.public_key
@@ -451,12 +443,7 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     on_host_maintenance = "MIGRATE"
     automatic_restart   = true
   }
-
-  labels = {
-    autostop = "false"
-  }
 }
-
 resource "google_compute_region_instance_group_manager" "ftdv_instance_group" {
   name               = "${var.resource_name_prefix}-ftdv-instance-group"
   region             = var.region
@@ -509,7 +496,7 @@ resource "google_compute_region_health_check" "ftdv_hc_elb" {
   name   = "${var.resource_name_prefix}-ftdv-hc-elb"
   region = var.region
   tcp_health_check {
-    port         = var.elb_port
+    port         = var.health_check_port
     proxy_header = "NONE"
   }
   timeout_sec         = var.elb_timeout_sec
@@ -552,7 +539,7 @@ resource "google_compute_region_backend_service" "ftdv_backend_service_ilb" {
 resource "google_compute_health_check" "ftdv_hc_ilb" {
   name = "${var.resource_name_prefix}-ftdv-hc-ilb"
   tcp_health_check {
-    port = var.ilb_port
+    port = var.health_check_port
   }
   check_interval_sec  = var.ilb_check_interval_sec
   timeout_sec         = var.ilb_timeout_sec
@@ -565,27 +552,57 @@ resource "google_compute_forwarding_rule" "ftdv_fr_ilb" {
   load_balancing_scheme = "INTERNAL"
   all_ports             = true
   backend_service       = google_compute_region_backend_service.ftdv_backend_service_ilb.id
+  ip_address            = google_compute_address.ftdv_ilb_ip.address
   network               = "projects/${var.project_id}/global/networks/${var.inside_vpc_name}"
-  subnetwork            = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnetwork_name}"
+  subnetwork            = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
 }
 
 resource "google_compute_address" "ftdv_ilb_ip" {
   name         = "${var.resource_name_prefix}-ftdv-ilb-ip"
   region       = var.region
   address_type = "INTERNAL"
-  subnetwork   = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnetwork_name}"
+  subnetwork   = "projects/${var.project_id}/regions/${var.region}/subnetworks/${var.inside_subnet_name}"
 }
 
-resource "google_compute_router" "nat_router" {
-  name    = "${var.resource_name_prefix}-nat-router"
+resource "google_compute_router" "out_nat_router" {
+  name    = "${var.resource_name_prefix}-out-nat-router"
   region  = var.region
   network = "projects/${var.project_id}/global/networks/${var.outside_vpc_name}"
 
 }
 
-resource "google_compute_router_nat" "nat" {
-  name                               = "${var.resource_name_prefix}-nat"
-  router                             = google_compute_router.nat_router.name
+resource "google_compute_router_nat" "out_nat" {
+  name                               = "${var.resource_name_prefix}-out-nat"
+  router                             = google_compute_router.out_nat_router.name
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
+# Outputs
+output "elb_name" {
+  value = google_compute_forwarding_rule.ftdv_fr_elb.name
+}
+
+output "ilb_name" {
+  value = google_compute_forwarding_rule.ftdv_fr_ilb.name
+}
+
+output "elb_ip" {
+  value = google_compute_address.ftdv_elb_ip.address
+}
+
+output "ilb_ip" {
+  value = google_compute_address.ftdv_ilb_ip.address
+}
+
+output "outside_nat_router" {
+  value = google_compute_router.out_nat_router.name
+}
+
+output "outside_nat" {
+  value = google_compute_router_nat.out_nat.name
+}
+
+output "instance_group_name" {
+  value = google_compute_region_instance_group_manager.ftdv_instance_group.name
 }

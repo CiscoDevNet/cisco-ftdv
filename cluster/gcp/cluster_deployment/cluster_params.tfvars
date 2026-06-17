@@ -49,7 +49,7 @@ public_key                   = "<ssh-public-key>"                               
 # --------------------
 # Autoscale Details
 # --------------------
-auto_scaling                 = true                                                  # Enable autoscaling
+auto_scaling                 = true                                                  # BOOL - Enable autoscaling
 cpu_utilization_target       = 0.60                                                  # Target CPU utilization for autoscaling (0.0 to 1.0)
 min_ftd_count                = 0                                                     # Minimum number of FTDv instances
 max_ftd_count                = 2                                                     # Maximum number of FTDv instances
@@ -61,10 +61,10 @@ ftd_password_secret_name     = ""                                               
 hostname                     = "ftdv"                                                # Hostname for FTDv, e.g. cisco-ngfwv
 ccl_subnet_range             = "<first ip> <last ip>"                                # Subnet range for CCL, space separated
 cluster_grp_name             = "<any-name-for-cluster>"                              # Cluster group name for FTDv
-with_diagnostic              = false                                                 # Whether to enable diagnostics
-assign_public_ip_to_mgmt     = true                                                  # Whether to assign public IP to management interface
-ftd_reg_via_public_ip        = true                                                  # Whether to register FTDv with public IP
-enable_secure_boot           = false                                                 # Supported from version 10.0 onwards only. Whether to enable secure boot
+with_diagnostic              = false                                                 # BOOL - Whether to enable diagnostics
+assign_public_ip_to_mgmt     = true                                                  # BOOL - Whether to assign public IP to management interface
+ftd_reg_via_public_ip        = true                                                  # BOOL - Whether to register FTDv with public IP
+enable_secure_boot           = false                                                 # BOOL - Supported from version 10.0 onwards only. Whether to enable secure boot
 
 # --------------------
 # FMC Information & FTDv Configuration
@@ -88,11 +88,11 @@ ilb_frontend_protocol        = "TCP"                                            
 ilb_backend_protocol         = "TCP"                                                 # Backend protocol
 
 # ILB Health Check
-ilb_health_check_port        = 8989                                                  # ILB Health-check balancer port, NAT required in FMC
+ilb_health_check_port        = 8989                                                # ILB health-check balancer port, NAT required in FMC
 ilb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
 ilb_draining_timeout_sec     = 60                                                    # Timeout for draining connections (seconds)
 ilb_check_interval_sec       = 10                                                    # Interval between health checks for ILB (seconds)
-ilb_unhealthy_threshold      = 1                                                     # Number of failed health checks before marking unhealthy
+ilb_unhealthy_threshold      = 3                                                     # Number of failed health checks before marking unhealthy
 
 # The below parameters are used for 'north_south' deployment type only
 # --------------------
@@ -105,6 +105,6 @@ elb_front_end_ports          = "all"                                            
 # ELB Health Check
 elb_health_check_port        = 7878                                                  # ELB health-check port, NAT required in FMC
 elb_timeout_sec              = 5                                                     # Load balancer timeout (seconds)
-elb_unhealthy_threshold      = 2                                                     # Number of failed health checks before marking unhealthy
+elb_unhealthy_threshold      = 3                                                     # Number of failed health checks before marking unhealthy
 elb_check_interval_sec       = 10                                                    # Interval between health checks for ELB (seconds)
 elb_draining_timeout_sec     = 60                                                    # Timeout for draining connections (seconds)

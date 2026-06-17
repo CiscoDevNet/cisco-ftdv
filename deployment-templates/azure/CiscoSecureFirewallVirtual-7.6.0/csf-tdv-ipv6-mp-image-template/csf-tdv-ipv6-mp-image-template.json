@@ -11,7 +11,7 @@
       },
       "softwareVersion": {
             "type": "string",
-            "defaultValue": "741172.0.0",
+            "defaultValue": "7.64.69",
             "metadata": {
                "description": "The software version text, this is the image version from the VM offer. Please check the documentation for more details."
             }
