@@ -347,13 +347,6 @@ variable "ilb_backend_protocol" {
     condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_backend_protocol)
     error_message = "Please provide a valid ILB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
-  validation {
-    condition = (
-      (var.ilb_frontend_protocol == "L3_DEFAULT" && var.ilb_backend_protocol == "UNSPECIFIED") ||
-      (var.ilb_frontend_protocol != "L3_DEFAULT" && var.ilb_backend_protocol != "UNSPECIFIED")
-    )
-    error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
-  }
 }
 
 variable "ilb_draining_timeout_sec" {
@@ -420,7 +413,20 @@ variable "elb_backend_protocol" {
     condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_backend_protocol)
     error_message = "Please provide a valid ELB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
-  validation {
+}
+
+check "ilb_protocol_pair" {
+  assert {
+    condition = (
+      (var.ilb_frontend_protocol == "L3_DEFAULT" && var.ilb_backend_protocol == "UNSPECIFIED") ||
+      (var.ilb_frontend_protocol != "L3_DEFAULT" && var.ilb_backend_protocol != "UNSPECIFIED")
+    )
+    error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
+  }
+}
+
+check "elb_protocol_pair" {
+  assert {
     condition = (
       (var.elb_frontend_protocol == "L3_DEFAULT" && var.elb_backend_protocol == "UNSPECIFIED") ||
       (var.elb_frontend_protocol != "L3_DEFAULT" && var.elb_backend_protocol != "UNSPECIFIED")
