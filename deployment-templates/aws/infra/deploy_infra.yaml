@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Stack deploying VPC, Mgmt, Diag, Inside, Outside Subnets
+
+Parameters:
+  Prefix:
+    Default: 'cim-cft'
+    Description: Prefix for the resources
+    Type: String
+  Region:
+    Default: us-east-1
+    Description: AWS Region to deploy the stack
+    Type: String
+  AvailabilityZone:
+    Default: us-east-1a
+    Description: Availability Zone for the subnets
+    Type: String
+  VPCCidr:
+    Default: 10.0.0.0/16
+    Description: CIDR block for the VPC
+    Type: String
+  DiagOff:
+    Default: 'true'
+    Description: Enable or disable Diagnostics subnet
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String  
+  MgmtSubnetCidr:
+    Default: 10.0.1.0/24
+    Description: CIDR block for the Management subnet
+    Type: String
+  InsideSubnetCidr:
+    Default: 10.0.2.0/24
+    Description: CIDR block for the Inside subnet
+    Type: String
+  OutsideSubnetCidr:
+    Default: 10.0.3.0/24
+    Description: CIDR block for the Outside subnet
+    Type: String
+  DiagSubnetCidr:
+    Default: 10.0.4.0/24
+    Description: CIDR block for the Diagnostics subnet
+    Type: String  
+
+Conditions:
+  CreateDiag: !Equals [!Ref DiagOff, 'false']
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-VPC
+  VPCCidrBlock:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-InternetGateway
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  MgmtSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPCCidrBlock
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref MgmtSubnetCidr
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-MgmtSubnet
+  MgmtSubnetIpv6Cidr:
+    Type: AWS::EC2::SubnetCidrBlock
+    DependsOn:
+      - VPCCidrBlock
+      - VPC
+    Properties:
+      Ipv6CidrBlock: !Select
+        - 0
+        - !Cidr
+          - !Select
+            - 0
+            - !GetAtt VPC.Ipv6CidrBlocks
+          - 4
+          - 64
+      SubnetId: !Ref MgmtSubnet
+  DiagSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPCCidrBlock
+    Condition: CreateDiag
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref DiagSubnetCidr
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-DiagSubnet
+  DiagSubnetIpv6Cidr:
+    Type: AWS::EC2::SubnetCidrBlock
+    DependsOn:
+      - VPCCidrBlock
+      - VPC
+    Condition: CreateDiag
+    Properties:
+      Ipv6CidrBlock: !Select
+        - 3
+        - !Cidr
+          - !Select
+            - 0
+            - !GetAtt VPC.Ipv6CidrBlocks
+          - 4
+          - 64
+      SubnetId: !Ref DiagSubnet        
+  InsideSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPCCidrBlock
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-InsideSubnet
+  InsideSubnetIpv6Cidr:
+    Type: AWS::EC2::SubnetCidrBlock
+    DependsOn:
+      - VPCCidrBlock
+      - VPC
+    Properties:
+      Ipv6CidrBlock: !Select
+        - 1
+        - !Cidr
+          - !Select
+            - 0
+            - !GetAtt VPC.Ipv6CidrBlocks
+          - 4
+          - 64
+      SubnetId: !Ref InsideSubnet
+  OutsideSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPCCidrBlock
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-OutsideSubnet
+  OutsideSubnetIpv6Cidr:
+    Type: AWS::EC2::SubnetCidrBlock
+    DependsOn:
+      - VPCCidrBlock
+      - VPC
+    Properties:
+      Ipv6CidrBlock: !Select
+        - 2
+        - !Cidr
+          - !Select
+            - 0
+            - !GetAtt VPC.Ipv6CidrBlocks
+          - 4
+          - 64
+      SubnetId: !Ref OutsideSubnet
+  MgmtRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-mgmt-rt
+  MgmtRouteToInternet:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref MgmtRouteTable
+  MgmtRouteToInternetIpv6:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref MgmtRouteTable
+  MgmtSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref MgmtRouteTable
+      SubnetId: !Ref MgmtSubnet
+  InsideRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-inside-rt
+  InsideSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref InsideRouteTable
+      SubnetId: !Ref InsideSubnet
+  OutsideRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-outside-rt
+  OutsideSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref OutsideRouteTable
+      SubnetId: !Ref OutsideSubnet
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow all traffic
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - CidrIp: 128.107.241.160/27
+          IpProtocol: '-1'
+        - CidrIp: 173.38.117.64/27
+          IpProtocol: '-1'
+        - CidrIp: 72.163.2.224/27
+          IpProtocol: '-1'
+        - CidrIp: 173.36.120.0/28
+          IpProtocol: '-1'
+        - CidrIp: 173.38.220.32/27
+          IpProtocol: '-1'
+        - CidrIp: 64.103.40.16/28
+          IpProtocol: '-1'
+        - CidrIp: 192.118.78.16/28
+          IpProtocol: '-1'
+        - CidrIp: 64.104.248.192/27
+          IpProtocol: '-1'
+        - CidrIp: 173.39.121.64/27
+          IpProtocol: '-1'
+        - CidrIp: 72.163.220.0/27
+          IpProtocol: '-1'
+        - CidrIp: 64.104.44.96/27
+          IpProtocol: '-1'
+        - CidrIp: 64.104.125.224/27
+          IpProtocol: '-1'
+        - CidrIp: 173.39.64.234/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.183.24/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.183.87/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.182.23/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.182.87/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.192.0/20
+          IpProtocol: '-1'
+        - CidrIp: 151.186.181.22/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.181.86/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.180.23/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.180.87/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.177.83/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.177.21/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.178.18/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.178.82/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.176.22/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.176.85/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.179.21/32
+          IpProtocol: '-1'
+        - CidrIp: 151.186.179.85/32
+          IpProtocol: '-1'
+        - CidrIp: 10.0.0.0/16
+          IpProtocol: '-1'
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-SecurityGroup
+
+Outputs:
+  VPCId:
+    Description: The ID of the VPC
+    Value: !Ref VPC
+  MgmtSubnetId:
+    Description: Management subnet ID
+    Value: !Ref MgmtSubnet
+  InsideSubnetId:
+    Description: The ID of the Inside subnet
+    Value: !Ref InsideSubnet
+  OutsideSubnetId:
+    Description: The ID of the Outside subnet
+    Value: !Ref OutsideSubnet
+  DiagSubnetId:
+    Description: The ID of the Diagnostics subnet
+    Value: !If 
+      - CreateDiag
+      - !Ref DiagSubnet
+      - ''      
+  SecurityGroupId:
+    Description: The ID of the security group
+    Value: !Ref SecurityGroup
+  InternetGatewayId:
+    Description: The ID of the Internet Gateway
+    Value: !Ref InternetGateway
+  RouteTableId:
+    Description: The ID of the management route table
+    Value: !Ref MgmtRouteTable
+  InsideRouteTableId:
+    Description: The ID of the inside data-plane route table
+    Value: !Ref InsideRouteTable
+  OutsideRouteTableId:
+    Description: The ID of the outside data-plane route table
+    Value: !Ref OutsideRouteTable
+  MgmtIpv6Cidr:
+    Description: The IPv6 CIDR block for the Management subnet
+    Value: !GetAtt MgmtSubnet.Ipv6CidrBlock    
+  InsideIpv6Cidr:
+    Description: The IPv6 CIDR block for the Inside subnet
+    Value: !GetAtt InsideSubnet.Ipv6CidrBlock
+  OutsideIpv6Cidr:
+    Description: The IPv6 CIDR block for the Outside subnet
+    Value: !GetAtt OutsideSubnet.Ipv6CidrBlock
+  DiagIpv6Cidr:
+    Description: The IPv6 CIDR block for the Diagnostics subnet
+    Value: !If 
+      - CreateDiag
+      - !GetAtt DiagSubnet.Ipv6CidrBlock
+      - ''  
+  VpcIpv6Cidr:
+    Description: The IPv6 CIDR block for the VPC
+    Value: !Select
+      - 0
+      - !GetAtt VPC.Ipv6CidrBlocks    
