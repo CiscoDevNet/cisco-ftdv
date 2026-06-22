@@ -144,10 +144,7 @@ variable "elb_fe_ports" {
   validation {
     condition = (
       var.elb_fe_ports == "all" ||
-      (
-        can(tolist(var.elb_fe_ports)) &&
-        length(tolist(var.elb_fe_ports)) > 0
-      )
+      try(length(tolist(var.elb_fe_ports)) > 0, false)
     )
     error_message = "Set elb_fe_ports to \"all\" or provide a non-empty list of ports."
   }
