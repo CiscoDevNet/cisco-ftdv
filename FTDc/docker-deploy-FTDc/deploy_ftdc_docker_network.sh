@@ -203,8 +203,9 @@ docker create -it \
     --shm-size="${SHM_SIZE}" \
     -v "$(pwd)/ftdc_shared/interface-config:/mnt/disk0/interface-config/interface-config:Z" \
     -v "$(pwd)/ftdc_shared/day0.json:/mnt/disk0/day0.json:Z" \
-    -v "$(pwd)/ftdc_shared/lina-path:/mnt/disk0/.private:Z" \
+    -v "$(pwd)/ftdc_shared/lina-path:/mnt/disk0/.private2:Z" \
     -v "$(pwd)/ftdc_shared/ngfw-path:/ftd/app_data/Volume/root2:Z" \
+    -v "$(pwd)/ftdc_shared/platform-logs:/opt/cisco/platform/logs:Z" \
     $SRIOV_VOLUMES \
     --privileged --cap-add=NET_RAW \
     -e FTDC_CPUS="${FTDC_CPUS}" \
@@ -243,4 +244,77 @@ if [ "$ENABLE_SRIOV" = false ]; then
         [ -z "$net" ] && continue
         docker network connect "$net" ftdc
     done
+fi
+
+# Intel SR-IOV VF cleanup listener.
+# Runs only for Intel (non-MLX5) SR-IOV deployments. Intel VFs are bound
+# to vfio-pci by DPDK and must be explicitly released back to the iavf driver.
+#
+# A background subshell listens persistently for container exit events (stop,
+# kill, crash) via docker events and runs VF cleanup on each exit. It exits
+# cleanly when the container is removed (docker rm).
+#
+# Cases handled:
+#   vfio-pci  - DPDK held the VF at exit; remove from vfio-pci new_id table
+#               (prevents vfio-pci from reclaiming after unbind), unbind, then
+#               bind to iavf.
+#   unbound   - DPDK partially cleaned up (unbound but did not rebind); bind
+#               directly to iavf.
+#   iavf      - already on native driver; skip.
+if [ "$ENABLE_SRIOV" = true ] && [ "$IS_MLX5" = false ]; then
+    IFACE_CONFIG_ABS="$(realpath "${IFACE_CONFIG}")"
+    (
+        coproc DEVENTS (docker events --filter "container=ftdc" \
+                                      --filter "event=die" \
+                                      --filter "event=destroy" \
+                                      --format '{{.Action}}')
+        while IFS= read -r _evt <&"${DEVENTS[0]}"; do
+            if [ "$_evt" = "destroy" ]; then
+                echo "[sriov-cleanup] ftdc removed; cleanup listener exiting."
+                kill "$DEVENTS_PID" 2>/dev/null
+                break
+            fi
+            echo "[sriov-cleanup] ftdc exited; releasing Intel VFs from vfio-pci..."
+            current_bdf=""
+            while IFS= read -r line; do
+                if echo "$line" | grep -q 'iface_id'; then
+                    current_bdf=$(echo "$line" | sed 's/.*iface_id *= *\([^;]*\);.*/\1/' | tr -d ' ')
+                elif echo "$line" | grep -q 'uio_driver'; then
+                    cfg_drv=$(echo "$line" | sed 's/.*uio_driver *= *\([^;]*\);.*/\1/' | tr -d ' ')
+                    if [ -n "$current_bdf" ] && [ "$cfg_drv" = "vfio-pci" ]; then
+                        bdf_full="0000:${current_bdf}"
+                        devpath="/sys/bus/pci/devices/${bdf_full}/"
+                        if [ -L "${devpath}physfn" ]; then
+                            vendor=$(cat "${devpath}vendor" 2>/dev/null)
+                            if [ "$vendor" = "0x8086" ]; then
+                                cur_drv=$(readlink "${devpath}driver" 2>/dev/null | xargs -r basename)
+                                if [ "$cur_drv" = "vfio-pci" ] || [ -z "$cur_drv" ]; then
+                                    echo "[sriov-cleanup] Releasing $bdf_full (cur: ${cur_drv:-unbound})"
+                                    if [ "$cur_drv" = "vfio-pci" ]; then
+                                        echo "" > "${devpath}driver_override" 2>/dev/null || true
+                                        vid=$(cat "${devpath}vendor" 2>/dev/null | sed 's/^0x//')
+                                        did=$(cat "${devpath}device" 2>/dev/null | sed 's/^0x//')
+                                        echo "${vid} ${did}" > /sys/bus/pci/drivers/vfio-pci/remove_id 2>/dev/null || true
+                                        if ! echo "$bdf_full" > /sys/bus/pci/drivers/vfio-pci/unbind 2>/dev/null; then
+                                            echo "[sriov-cleanup] ERROR: unbind failed for $bdf_full (device busy?)"
+                                            continue
+                                        fi
+                                    fi
+                                    echo "iavf" > "${devpath}driver_override" 2>/dev/null || true
+                                    echo "$bdf_full" > /sys/bus/pci/drivers/iavf/bind 2>/dev/null && \
+                                        echo "[sriov-cleanup] $bdf_full returned to iavf" || \
+                                        echo "[sriov-cleanup] Warning: iavf bind failed for $bdf_full"
+                                    echo "" > "${devpath}driver_override" 2>/dev/null || true
+                                fi
+                            fi
+                        fi
+                    fi
+                    current_bdf=""
+                fi
+            done < "${IFACE_CONFIG_ABS}"
+        done
+    ) &
+    CLEANUP_PID=$!
+    disown $CLEANUP_PID
+    echo "Intel SR-IOV VF cleanup listener started (PID $CLEANUP_PID)"
 fi

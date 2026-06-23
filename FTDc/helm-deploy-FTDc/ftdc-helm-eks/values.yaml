@@ -57,13 +57,13 @@ worker_nodes:
           interface: "ens161"
 
   # Persistent Volume Configuration
-  # NOTE: helm upgrade to a new FTDc image version over exisitng persistent volume mounts is not supported.
+  # NOTE: helm upgrade and downgrade to a different FTDc image version over existing persistent volume mounts is supported.
   persistence:
     # Lina persistent volume for pod private data
     lina:
       enabled: true
       storageClass: "lina-storage"
-      size: "1Gi"
+      size: "2Gi"
       # Host path on worker nodes - must exist or be creatable
       hostPath: "/home/ubuntu/lina-path"
       accessMode: "ReadWriteMany"
@@ -76,6 +76,15 @@ worker_nodes:
       size: "5Gi"
       # Host path on worker nodes - must exist or be creatable
       hostPath: "/home/ubuntu/ngfw-path"
+      accessMode: "ReadWriteMany"
+
+    # Platform logs persistent volume
+    platform_logs:
+      enabled: true
+      storageClass: "platform-logs-storage"
+      size: "1Gi"
+      # Host path on worker nodes - must exist or be creatable
+      hostPath: "/home/ubuntu/platform-logs"
       accessMode: "ReadWriteMany"
 
 worker_node1:

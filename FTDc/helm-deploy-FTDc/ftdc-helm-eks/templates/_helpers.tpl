@@ -12,7 +12,7 @@ numInterfaces is auto-calculated from the networks list based on CNI type
 {{- else -}}
 {{- $numInterfaces = len .Values.worker_nodes.cni.macvlan.networks -}}
 {{- end -}}
-{{- $rawMi := add (mul $cpus 128) (mul $numInterfaces 64) -}}
+{{- $rawMi := mul (mul $numInterfaces $cpus) 40 -}}
 {{- $rounded := mul (div (add $rawMi 255) 256) 256 -}}
 {{- printf "%dMi" $rounded -}}
 {{- else -}}
