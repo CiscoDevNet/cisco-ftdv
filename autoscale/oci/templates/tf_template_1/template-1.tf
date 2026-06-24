@@ -89,6 +89,8 @@ variable "autoscale_group_prefix" {
 }
 
 locals{
+  is_flex_shape = length(regexall("Flex", var.instance_shape)) > 0
+
   day_0 = <<EOT
 {
 	"AdminPassword": "FtDv_AuT0Scale",
@@ -98,7 +100,20 @@ locals{
 	"ManageLocally": "No"
 }
 EOT
+}
 
+check "flex_shape_memory_validation" {
+  assert {
+    condition = (
+      !local.is_flex_shape || 
+      (var.instance_flex_memory_in_gbs != null && var.instance_flex_ocpus != null && 
+       var.instance_flex_memory_in_gbs >= var.instance_flex_ocpus * 4)
+    )
+    error_message = "For Flex shapes, instance_flex_memory_in_gbs must be at least 4x the instance_flex_ocpus value. For example: 4 OCPUs requires minimum 16 GB, 6 OCPUs requires minimum 24 GB, 8 OCPUs requires minimum 32 GB."
+  }
+}
+
+locals{
   min_instance_count = split(",", var.min_and_max_instance_count)[0]
   max_instance_count = split(",", var.min_and_max_instance_count)[1]
   availability_domains = tolist("${split(",", var.availability_domain)}")
@@ -237,14 +252,33 @@ variable "health_check_port" {
 }
 
 variable "instance_shape" {
-  description = "The shape of the instance to be created. The shape determines the number of CPUs, amount of memory, and other resources allocated to the instance. Supported shapes for FTDv are - 'VM.Standard2.4' and 'VM.Standard2.8'"
+  description = "The shape of the instance to be created. The shape determines the number of CPUs, amount of memory, and other resources allocated to the instance. Supported shapes for FTDv are - 'VM.DenseIO2.8', 'VM.StandardB1.4', 'VM.StandardB1.8', 'VM.Standard1.4', 'VM.Standard1.8', 'VM.Standard2.4', 'VM.Standard2.8', 'VM.Standard3.Flex', 'VM.Optimized3.Flex', 'VM.Standard.E4.Flex', 'VM.Standard.E5.Flex', 'VM.Standard.E6.Flex'"
   validation {
         condition = (
-          contains(["VM.Standard2.4", "VM.Standard2.8"], var.instance_shape)
+          contains(["VM.DenseIO2.8", "VM.StandardB1.4", "VM.StandardB1.8", "VM.Standard1.4", "VM.Standard1.8", "VM.Standard2.4", "VM.Standard2.8", "VM.Standard3.Flex", "VM.Optimized3.Flex", "VM.Standard.E4.Flex", "VM.Standard.E5.Flex", "VM.Standard.E6.Flex"], var.instance_shape)
         )
         error_message = "Please provide a valid instance shape."
       }
 }
+
+variable "instance_flex_ocpus" {
+  type        = number
+  default     = 4
+  description = "The number of OCPUs to be allocated to the instance. Required only when using a Flex shape. Supported values: 4, 6, or 8 OCPUs."
+  validation {
+    condition = (
+      var.instance_flex_ocpus == null || contains([4, 6, 8], var.instance_flex_ocpus)
+    )
+    error_message = "instance_flex_ocpus must be 4, 6, or 8 when using a Flex shape."
+  }
+}
+
+variable "instance_flex_memory_in_gbs" {
+  type        = number
+  default     = 16
+  description = "The amount of memory (in GBs) to be allocated to the instance. Required only when using a Flex shape. Memory must be at least 4x the OCPUs selected (e.g., 4 OCPUs requires minimum 16 GB, 6 OCPUs requires minimum 24 GB, 8 OCPUs requires minimum 32 GB)."
+}
+
 variable "lb_bs_policy" {
   description = "The load balancer policy to be used for the internal and external load balancer backend set. To know more about how load balancer policies work, refer to this link - https://docs.oracle.com/en-us/iaas/Content/Balance/Reference/lbpolicies.htm . Supported values are - 'ROUND_ROBIN', 'LEAST_CONNECTIONS', 'IP_HASH'"
   validation {
@@ -510,6 +544,13 @@ resource "oci_core_instance_configuration" "test_instance_configuration" {
             launch_mode = "PARAVIRTUALIZED"
             metadata = {"user_data" : base64encode("${local.day_0}")}
             shape = "${var.instance_shape}"
+            dynamic "shape_config" {
+                for_each = local.is_flex_shape ? [1] : []
+                content {
+                    ocpus         = var.instance_flex_ocpus
+                    memory_in_gbs = var.instance_flex_memory_in_gbs
+                }
+            }
             source_details {
                 source_type = "image"
                 image_id = var.custom_image_ocid == ""? data.oci_core_app_catalog_listing_resource_version.test_catalog_listing[0].listing_resource_id : var.custom_image_ocid
