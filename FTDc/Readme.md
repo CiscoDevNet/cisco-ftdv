@@ -93,25 +93,35 @@ FTDc requires 2Mi hugepages for its data plane (DPDK). The amount of hugepages e
 reserves scales with the number of **data NICs** attached to the pod and the number of
 **CPU cores** assigned to it.
 
-The Helm chart computes the per-pod hugepages request automatically using:
+The Helm chart computes the per-pod hugepages request automatically as the larger of the
+following two terms, rounded up to the nearest 256Mi:
+
+- a **DPDK queue term**, scaling with the number of data NICs and CPU cores
+- a **minimum baseline**, determined by the number of CPU cores and data NICs
 
 ```
-hugepages_Mi = roundUp256( numInterfaces * cpus * 40 )
+queues_Mi   = numInterfaces * cpus * 40
+baseline_Mi = (cpus * 200) + (numInterfaces * 200)
+hugepages_Mi = roundUp256( max( queues_Mi, baseline_Mi ) )
 ```
 
 Where `numInterfaces` is the length of the configured data networks list —
 `worker_nodes.cni.macvlan.networks` or `worker_nodes.cni.sriov.networks`, selected by
 `worker_nodes.cni.type` (`macvlan` or `sriov`) — and `cpus` is `ftdc.cpus` in `values.yaml`.
-The result is rounded up to the nearest 256Mi. See [`templates/_helpers.tpl`](Helm_charts/ftdc-helm/templates/_helpers.tpl) for the exact logic.
+The `baseline_Mi` term (200Mi per CPU core plus 200Mi per data NIC) acts as the minimum,
+so the queue term only dominates at high NIC-to-core ratios. The final value is rounded up
+to the nearest 256Mi. See [`templates/_helpers.tpl`](Helm_charts/ftdc-helm/templates/_helpers.tpl)
+for the exact logic.
 
 Examples (per pod):
 
-| CPUs | Data NICs | Raw (Mi) | Reserved (Mi) | 2Mi pages |
-|------|-----------|----------|---------------|-----------|
-| 4    | 4         | 640      | 768           | 384       |
-| 4    | 6         | 960      | 1024          | 512       |
-| 8    | 4         | 1280     | 1280          | 640       |
-| 8    | 6         | 1920     | 2048          | 1024      |
+| CPUs | Data NICs | queues_Mi | baseline_Mi | Raw max (Mi) | Reserved (Mi) | 2Mi pages |
+|------|-----------|-----------|-------------|--------------|---------------|-----------|
+| 4    | 4         | 640       | 1600        | 1600         | 1792          | 896       |
+| 4    | 6         | 960       | 2000        | 2000         | 2048          | 1024      |
+| 8    | 4         | 1280      | 2400        | 2400         | 2560          | 1280      |
+| 16   | 8         | 5120      | 4800        | 5120         | 5120          | 2560      |
+| 16   | 9         | 5760      | 5000        | 5760         | 5888          | 2944      |
 
 **Hugepages must be allocated on each worker node before scheduling FTDc pods.**
 Kubernetes only exposes hugepages it finds already reserved by the kernel; it will not
