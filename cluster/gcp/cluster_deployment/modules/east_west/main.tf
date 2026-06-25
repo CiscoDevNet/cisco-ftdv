@@ -86,10 +86,13 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
 
   }
 
-  shielded_instance_config{
-    enable_secure_boot = var.enable_secure_boot
-    enable_vtpm        = true
-    enable_integrity_monitoring = true
+  dynamic "shielded_instance_config" {
+    for_each = var.enable_secure_boot ? [1] : []
+    content {
+      enable_secure_boot          = true
+      enable_vtpm                 = true
+      enable_integrity_monitoring = true
+    }
   }
 
   network_interface {
