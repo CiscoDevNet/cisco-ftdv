@@ -32,7 +32,7 @@ ftdc:
   
   # Hugepages configuration
   # Set hugepages to "auto" to calculate based on CPUs and number of interfaces
-  # Formula: (cpus * 128) + (numInterfaces * 64) Mi, rounded up to nearest 256Mi
+  # Formula: max(numInterfaces * cpus * 40, (cpus * 200) + (numInterfaces * 200)) Mi, rounded up to nearest 256Mi
   # numInterfaces is auto-calculated from worker_nodes.cni.macvlan.networks or worker_nodes.cni.sriov.networks
   # Or specify a fixed value like "512Mi", "1Gi", "2Gi"
   hugepages: "auto"
