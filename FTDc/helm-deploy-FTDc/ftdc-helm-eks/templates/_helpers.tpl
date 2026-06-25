@@ -1,6 +1,6 @@
 {{/*
 Calculate hugepages based on CPUs and interfaces
-Formula: (cpus * 128) + (numInterfaces * 64) Mi, rounded up to nearest 256Mi
+Formula: max(numInterfaces * cpus * 40, (cpus * 200) + (numInterfaces * 200)) Mi, rounded up to nearest 256Mi
 numInterfaces is auto-calculated from the networks list based on CNI type
 */}}
 {{- define "ftdc.hugepages" -}}
