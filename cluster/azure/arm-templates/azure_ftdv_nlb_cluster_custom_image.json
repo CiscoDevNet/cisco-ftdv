@@ -926,6 +926,10 @@
                      "value": "[parameters('ftdvPerformanceTier')]"
                    },
                   {
+                     "name": "AUTOSCALING",
+                     "value": "[parameters('autoscaling')]"
+                  },
+                  {
                      "name":"SCALING_METRICS_LIST",
                      "value":"[parameters('scalingMetricsList')]"
                   },
