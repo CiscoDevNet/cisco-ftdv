@@ -144,8 +144,14 @@ variable "elb_fe_ports" {
   }
 }
 
+data "google_compute_image" "source_image" {
+  project = regex("projects/([^/]+)/", var.source_image_url)[0]
+  name    = regex("images/([^/]+)$", var.source_image_url)[0]
+}
+
 locals {
-  elb_fe_ports_list = var.elb_fe_ports == "all" ? null : tolist(var.elb_fe_ports)
+  elb_fe_ports_list  = var.elb_fe_ports == "all" ? null : tolist(var.elb_fe_ports)
+  is_uefi_compatible = contains([for f in data.google_compute_image.source_image.guest_os_features : f.type], "UEFI_COMPATIBLE")
 }
 
 variable "ilb_backend_protocol" {
@@ -428,10 +434,13 @@ resource "google_compute_instance_template" "ftdv_instance_template" {
     }
   }
 
-  shielded_instance_config {
-    enable_secure_boot          = var.enable_secure_boot
-    enable_vtpm                 = true
-    enable_integrity_monitoring = true
+  dynamic "shielded_instance_config" {
+    for_each = local.is_uefi_compatible ? [1] : []
+    content {
+      enable_secure_boot          = var.enable_secure_boot
+      enable_vtpm                 = true
+      enable_integrity_monitoring = true
+    }
   }
 
   metadata = {
