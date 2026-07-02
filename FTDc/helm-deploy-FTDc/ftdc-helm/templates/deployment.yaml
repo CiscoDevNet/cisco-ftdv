@@ -105,6 +105,41 @@ spec:
 
 ---
 
+{{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: disk0-logs-pv
+spec:
+  capacity:
+    storage: {{ .Values.worker_nodes.persistence.disk0_logs.size }}
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.disk0_logs.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.worker_nodes.persistence.disk0_logs.storageClass }}
+  hostPath:
+    path: {{ .Values.worker_nodes.persistence.disk0_logs.hostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: disk0-logs-pvc
+spec:
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.disk0_logs.accessMode }}
+  storageClassName: {{ .Values.worker_nodes.persistence.disk0_logs.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.worker_nodes.persistence.disk0_logs.size }}
+{{- end }}
+
+---
+
 {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
 apiVersion: v1
 kind: PersistentVolume
@@ -219,6 +254,11 @@ spec:
         persistentVolumeClaim:
           claimName: platform-logs-pvc
       {{- end }}
+      {{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+      - name: disk0-logs-storage
+        persistentVolumeClaim:
+          claimName: disk0-logs-pvc
+      {{- end }}
       containers:
       - name: ftdc
         image: {{ .Values.ftdc.repository }}
@@ -286,6 +326,10 @@ spec:
           {{- if (dig "persistence" "platform_logs" "enabled" false .Values.worker_nodes) }}
           - name: platform-logs-storage
             mountPath: /opt/cisco/platform/logs
+          {{- end }}
+          {{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+          - name: disk0-logs-storage
+            mountPath: /mnt/disk0/log
           {{- end }}
           {{- if eq .Values.worker_nodes.cni.type "sriov" }}
           - name: pci-bus

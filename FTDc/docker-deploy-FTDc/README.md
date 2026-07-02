@@ -158,19 +158,20 @@ FFTDc has persistence enabled by default. The container state is stored in the f
 - `ftdc_shared/lina-path` — maps to `/mnt/disk0/.private2` inside the container (lina private data, config, logs, upgrade markers, etc.)
 - `ftdc_shared/ngfw-path` — maps to `/ftd/app_data/Volume/root2` inside the container (NGFW application data)
 - `ftdc_shared/platform-logs` — maps to `/opt/cisco/platform/logs` inside the container (platform logs)
+- `ftdc_shared/disk0-logs` — maps to `/mnt/disk0/log` inside the container (lina/ASA process logs)
 
 This means that after a `docker stop` and `docker rm`, new deployments will come up with the original state, preventing re-registration.
 
 To perform a fresh deployment, manually remove these directories before starting a new container:
 ```
-sudo rm -rf ftdc_shared/lina-path ftdc_shared/ngfw-path ftdc_shared/platform-logs
+sudo rm -rf ftdc_shared/lina-path ftdc_shared/ngfw-path ftdc_shared/platform-logs ftdc_shared/disk0-logs
 ```
 
 **Note:** For a clean deployment with no prior state, remove the persistent directories before deploying.
 
 ### Note: FTDc Upgrade and Downgrade (Docker)
 
-FTDc supports manual upgrade and downgrade over existing persistent storage. The persistent directories (`lina-path`, `ngfw-path`, `platform-logs`) are preserved across version changes.
+FTDc supports manual upgrade and downgrade over existing persistent storage. The persistent directories (`lina-path`, `ngfw-path`, `platform-logs`, `disk0-logs`) are preserved across version changes.
 
 **To upgrade or downgrade:**
 

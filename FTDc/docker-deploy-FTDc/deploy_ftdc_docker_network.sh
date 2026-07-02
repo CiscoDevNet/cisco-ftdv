@@ -206,6 +206,7 @@ docker create -it \
     -v "$(pwd)/ftdc_shared/lina-path:/mnt/disk0/.private2:Z" \
     -v "$(pwd)/ftdc_shared/ngfw-path:/ftd/app_data/Volume/root2:Z" \
     -v "$(pwd)/ftdc_shared/platform-logs:/opt/cisco/platform/logs:Z" \
+    -v "$(pwd)/ftdc_shared/disk0-logs:/mnt/disk0/log:Z" \
     $SRIOV_VOLUMES \
     --privileged --cap-add=NET_RAW \
     -e FTDC_CPUS="${FTDC_CPUS}" \

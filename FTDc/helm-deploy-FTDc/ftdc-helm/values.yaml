@@ -113,6 +113,15 @@ worker_nodes:
       hostPath: "/home/ubuntu/platform-logs"
       accessMode: "ReadWriteMany"
 
+    # /mnt/disk0/log persistent volume
+    disk0_logs:
+      enabled: true
+      storageClass: "disk0-logs-storage"
+      size: "1Gi"
+      # Host path on worker nodes - must exist or be creatable
+      hostPath: "/home/ubuntu/disk0-logs"
+      accessMode: "ReadWriteMany"
+
 
 
 worker_node1:
