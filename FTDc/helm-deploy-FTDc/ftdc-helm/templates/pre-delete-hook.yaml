@@ -234,13 +234,14 @@ spec:
           LINA_PATH="{{ .Values.worker_nodes.persistence.lina.hostPath }}"
           NGFW_PATH="{{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}"
           PLATFORM_LOGS_PATH="{{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}"
+          DISK0_LOGS_PATH="{{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}"
 
           echo "=========================================="
           echo "Cleaning up persistent storage"
           echo "=========================================="
           
-          # Cleanup lina, ngfw, and platform-logs paths
-          for TARGET_PATH in "$LINA_PATH" "$NGFW_PATH" "$PLATFORM_LOGS_PATH"; do
+          # Cleanup lina, ngfw, platform-logs, and disk0-logs paths
+          for TARGET_PATH in "$LINA_PATH" "$NGFW_PATH" "$PLATFORM_LOGS_PATH" "$DISK0_LOGS_PATH"; do
             echo "Target path: $TARGET_PATH"
             if [ -d "$TARGET_PATH" ]; then
               echo "Directory exists. Listing contents before cleanup:"
@@ -263,6 +264,8 @@ spec:
           mountPath: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
         - name: platform-logs-path
           mountPath: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+        - name: disk0-logs-path
+          mountPath: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
       volumes:
       - name: lina-path
         hostPath:
@@ -275,4 +278,8 @@ spec:
       - name: platform-logs-path
         hostPath:
           path: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+      - name: disk0-logs-path
+        hostPath:
+          path: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
           type: DirectoryOrCreate
