@@ -22,13 +22,18 @@
 namespace: "default"
 
 ftdc:
-  repository: "localhost:5000/ftdc_10.0.0.143"
+  primary:
+    repository: "localhost:5000/ftdc_10.0.0-143"
+  secondary:
+    repository: "localhost:5000/ftdc_10.0.0-143"
   app_name: "ftdc"
   cpus: 4
   # Memory in MB
   memory: 8192
   # /dev/shm size (shared memory) - default 128Mi, increase if needed
   shmSize: "128Mi"
+  # For configuring HA make this true
+  enable_ha: "false"
   
   # Hugepages configuration
   # Set hugepages to "auto" to calculate based on CPUs and number of interfaces
@@ -129,3 +134,7 @@ worker_node1:
   ip: "10.10.3.4"
   iface_name: "ens192"
 
+worker_node2:
+  name: "k8s-worker2"
+  ip: "10.10.3.5"
+  iface_name: "ens192"

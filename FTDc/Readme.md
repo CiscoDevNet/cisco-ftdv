@@ -110,7 +110,7 @@ Where `numInterfaces` is the length of the configured data networks list —
 `worker_nodes.cni.type` (`macvlan` or `sriov`) — and `cpus` is `ftdc.cpus` in `values.yaml`.
 The `baseline_Mi` term (200Mi per CPU core plus 200Mi per data NIC) acts as the minimum,
 so the queue term only dominates at high NIC-to-core ratios. The final value is rounded up
-to the nearest 256Mi. See [`templates/_helpers.tpl`](Helm_charts/ftdc-helm/templates/_helpers.tpl)
+to the nearest 256Mi. See [`templates/_helpers.tpl`](helm-deploy-FTDc/ftdc-helm/templates/_helpers.tpl)
 for the exact logic.
 
 Examples (per pod):
@@ -168,7 +168,7 @@ kubectl describe node <worker> | grep hugepages-2Mi
 
 ### Components
 
-- **FTDc Pod**: A single containerized firewall pod with data plane interfaces via Macvlan or SR-IOV. Only one FTDc pod per deployment is supported.
+- **FTDc Pod**: A containerized firewall pod with data plane interfaces via Macvlan or SR-IOV. Supports standalone (single pod) and HA (primary + secondary pods on separate worker nodes) deployments.
 - **FMC**: Centralized management for policies, monitoring, and reporting.
 
 ### Lifecycle Flow
