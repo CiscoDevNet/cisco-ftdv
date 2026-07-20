@@ -203,6 +203,7 @@ spec:
           fi
 
 ---
+{{- $isHA := eq (.Values.ftdc.enable_ha | default "false") "true" }}
 # Cleanup job to delete persistent volume content on worker nodes
 apiVersion: batch/v1
 kind: Job
@@ -284,7 +285,7 @@ spec:
           path: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
           type: DirectoryOrCreate
 
-{{- if eq (.Values.ftdc.enable_ha | default "false") "true" }}
+{{- if $isHA }}
 ---
 # Cleanup job for secondary worker node (HA mode)
 apiVersion: batch/v1
