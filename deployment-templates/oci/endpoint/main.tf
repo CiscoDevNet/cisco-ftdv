@@ -170,7 +170,24 @@ resource "oci_core_instance" "vm" {
       # Basic tools
       sudo apt-get update
       sudo apt-get install -y nmap iperf iperf3 firewalld net-tools
-      sudo systemctl stop firewalld
+
+      disable_endpoint_firewall() {
+        systemctl stop ufw 2>/dev/null || true
+        systemctl disable ufw 2>/dev/null || true
+        ufw disable 2>/dev/null || true
+        systemctl stop firewalld 2>/dev/null || true
+        systemctl disable firewalld 2>/dev/null || true
+        iptables -P INPUT ACCEPT 2>/dev/null || true
+        iptables -P FORWARD ACCEPT 2>/dev/null || true
+        iptables -P OUTPUT ACCEPT 2>/dev/null || true
+        iptables -F 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
+        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -F 2>/dev/null || true
+        command -v nft >/dev/null 2>&1 && nft flush ruleset || true
+      }
+      disable_endpoint_firewall
 
       # Network tuning
       sudo ip link set ens3 mtu 1300
@@ -178,6 +195,23 @@ resource "oci_core_instance" "vm" {
       # Configure secondary data VNIC when OCI attaches it after first boot.
       cat >/usr/local/sbin/configure-oci-data-vnic.sh <<'DATA_VNIC_SCRIPT'
       #!/bin/bash
+      disable_endpoint_firewall() {
+        systemctl stop ufw 2>/dev/null || true
+        systemctl disable ufw 2>/dev/null || true
+        ufw disable 2>/dev/null || true
+        systemctl stop firewalld 2>/dev/null || true
+        systemctl disable firewalld 2>/dev/null || true
+        iptables -P INPUT ACCEPT 2>/dev/null || true
+        iptables -P FORWARD ACCEPT 2>/dev/null || true
+        iptables -P OUTPUT ACCEPT 2>/dev/null || true
+        iptables -F 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
+        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -F 2>/dev/null || true
+        command -v nft >/dev/null 2>&1 && nft flush ruleset || true
+      }
+
       DATA_IFACE=""
       for _ in $(seq 1 120); do
         for iface in ens5 eth1; do
@@ -212,10 +246,27 @@ resource "oci_core_instance" "vm" {
       netplan generate >>/var/log/oci-data-vnic.log 2>&1
       netplan apply >>/var/log/oci-data-vnic.log 2>&1
       ip link set "$DATA_IFACE" mtu 1300 >>/var/log/oci-data-vnic.log 2>&1 || true
+      disable_endpoint_firewall
       ip -br addr show "$DATA_IFACE" >>/var/log/oci-data-vnic.log 2>&1 || true
       DATA_VNIC_SCRIPT
       chmod +x /usr/local/sbin/configure-oci-data-vnic.sh
-      nohup /usr/local/sbin/configure-oci-data-vnic.sh >/var/log/oci-data-vnic.log 2>&1 &
+      cat >/etc/systemd/system/configure-oci-data-vnic.service <<'DATA_VNIC_SERVICE'
+      [Unit]
+      Description=Configure OCI endpoint data VNIC
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/configure-oci-data-vnic.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+      DATA_VNIC_SERVICE
+      systemctl daemon-reload
+      systemctl enable configure-oci-data-vnic.service
+      systemctl start configure-oci-data-vnic.service
 
       # Shell setup
       sudo cp /etc/skel/.bashrc /home/${var.admin_username}/
