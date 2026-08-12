@@ -11,6 +11,11 @@ variable "image" {
 variable "machine_type" {
   default = "n1-standard-4"
 }
+variable "enable_secure_boot" {
+  description = "Enable Secure Boot for the instance."
+  type        = bool
+  default     = false
+}
 # variable "admin_password" {}
 variable "day0_config" {}
 
@@ -36,8 +41,8 @@ variable "diag_subnet_name" {
 ############################################################################################
 
 provider "google" {
-  project     = var.project_id
-  region      = var.region
+  project = var.project_id
+  region  = var.region
 }
 
 resource "google_compute_instance" "ftdv_instance" {
@@ -76,7 +81,7 @@ resource "google_compute_instance" "ftdv_instance" {
     stack_type = "IPV4_IPV6"
     access_config {
       network_tier = "PREMIUM"
-      }
+    }
     ipv6_access_config {
       network_tier = "PREMIUM"
     }
@@ -88,9 +93,9 @@ resource "google_compute_instance" "ftdv_instance" {
       network    = var.diag_vpc_name
       subnetwork = var.diag_subnet_name
       stack_type = "IPV4_IPV6"
-    ipv6_access_config {
-      network_tier = "PREMIUM"
-    }
+      ipv6_access_config {
+        network_tier = "PREMIUM"
+      }
     }
   }
 
@@ -113,6 +118,15 @@ resource "google_compute_instance" "ftdv_instance" {
     autostop = "false"
   }
 
+  dynamic "shielded_instance_config" {
+    for_each = var.enable_secure_boot ? [1] : []
+    content {
+      enable_secure_boot          = true
+      enable_vtpm                 = true
+      enable_integrity_monitoring = true
+    }
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -121,43 +135,42 @@ resource "google_compute_instance" "ftdv_instance" {
 # Outputs
 output "ftdv_ssh_ip" {
   description = "Public IP address of the management interface"
-  value = length(google_compute_instance.ftdv_instance.network_interface[2].access_config) > 0 ? google_compute_instance.ftdv_instance.network_interface[2].access_config[0].nat_ip : null
+  value       = length(google_compute_instance.ftdv_instance.network_interface[2].access_config) > 0 ? google_compute_instance.ftdv_instance.network_interface[2].access_config[0].nat_ip : null
 }
 output "ftdv_inside_ip" {
   description = "Private IP address of the inside interface"
-  value = google_compute_instance.ftdv_instance.network_interface[0].network_ip
+  value       = google_compute_instance.ftdv_instance.network_interface[0].network_ip
 }
 output "ftdv_inside_ipv6" {
   description = "IPv6 address of inside interface"
-  value = google_compute_instance.ftdv_instance.network_interface[0].ipv6_access_config[0].external_ipv6
+  value       = google_compute_instance.ftdv_instance.network_interface[0].ipv6_access_config[0].external_ipv6
 }
 output "ftdv_outside_ip" {
   description = "Private IP address of the outside interface"
-  value = google_compute_instance.ftdv_instance.network_interface[1].network_ip
+  value       = google_compute_instance.ftdv_instance.network_interface[1].network_ip
 }
 output "ftdv_outside_ipv6" {
   description = "IPv6 address of outside interface"
-  value = google_compute_instance.ftdv_instance.network_interface[1].ipv6_access_config[0].external_ipv6
+  value       = google_compute_instance.ftdv_instance.network_interface[1].ipv6_access_config[0].external_ipv6
 }
 output "ftdv_mgmt_ip" {
   description = "Private IP address of the management interface"
-  value = google_compute_instance.ftdv_instance.network_interface[2].network_ip
+  value       = google_compute_instance.ftdv_instance.network_interface[2].network_ip
 }
 output "ftdv_mgmt_ipv6" {
   description = "IPv6 address of the management interface"
-  value = google_compute_instance.ftdv_instance.network_interface[2].ipv6_access_config[0].external_ipv6
+  value       = google_compute_instance.ftdv_instance.network_interface[2].ipv6_access_config[0].external_ipv6
 }
 output "ftdv_diag_ip" {
   description = "Private IP address of the diagnostic interface"
-  value = var.with_diagnostic && var.diag_vpc_name != "" && var.diag_subnet_name != "" ? google_compute_instance.ftdv_instance.network_interface[3].network_ip : null
+  value       = var.with_diagnostic && var.diag_vpc_name != "" && var.diag_subnet_name != "" ? google_compute_instance.ftdv_instance.network_interface[3].network_ip : null
 }
 output "ftdv_diag_ipv6" {
   description = "IPv6 address of the diagnostic interface"
-  value = var.with_diagnostic && var.diag_vpc_name != "" && var.diag_subnet_name != "" ? google_compute_instance.ftdv_instance.network_interface[3].ipv6_access_config[0].external_ipv6 : null
+  value       = var.with_diagnostic && var.diag_vpc_name != "" && var.diag_subnet_name != "" ? google_compute_instance.ftdv_instance.network_interface[3].ipv6_access_config[0].external_ipv6 : null
 }
 
 output "ftdv_instance_name" {
   description = "Name of the FTDv instance"
-  value = google_compute_instance.ftdv_instance.name
+  value       = google_compute_instance.ftdv_instance.name
 }
-
