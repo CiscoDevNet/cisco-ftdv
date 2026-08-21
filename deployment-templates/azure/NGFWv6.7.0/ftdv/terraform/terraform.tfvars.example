@@ -1,0 +1,33 @@
+rg_name = "ngfw-test"
+location = "West Europe"
+ngfw_name = "ngfw1"
+vm_size = "Standard_D3_v2"
+ngfw_version = "67065.0.0" # "latest" is also possible
+custom_data {
+    AdminPassword = "Admin123"
+    Hostname      = "FTD"
+    FmcIp         = ""
+    FmcRegKey     = ""
+    FmcNatId      = ""
+    ManageLocally = "No"
+    }
+vnet = {
+    name = "HUB"
+    space = "192.168.0.0/16"
+    }
+subnet_0 = {
+    name = "mgmt"
+    prefix = "192.168.0.0/24"
+    }
+subnet_1 = {
+    name = "diagnostic"
+    prefix = "192.168.1.0/24"
+    }
+subnet_2 = {
+    name = "inside"
+    prefix = "192.168.2.0/24"
+    }
+subnet_3 = {
+    name = "outside"
+    prefix = "192.168.3.0/24"
+    }

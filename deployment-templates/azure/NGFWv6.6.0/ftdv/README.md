@@ -22,7 +22,8 @@ File : [ Firepower NGFW Virtual v6.6.0 on Azure ] : Cisco_Firepower_Threat_Defen
 
 3. Create a Image from the VHD and acquire the Resource ID of the newly created Image.
 
-4. Use the ARM template to deploy a Firepower Threat Defense Virtual firewall using the image.
+4. Use the ARM template to deploy a Firepower Threat Defense Virtual firewall using the image.\
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FCiscoDevNet%2Fcisco-ftdv%2Fmaster%2Fdeployment-templates%2Fazure%2FNGFWv6.6.0%2Fftdv%2Fazure-ftdv-custom-template.json)
 
 5. Update the parameters in the parameters template file(json) and use it to provide the parameters to the ARM template.
 
