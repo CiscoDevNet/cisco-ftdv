@@ -265,7 +265,7 @@ def scale_out(event, context):
     while (time.time() - start_time) < timeout_time and not joined_cluster:
         try:
             node_state = cl.is_joined_cluster(channel)
-            if node_state in ["DATA_NODE", "CONTROL_NODE"]:
+            if node_state in ["DATA_NODE", "CONTROL_NODE", "MASTER", "SLAVE"]:
                 print(f"INFO: Instance {instanceName} has joined cluster as {node_state}")
                 joined_cluster = True
                 data["joined_cluster"] = True

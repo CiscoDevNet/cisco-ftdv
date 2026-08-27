@@ -138,7 +138,7 @@ data "oci_core_subnet" "data_subnet" {
 resource "oci_core_instance" "vm" {
   availability_domain = var.availability_domain
   compartment_id      = var.compartment_id
-  display_name        = "${var.instance_name}"
+  display_name        = var.instance_name
   shape               = var.instance_type
 
   source_details {
@@ -147,12 +147,12 @@ resource "oci_core_instance" "vm" {
   }
 
   create_vnic_details {
-    subnet_id              = var.mgmt_subnet_id
-    display_name           = "${var.instance_name}-mgmt-vnic"
-    assign_public_ip       = true
-    nsg_ids                = [var.mgmt_nsg_id]
+    subnet_id                 = var.mgmt_subnet_id
+    display_name              = "${var.instance_name}-mgmt-vnic"
+    assign_public_ip          = true
+    nsg_ids                   = [var.mgmt_nsg_id]
     assign_private_dns_record = true
-    hostname_label         = var.instance_name
+    hostname_label            = var.instance_name
   }
 
   metadata = {
@@ -170,10 +170,103 @@ resource "oci_core_instance" "vm" {
       # Basic tools
       sudo apt-get update
       sudo apt-get install -y nmap iperf iperf3 firewalld net-tools
-      sudo systemctl stop firewalld
+
+      disable_endpoint_firewall() {
+        systemctl stop ufw 2>/dev/null || true
+        systemctl disable ufw 2>/dev/null || true
+        ufw disable 2>/dev/null || true
+        systemctl stop firewalld 2>/dev/null || true
+        systemctl disable firewalld 2>/dev/null || true
+        iptables -P INPUT ACCEPT 2>/dev/null || true
+        iptables -P FORWARD ACCEPT 2>/dev/null || true
+        iptables -P OUTPUT ACCEPT 2>/dev/null || true
+        iptables -F 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
+        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -F 2>/dev/null || true
+        command -v nft >/dev/null 2>&1 && nft flush ruleset || true
+      }
+      disable_endpoint_firewall
 
       # Network tuning
       sudo ip link set ens3 mtu 1300
+
+      # Configure secondary data VNIC when OCI attaches it after first boot.
+      cat >/usr/local/sbin/configure-oci-data-vnic.sh <<'DATA_VNIC_SCRIPT'
+      #!/bin/bash
+      disable_endpoint_firewall() {
+        systemctl stop ufw 2>/dev/null || true
+        systemctl disable ufw 2>/dev/null || true
+        ufw disable 2>/dev/null || true
+        systemctl stop firewalld 2>/dev/null || true
+        systemctl disable firewalld 2>/dev/null || true
+        iptables -P INPUT ACCEPT 2>/dev/null || true
+        iptables -P FORWARD ACCEPT 2>/dev/null || true
+        iptables -P OUTPUT ACCEPT 2>/dev/null || true
+        iptables -F 2>/dev/null || true
+        ip6tables -P INPUT ACCEPT 2>/dev/null || true
+        ip6tables -P FORWARD ACCEPT 2>/dev/null || true
+        ip6tables -P OUTPUT ACCEPT 2>/dev/null || true
+        ip6tables -F 2>/dev/null || true
+        command -v nft >/dev/null 2>&1 && nft flush ruleset || true
+      }
+
+      DATA_IFACE=""
+      for _ in $(seq 1 120); do
+        for iface in ens5 eth1; do
+          if ip link show "$iface" >/dev/null 2>&1; then
+            DATA_IFACE="$iface"
+            break 2
+          fi
+        done
+        sleep 2
+      done
+
+      if [ -z "$DATA_IFACE" ]; then
+        echo "OCI endpoint data interface was not found" >>/var/log/oci-data-vnic.log
+        exit 0
+      fi
+
+      cat >/etc/netplan/99-oci-data-vnic.yaml <<NETPLAN_DATA_VNIC
+      network:
+        version: 2
+        ethernets:
+          $DATA_IFACE:
+            dhcp4: true
+            dhcp4-overrides:
+              route-metric: 200
+              use-dns: false
+            dhcp6: true
+            dhcp6-overrides:
+              route-metric: 200
+              use-dns: false
+            accept-ra: true
+      NETPLAN_DATA_VNIC
+      netplan generate >>/var/log/oci-data-vnic.log 2>&1
+      netplan apply >>/var/log/oci-data-vnic.log 2>&1
+      ip link set "$DATA_IFACE" mtu 1300 >>/var/log/oci-data-vnic.log 2>&1 || true
+      disable_endpoint_firewall
+      ip -br addr show "$DATA_IFACE" >>/var/log/oci-data-vnic.log 2>&1 || true
+      DATA_VNIC_SCRIPT
+      chmod +x /usr/local/sbin/configure-oci-data-vnic.sh
+      cat >/etc/systemd/system/configure-oci-data-vnic.service <<'DATA_VNIC_SERVICE'
+      [Unit]
+      Description=Configure OCI endpoint data VNIC
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/configure-oci-data-vnic.sh
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+      DATA_VNIC_SERVICE
+      systemctl daemon-reload
+      systemctl enable configure-oci-data-vnic.service
+      systemctl start configure-oci-data-vnic.service
 
       # Shell setup
       sudo cp /etc/skel/.bashrc /home/${var.admin_username}/
@@ -184,8 +277,8 @@ resource "oci_core_instance" "vm" {
   }
 
   freeform_tags = {
-    autostop    = "false"
-    autodelete  = "false"
+    autostop   = "false"
+    autodelete = "false"
   }
 }
 
@@ -209,8 +302,8 @@ resource "oci_core_vnic_attachment" "vm_data_vnic" {
 
 # Data source to get VNIC attachment for the instance
 data "oci_core_vnic_attachments" "vm_vnic_attachments" {
-  compartment_id      = var.compartment_id
-  instance_id         = oci_core_instance.vm.id
+  compartment_id = var.compartment_id
+  instance_id    = oci_core_instance.vm.id
 }
 
 # Data source to get management VNIC details for outputs
@@ -227,10 +320,22 @@ data "oci_core_vnic" "vm_data_vnic" {
 resource "oci_core_ipv6" "vm_ipv6" {
   count   = var.assign_ipv6_address && length(data.oci_core_vcn.mgmt_vcn.ipv6cidr_blocks) > 0 ? 1 : 0
   vnic_id = data.oci_core_vnic_attachments.vm_vnic_attachments.vnic_attachments[0].vnic_id
-  
+
   freeform_tags = {
     Environment = "test"
     Purpose     = "endpoint"
+    Prefix      = var.prefix
+  }
+}
+
+# IPv6 address for the data VNIC (if IPv6 is enabled on the data VCN)
+resource "oci_core_ipv6" "vm_data_ipv6" {
+  count   = var.assign_ipv6_address && length(data.oci_core_vcn.data_vcn.ipv6cidr_blocks) > 0 ? 1 : 0
+  vnic_id = oci_core_vnic_attachment.vm_data_vnic.vnic_id
+
+  freeform_tags = {
+    Environment = "test"
+    Purpose     = "endpoint-data"
     Prefix      = var.prefix
   }
 }
@@ -264,6 +369,11 @@ output "private_ipv4_address" {
 output "data_private_ipv4_address" {
   description = "Private IPv4 address of the data interface"
   value       = data.oci_core_vnic.vm_data_vnic.private_ip_address
+}
+
+output "data_private_ipv6_address" {
+  description = "Private IPv6 address of the data interface"
+  value       = var.assign_ipv6_address && length(data.oci_core_vcn.data_vcn.ipv6cidr_blocks) > 0 ? oci_core_ipv6.vm_data_ipv6[0].ip_address : null
 }
 
 output "hostname" {

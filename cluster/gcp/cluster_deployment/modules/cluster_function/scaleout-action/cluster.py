@@ -19,7 +19,7 @@ import re
 
 def is_joined_cluster(channel):
     node_state = "NOT_JOINED"
-    cmd = "show cluster info | grep NODE"
+    cmd = "show cluster info | include in state"
     try:
         msg = send_cmd_and_wait_for_execution(channel, cmd)
         match = re.search(r'This is .*state (\w+)', msg)
@@ -53,10 +53,10 @@ def is_full_cluster_formed(channel, min_nodes):
     except Exception as e:
         raise Exception("ERROR: Exception occured in checking cluster form status.", str(e))
         
-    control_data_cls = msg.count('in state CONTROL_NODE\r\n')
+    control_data_cls = msg.count('in state CONTROL_NODE\r\n') + msg.count('in state MASTER\r\n')
     data_nodes = 0
     if  control_data_cls:
-        data_nodes = msg.count('in state DATA_NODE\r\n')
+        data_nodes = msg.count('in state DATA_NODE\r\n') + msg.count('in state SLAVE\r\n')
         print("Available DATA nodes : "+ str(data_nodes))
 
     if ((min_nodes-1)  == data_nodes):
@@ -106,7 +106,7 @@ def get_control_node_unit(channel):
         raise Exception("ERROR: Exception occured in getting control node ", str(e))
         
     for line in msg.splitlines():
-        if ('CONTROL_NODE' in line):
+        if ('CONTROL_NODE' in line or 'MASTER' in line):
             if ((line.strip()).startswith('This')):
                 numbers=re.findall('[0-9]+', line)
                 return numbers[0]

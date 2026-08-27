@@ -84,8 +84,8 @@ outside_zone                 = "outside-sz"                                     
 # --------------------
 # Internal Load Balancer Configuration
 # --------------------
-ilb_frontend_protocol        = "TCP"                                                 # Load balancer protocol
-ilb_backend_protocol         = "TCP"                                                 # Backend protocol
+ilb_frontend_protocol        = "L3_DEFAULT"                                          # Load balancer protocol
+ilb_backend_protocol         = "UNSPECIFIED"                                         # Backend protocol
 
 # ILB Health Check
 ilb_health_check_port        = 8989                                                # ILB health-check balancer port, NAT required in FMC
@@ -98,8 +98,8 @@ ilb_unhealthy_threshold      = 3                                                
 # --------------------
 # External Load Balancer Configuration
 # --------------------
-elb_frontend_protocol        = "TCP"                                                 # Port name for ELB
-elb_backend_protocol         = "TCP"                                                 # Load balancer protocol
+elb_frontend_protocol        = "L3_DEFAULT"                                          # Port name for ELB
+elb_backend_protocol         = "UNSPECIFIED"                                         # Load balancer protocol
 elb_front_end_ports          = "all"                                                 # List of ELB frontend(listener) ports, e.g. "all" or [22, 80, 443] 
 
 # ELB Health Check
