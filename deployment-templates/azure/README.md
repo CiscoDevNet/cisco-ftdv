@@ -44,3 +44,7 @@ This project is licensed under the Apache License, Version 2.0 - see the [LICENS
 
 ## Copyright
 Copyright (c) 2026 Cisco Systems Inc and/or its affiliates.
+
+## Changelog
+### Unreleased
+- Updated ARM templates for all versions to use general-purpose v2 (`StorageV2`) storage accounts instead of legacy general-purpose v1 (`Storage`) accounts, ensuring compatibility with current Azure storage capabilities.
