@@ -62,14 +62,14 @@ variable "mgmt_nsg_ocid" {
       }
 }
 variable "instance_shape" {
-    default = "VM.Standard2.4"
-  description = "The shape of the instance to be created. The shape determines the number of CPUs, amount of memory, and other resources allocated to the instance. Supported shapes for FTDv are - 'VM.Standard2.4' and 'VM.Standard2.8'"
+  description = "The OCI compute shape used to deploy the FMCv instance. Product and release compatibility must be validated by the caller."
+  type        = string
+  default     = "VM.Standard2.4"
+
   validation {
-        condition = (
-          contains(["VM.Standard2.4", "VM.Standard2.8"], var.instance_shape)
-        )
-        error_message = "Please provide a valid instance shape."
-      }
+    condition     = can(regex("^(VM|BM)\\.[A-Za-z0-9]+(\\.[A-Za-z0-9]+)*$", var.instance_shape))
+    error_message = "Instance shape must start with 'VM.' or 'BM.' and follow OCI naming conventions."
+  }
 }
 variable "custom_image_ocid" {
   description = "OCID of the custom image to be used to create instance configuration if the marketplace image is not to be used."
@@ -84,9 +84,26 @@ variable "user_data" {
     type = string
 }
 
+# FMCv300 Flex shape configuration. Fixed shapes ignore these values.
+variable "ocpus" {
+  type        = number
+  default     = 16
+  description = "OCPUs allocated when instance_shape is a Flex shape."
+}
+
+variable "memory_in_gbs" {
+  type        = number
+  default     = 64
+  description = "Memory in GB allocated when instance_shape is a Flex shape."
+}
+
 provider "oci" {
   tenancy_ocid     = var.tenancy_ocid
   region           = var.region
+}
+
+locals {
+  is_flex_shape = can(regex("\\.Flex$", var.instance_shape))
 }
 
 resource "oci_core_instance" "test_instance" {
@@ -94,6 +111,14 @@ resource "oci_core_instance" "test_instance" {
     availability_domain = var.availability_domain
     compartment_id = var.compartment_id
     shape = var.instance_shape
+
+    dynamic "shape_config" {
+      for_each = local.is_flex_shape ? [1] : []
+      content {
+        ocpus         = var.ocpus
+        memory_in_gbs = var.memory_in_gbs
+      }
+    }
 
     create_vnic_details {
         #Optional
