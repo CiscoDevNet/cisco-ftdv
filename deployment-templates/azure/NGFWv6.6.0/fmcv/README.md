@@ -69,8 +69,17 @@ e.g. mgmt
 10. **mgmtSubnetIP**: The Management interface IP address.<br>
 e.g. 10.4.0.15
 
-11. **vmSize**: The VM size to use for the Firepower Management Center Virtual VM. Standard_D4_V2 & Standard_D4 are supported. <br>
-e.g. Standard_D4_V2
+11. **vmSize**: The VM size to use for the Firepower Management Center Virtual VM. The following VM sizes are supported:<br>
+  * Standard_D4_v2
+  * Standard_D8_v4
+  * Standard_D16_v4
+  * Standard_D8s_v4
+  * Standard_D16s_v4
+  * Standard_D8_v5
+  * Standard_D16_v5
+  * Standard_D8s_v5
+  * Standard_D16s_v5
+e.g. Standard_D8_v5
 
 
 ## References
