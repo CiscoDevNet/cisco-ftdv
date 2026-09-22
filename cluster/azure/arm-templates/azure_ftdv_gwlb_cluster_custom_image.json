@@ -560,6 +560,7 @@
         "name": "[variables('storageAccountName')]",
         "apiVersion": "2023-01-01",
         "location": "[resourceGroup().location]",
+        "kind": "StorageV2",
         "sku": {
             "name": "Standard_LRS"
         }
