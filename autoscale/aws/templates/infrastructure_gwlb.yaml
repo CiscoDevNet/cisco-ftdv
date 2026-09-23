@@ -437,14 +437,6 @@ Resources:
           Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'instance-sg' ] ]
         SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8305
-          ToPort: 8305
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
           CidrIp: !Ref VpcCidr
@@ -509,7 +501,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref VpcCidr
         SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 0
@@ -525,14 +517,6 @@ Resources:
           Value: !Join ['-', [!Ref PodName, !Ref PodNumber, 'FMC-sg' ] ]
         SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
           CidrIp: !Ref VpcCidr
@@ -540,7 +524,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
-          CidrIp: 0.0.0.0/0        
+          CidrIp: 0.0.0.0/0
 # -------------------------------------------
 # Public Subnet Route Table Association
   subnetrouteMgmt0:
@@ -683,6 +667,9 @@ Outputs:
   LambdaSecurityGroupId:
     Value: !Ref LambdaSecurityGroup
     Description: Security Group ID for Lambda Functions
+  FmcInstanceSGID:
+    Value: !Ref FMCSecurityGroup
+    Description: Security Group ID for FMC
   EIPforNATgw:
     Value: !Ref eipNat
     Description: EIP reserved for NAT GW

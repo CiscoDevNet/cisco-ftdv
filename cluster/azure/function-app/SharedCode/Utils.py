@@ -117,7 +117,7 @@ class FMC:
                     r.status_code = 2xx on success
         Raises:
         """
-        retryable_status_codes = [502, 503, 504]
+        retryable_status_codes = [500, 501, 502, 503, 504]
         r = None
         
         for attempt in range(max_retries + 1):

@@ -84,9 +84,19 @@
         "VmSize": {
             "type": "string",
             "defaultValue": "Standard_D4_v2",
-            "allowedValues": [ "Standard_D4_v2" , "Standard_D4" ],
+            "allowedValues": [
+                "Standard_D4_v2",
+                "Standard_D8_v4",
+                "Standard_D16_v4",
+                "Standard_D8s_v4",
+                "Standard_D16s_v4",
+                "Standard_D8_v5",
+                "Standard_D16_v5",
+                "Standard_D8s_v5",
+                "Standard_D16s_v5"
+            ],
             "metadata": {
-                "description": "CSF-MCv VM Size (Standard_D4_v2 or Standard_D4)"
+                "description": "CSF-MCv VM Size"
             }
         }
     },
@@ -210,7 +220,7 @@
                 "name": "Standard_LRS"
             },
             "location": "[resourceGroup().location]",
-            "kind": "Storage",
+            "kind": "StorageV2",
             "properties": {}
         },
         {

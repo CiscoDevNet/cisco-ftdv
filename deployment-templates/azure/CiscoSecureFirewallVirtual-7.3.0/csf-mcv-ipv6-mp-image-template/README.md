@@ -74,8 +74,18 @@ e.g. 10.4.0.15
 13. **mgmtSubnetIPv6**: CSF-MCv IPv6 on the mgmt interface (example: ace:cab:deca:dddd::6).<br>
 e.g. ace:cab:deca:dddd::c3
 
-14. **vmSize**: The VM size to use for the CSF-MCv. Standard_D4_V2 & Standard_D4 are supported. <br>
-e.g. Standard_D4_V2
+14. **vmSize**: The VM size to use for the CSF-MCv. The following VM sizes are supported:<br>
+  * Standard_D4_v2
+  * Standard_D8_v4
+  * Standard_D16_v4
+  * Standard_D8s_v4
+  * Standard_D16s_v4
+  * Standard_D8_v5
+  * Standard_D16_v5
+  * Standard_D8s_v5
+  * Standard_D16s_v5
+  * Standard_D32ds_v5
+e.g. Standard_D8_v5
 
 15. **location**: This shouldn't be changed and should always be set to the below value.<br>
 resourceGroup().location

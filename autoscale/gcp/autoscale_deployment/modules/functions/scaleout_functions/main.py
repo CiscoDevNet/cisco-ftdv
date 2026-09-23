@@ -175,6 +175,8 @@ def scale_out(event, context):
           return
 
      ftd_version = bf.showVersion(channel)
+     ftd_version_tuple = tuple(map(int, ftd_version.split('.')[:2]))
+     
      bf.configureManager(channel, fmc_ip, reg_id, nat_id)
     
      new_password = os.getenv('NEW_FTD_PASSWORD')
@@ -237,34 +239,14 @@ def scale_out(event, context):
      print("Sleeping for few minutes after FTD registration")
      time.sleep(150)
      
-     if (time.time() - start_time) <= timeout_time:
-          nic0 = "Ethernet0/0"
-          nic_id = fmc.get_nic_id_by_name(vm_name, nic0)
-          for i in range(20):
-               if nic_id == None:
-                    nic_id = fmc.get_nic_id_by_name(vm_name, nic0)
-                    print("Could not fetch NIC ID," +str(i)+". Sleeping for 5 seconds")
-                    time.sleep(5)
-               else:
-                    break
-     else:
-          print("Second Attempt "+str(info_dict))
-          return
-
-     if nic_id == None:
-          print("ERROR: Could not fetch NIC ID for FTDv:{}".format(vm_name))
-          print("Deleting Instance {}".format(instanceName))
-          api = discovery.build('compute', 'v1',cache_discovery=False)
-          response = api.instances().delete(project=project_id, zone=zone, instance=instanceName).execute()
-          return
      
      api = discovery.build('compute', 'v1',cache_discovery=False)
      host_object_name_gw_inside = os.getenv("INSIDE_GW_NAME")
      response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
-     subnetwork = response["networkInterfaces"][1]["subnetwork"].split("/")[-1]
-     print("Subnetwork is", subnetwork)
+     inside_subnetwork = response["networkInterfaces"][1]["subnetwork"].split("/")[-1]
+     print("Inside Subnetwork is", inside_subnetwork)
 
-     response = api.subnetworks().get(project=project_id, region=region, subnetwork=subnetwork).execute()
+     response = api.subnetworks().get(project=project_id, region=region, subnetwork=inside_subnetwork).execute()
      inside_gw = response["gatewayAddress"]
      print("Inside GW is", str(inside_gw))
 
@@ -274,10 +256,10 @@ def scale_out(event, context):
      
      host_object_name_gw_outside = os.getenv("OUTSIDE_GW_NAME")
      response = api.instances().get(project=project_id, zone=zone, instance=instanceName).execute()
-     subnetwork = response["networkInterfaces"][0]["subnetwork"].split("/")[-1]
-     print("Subnetwork is", subnetwork)
+     outside_subnetwork = response["networkInterfaces"][0]["subnetwork"].split("/")[-1]
+     print("Outside Subnetwork is", outside_subnetwork)
 
-     response = api.subnetworks().get(project=project_id, region=region, subnetwork=subnetwork).execute()
+     response = api.subnetworks().get(project=project_id, region=region, subnetwork=outside_subnetwork).execute()
      outside_gw = response["gatewayAddress"]
      print("Outside GW is", str(outside_gw))
 
@@ -285,18 +267,24 @@ def scale_out(event, context):
           fmc.add_host_object(name = host_object_name_gw_outside, ip = outside_gw)
           print("Created OUTSIDE_GW object in FMCv")
      
-     print("Configuring Interfaces")
-     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/0', "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
-     fmc.configure_nic_dhcp(vm_name, 'Ethernet0/1', "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
+     ethernet_version_tuple = (10, 0)
+     if ftd_version_tuple >= ethernet_version_tuple:
+          out_nic_name = 'Ethernet0/0'
+          in_nic_name = 'Ethernet0/1'
+     else:
+          out_nic_name = 'GigabitEthernet0/0'
+          in_nic_name = 'GigabitEthernet0/1'
+
+     print(f"Configuring Interfaces {in_nic_name} and {out_nic_name}")
+     fmc.configure_nic_dhcp(vm_name, out_nic_name, "outside", os.getenv("OUTSIDE_SEC_ZONE"), 1500)
+     fmc.configure_nic_dhcp(vm_name, in_nic_name, "inside", os.getenv("INSIDE_SEC_ZONE"), 1500)
      
      print("Adding Static Routes")
      fmc.create_static_network_route(vm_name, 'outside', 'any-ipv4', os.getenv("OUTSIDE_GW_NAME"), metric=1)
      fmc.create_static_network_route(vm_name, 'inside', 'any-ipv4', os.getenv("INSIDE_GW_NAME"), metric=2)
     
-     version_tuple = (7, 7)
-     ftd_version_tuple = tuple(map(int, ftd_version.split('.')[:2]))
-
-     if ftd_version_tuple >= version_tuple:  
+     loopback_version_tuple = (7, 7)
+     if ftd_version_tuple >= loopback_version_tuple:  
         """
         GCP HealthProbe Using Static Route Leaking - Supported from version 7.7
             1. Create objects in FMC
