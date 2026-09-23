@@ -75,8 +75,18 @@ e.g. mgmt
 11. **mgmtSubnetIP**: The Management interface IP address.<br>
 e.g. 10.4.0.15
 
-12. **vmSize**: The VM size to use for the CSF-MCv. Standard_D4_V2 & Standard_D4 are supported. <br>
-e.g. Standard_D4_V2
+12. **vmSize**: The VM size to use for the CSF-MCv. The following VM sizes are supported:<br>
+  * Standard_D4_v2
+  * Standard_D8_v4
+  * Standard_D16_v4
+  * Standard_D8s_v4
+  * Standard_D16s_v4
+  * Standard_D8_v5
+  * Standard_D16_v5
+  * Standard_D8s_v5
+  * Standard_D16s_v5
+  * Standard_D32ds_v5
+e.g. Standard_D8_v5
 
 13. **location**: This shouldn't be changed and should always be set to the below value.<br>
 resourceGroup().location
