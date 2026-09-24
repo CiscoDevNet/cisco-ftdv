@@ -151,7 +151,7 @@ e.g ace:cab:deca:4444::6
 
 33. **vmSize**: The VM size to use for the CSF-TDv VM. Standard_D8s_v3 is the default.<br>
 e.g. Standard_D8s_v3 <br>
-Supported Gen2 VM sizes for 10.0: <br>
+Supported Gen2 VM sizes for 10.1: <br>
   * Standard_D8s_v3
   * Standard_D16s_v3
   * Standard_F8s_v2
@@ -164,6 +164,22 @@ Supported Gen2 VM sizes for 10.0: <br>
   * Standard_D16_v5
   * Standard_D8s_v5
   * Standard_D16s_v5
+  * Standard_D8s_v6
+  * Standard_D16s_v6
+
+Network-optimized VM sizes in public preview (custom-image template only): <br>
+  * Standard_D4ns_v6
+  * Standard_D8ns_v6
+  * Standard_D16ns_v6
+  * Standard_D4nds_v6
+  * Standard_D8nds_v6
+  * Standard_D16nds_v6
+  * Standard_D4nls_v6
+  * Standard_D8nls_v6
+  * Standard_D16nls_v6
+  * Standard_D4nlds_v6
+  * Standard_D8nlds_v6
+  * Standard_D16nlds_v6
 
 34. **location**: This shouldn't be changed and should always be set to the below value.<br>
 resourceGroup().location
