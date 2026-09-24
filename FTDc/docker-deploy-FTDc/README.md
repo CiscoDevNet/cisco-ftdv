@@ -154,7 +154,7 @@ You can access the clish prompt
 
 ### Note: FTDc Persistence
 
-FFTDc has persistence enabled by default. The container state is stored in the following host directories:
+FTDc has persistence enabled by default. The container state is stored in the following host directories:
 - `ftdc_shared/lina-path` — maps to `/mnt/disk0/.private2` inside the container (lina private data, config, logs, upgrade markers, etc.)
 - `ftdc_shared/ngfw-path` — maps to `/ftd/app_data/Volume/root2` inside the container (NGFW application data)
 - `ftdc_shared/platform-logs` — maps to `/opt/cisco/platform/logs` inside the container (platform logs)
