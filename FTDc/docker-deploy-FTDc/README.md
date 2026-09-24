@@ -101,26 +101,30 @@ docker network create -d macvlan \
 1. Data networks are **not** needed in SR-IOV mode — only the management network created above is required.
 
 2. Edit `ftdc_shared/interface-config` for SR-IOV mode.
-a) vfio
-Set `iface_id` to the PCI ID of the desired VF and `uio_driver` to `vfio-pci`:
-```
-[interface0]
-  iface_id = 0b:0a.0;
-  uio_driver = vfio-pci;
-[interface1]
-  iface_id = 0b:0a.1;
-  uio_driver = vfio-pci;
-```
-b) mlx5
-Set `iface_id` to the PCI ID of the desired VF and `uio_driver` to `mlx5_core`:
-```
-[interface0]
-  iface_id = 61:02.0;
-  uio_driver = mlx5_core;
-[interface1]
-  iface_id = 61:04.0;
-  uio_driver = mlx5_core;
-```
+   
+   a) **vfio**
+   
+   Set `iface_id` to the PCI ID of the desired VF and `uio_driver` to `vfio-pci`:
+   ```
+   [interface0]
+     iface_id = 0b:0a.0;
+     uio_driver = vfio-pci;
+   [interface1]
+     iface_id = 0b:0a.1;
+     uio_driver = vfio-pci;
+   ```
+   
+   b) **mlx5**
+   
+   Set `iface_id` to the PCI ID of the desired VF and `uio_driver` to `mlx5_core`:
+   ```
+   [interface0]
+     iface_id = 61:02.0;
+     uio_driver = mlx5_core;
+   [interface1]
+     iface_id = 61:04.0;
+     uio_driver = mlx5_core;
+   ```
 Replace the PCI IDs with the actual VF PCI addresses assigned to your SR-IOV interfaces (use `lspci | grep Virtual` to identify them).
 
 3. Run this command with `--enable-sriov-cni` (no `--data-net` flags):
@@ -150,11 +154,41 @@ You can access the clish prompt
 
 ### Note: FTDc Persistence
 
-FTDc has persistence enabled by default. The container state is stored in `ftdc_shared/lina-path` and `ftdc_shared/ngfw-path` directories on the host. This means that after a `docker stop` and `docker rm`, new deployments will come up with the original state, preventing re-registration.
+FTDc has persistence enabled by default. The container state is stored in the following host directories:
+- `ftdc_shared/lina-path` — maps to `/mnt/disk0/.private2` inside the container (lina private data, config, logs, upgrade markers, etc.)
+- `ftdc_shared/ngfw-path` — maps to `/ftd/app_data/Volume/root2` inside the container (NGFW application data)
+- `ftdc_shared/platform-logs` — maps to `/opt/cisco/platform/logs` inside the container (platform logs)
+- `ftdc_shared/disk0-logs` — maps to `/mnt/disk0/log` inside the container (lina/ASA process logs)
+
+This means that after a `docker stop` and `docker rm`, new deployments will come up with the original state, preventing re-registration.
 
 To perform a fresh deployment, manually remove these directories before starting a new container:
 ```
-sudo rm -rf ftdc_shared/lina-path ftdc_shared/ngfw-path
+sudo rm -rf ftdc_shared/lina-path ftdc_shared/ngfw-path ftdc_shared/platform-logs ftdc_shared/disk0-logs
 ```
 
-**Important:** Deploying a different FTDc image version over existing `lina-path` and `ngfw-path` directories is not supported. A new version should always be a fresh deployment — remove these directories before deploying with a newer image.
+**Note:** For a clean deployment with no prior state, remove the persistent directories before deploying.
+
+### Note: FTDc Upgrade and Downgrade (Docker)
+
+FTDc supports manual upgrade and downgrade over existing persistent storage. The persistent directories (`lina-path`, `ngfw-path`, `platform-logs`, `disk0-logs`) are preserved across version changes.
+
+**To upgrade or downgrade:**
+
+1. Stop and remove the current container:
+```
+docker stop ftdc
+docker rm ftdc
+```
+
+2. Load the new FTDc image:
+```
+docker load < ftdc-<new-version>.tar
+```
+
+3. Re-deploy with the new version using the same deploy script:
+```
+./deploy_ftdc_docker_network.sh -v <new-version> ...
+```
+
+The existing persistent data in `ftdc_shared/lina-path`, `ftdc_shared/ngfw-path`, `ftdc_shared/platform-logs`, and `ftdc_shared/disk0-logs` will be reused, preserving configuration and state.

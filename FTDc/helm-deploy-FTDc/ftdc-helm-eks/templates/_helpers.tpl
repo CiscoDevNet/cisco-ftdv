@@ -1,6 +1,6 @@
 {{/*
 Calculate hugepages based on CPUs and interfaces
-Formula: (cpus * 128) + (numInterfaces * 64) Mi, rounded up to nearest 256Mi
+Formula: max(numInterfaces * cpus * 40, (cpus * 200) + (numInterfaces * 200)) Mi, rounded up to nearest 256Mi
 numInterfaces is auto-calculated from the networks list based on CNI type
 */}}
 {{- define "ftdc.hugepages" -}}
@@ -12,7 +12,11 @@ numInterfaces is auto-calculated from the networks list based on CNI type
 {{- else -}}
 {{- $numInterfaces = len .Values.worker_nodes.cni.macvlan.networks -}}
 {{- end -}}
-{{- $rawMi := add (mul $cpus 128) (mul $numInterfaces 64) -}}
+{{- $queuesMi := mul (mul $numInterfaces $cpus) 40 -}}
+{{- $coresMi := mul $cpus 200 -}}
+{{- $nicsMi := mul $numInterfaces 200 -}}
+{{- $minMi := add $coresMi $nicsMi -}}
+{{- $rawMi := max $queuesMi $minMi -}}
 {{- $rounded := mul (div (add $rawMi 255) 256) 256 -}}
 {{- printf "%dMi" $rounded -}}
 {{- else -}}
