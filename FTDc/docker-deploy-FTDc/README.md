@@ -190,9 +190,5 @@ docker load < ftdc-<new-version>.tar
 ```
 ./deploy_ftdc_docker_network.sh -v <new-version> ...
 ```
-or for host network mode:
-```
-./deploy_ftdc_host_network.sh -v <new-version> ...
-```
 
 The existing persistent data in `ftdc_shared/lina-path`, `ftdc_shared/ngfw-path`, `ftdc_shared/platform-logs`, and `ftdc_shared/disk0-logs` will be reused, preserving configuration and state.
