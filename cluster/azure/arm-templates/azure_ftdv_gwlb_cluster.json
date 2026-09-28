@@ -1,5 +1,5 @@
 {
-    "$schema": "http://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json",
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json",
     "contentVersion": "1.0.0.0",
     "parameters": {
         "resourceNamePrefix": {
@@ -575,6 +575,7 @@
         "name": "[variables('storageAccountName')]",
         "apiVersion": "2023-01-01",
         "location": "[resourceGroup().location]",
+        "kind": "StorageV2",
         "sku": {
             "name": "Standard_LRS"
         },
@@ -1075,6 +1076,9 @@
         "name": "[variables('vmssName')]",
         "location": "[resourceGroup().location]",
         "apiVersion": "2023-09-01",
+        "tags": {
+          "LegacyVMNVA": "true"
+        },
         "dependsOn": [
             "[concat('Microsoft.Network/loadBalancers/', variables('gwlbName'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
