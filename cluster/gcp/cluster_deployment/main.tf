@@ -130,9 +130,10 @@ variable "machine_type" {
         "n2-highmem-4", "n2-highmem-8", "n1-highmem-4",
         "n1-highmem-8", "n1-highmem-16",
         "n2d-standard-4", "n2d-standard-8", "n2d-standard-16",
+        "t2d-standard-4", "t2d-standard-8", "t2d-standard-16",
       "c2d-standard-4", "c2d-standard-8", "c2d-standard-16"]
     , var.machine_type)
-    error_message = "Invalid machine type. Must be one of the predefined types: c2-standard-4, c2-standard-8, c2-standard-16, n1-standard-4, n1-standard-8, n1-standard-16, n2-standard-4, n2-standard-8, n2-standard-16, n2-highmem-4, n2-highmem-8, n1-highmem-4, n1-highmem-8, n1-highmem-16, n2d-standard-4, n2d-standard-8, n2d-standard-16, c2d-standard-4, c2d-standard-8, c2d-standard-16."
+    error_message = "Invalid machine type. Must be one of the predefined types: c2-standard-4, c2-standard-8, c2-standard-16, n1-standard-4, n1-standard-8, n1-standard-16, n2-standard-4, n2-standard-8, n2-standard-16, n2-highmem-4, n2-highmem-8, n1-highmem-4, n1-highmem-8, n1-highmem-16, n2d-standard-4, n2d-standard-8, n2d-standard-16, t2d-standard-4, t2d-standard-8, t2d-standard-16, c2d-standard-4, c2d-standard-8, c2d-standard-16."
   }
 }
 

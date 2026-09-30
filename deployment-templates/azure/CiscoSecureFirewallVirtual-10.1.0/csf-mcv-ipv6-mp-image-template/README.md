@@ -85,6 +85,7 @@ Supported sizes for version 7.0 and above:<br>
   * Standard_D16_v5
   * Standard_D8s_v5
   * Standard_D16s_v5
+  * Standard_F16s_v2
 
 e.g. Standard_D8_v5
 
