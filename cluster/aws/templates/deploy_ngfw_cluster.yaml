@@ -266,6 +266,8 @@ Parameters:
       - c6in.xlarge
       - c6in.2xlarge
       - c6in.4xlarge
+      - c6in.8xlarge
+      - c6in.16xlarge
       - c6id.xlarge
       - c6id.2xlarge
       - c6id.4xlarge
