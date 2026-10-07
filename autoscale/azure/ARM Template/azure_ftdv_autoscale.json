@@ -895,6 +895,9 @@
         "name": "[variables('vmssName')]",
         "location": "[resourceGroup().location]",
         "apiVersion": "2017-12-01",
+        "tags": {
+          "LegacyVMNVA": "true"
+        },
         "dependsOn": [
             "[concat('Microsoft.Network/loadBalancers/', variables('elbName'))]",
             "[concat('Microsoft.Network/loadBalancers/', variables('ilbName'))]",
