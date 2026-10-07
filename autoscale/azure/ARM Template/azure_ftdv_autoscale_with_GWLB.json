@@ -88,7 +88,9 @@
             "Standard_D3",
             "Standard_D3_v2",
             "Standard_D4_v2",
-            "Standard_D5_v2"
+            "Standard_D5_v2",
+            "Standard_D8s_v6",
+            "Standard_D16s_v6"
         ],
         "metadata" : {
             "description" : "Size of the Virtual Machine"

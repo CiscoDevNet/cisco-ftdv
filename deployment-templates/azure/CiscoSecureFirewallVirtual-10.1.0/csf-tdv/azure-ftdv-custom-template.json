@@ -138,7 +138,9 @@
             "Standard_D8_v5",
             "Standard_D16_v5",
             "Standard_D8s_v5",
-            "Standard_D16s_v5"
+            "Standard_D16s_v5",
+            "Standard_D8s_v6",
+            "Standard_D16s_v6"
          ],
          "metadata": {
             "description": "CSF-TDv VM Size."
@@ -416,7 +418,7 @@
             "name": "Standard_LRS"
          },
          "location": "[parameters('location')]",
-         "kind": "Storage",
+         "kind": "StorageV2",
          "properties": {}
       },
       {

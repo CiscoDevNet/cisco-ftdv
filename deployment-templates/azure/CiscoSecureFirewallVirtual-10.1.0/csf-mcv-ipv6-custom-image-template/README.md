@@ -83,6 +83,7 @@ e.g. ace:cab:deca:dddd::c3
 
 14. **vmSize**: The VM size to use for the CSF-MCv. Standard_D8_v5 is the default.<br>
 Supported Gen2 VM sizes for version 10.0:<br>
+  * Standard_D4_v2
   * Standard_DS3_v2
   * Standard_DS4_v2
   * Standard_DS5_v2

@@ -203,6 +203,7 @@ spec:
           fi
 
 ---
+{{- $isHA := eq (.Values.ftdc.enable_ha | default "false") "true" }}
 # Cleanup job to delete persistent volume content on worker nodes
 apiVersion: batch/v1
 kind: Job
@@ -233,30 +234,28 @@ spec:
           
           LINA_PATH="{{ .Values.worker_nodes.persistence.lina.hostPath }}"
           NGFW_PATH="{{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}"
-          
+          PLATFORM_LOGS_PATH="{{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}"
+          DISK0_LOGS_PATH="{{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}"
+
           echo "=========================================="
           echo "Cleaning up persistent storage"
           echo "=========================================="
           
-          # Cleanup lina and ngfw paths
-          echo "Target path: $LINA_PATH and $NGFW_PATH"
-          if [ -d "$LINA_PATH" ] || [ -d "$NGFW_PATH" ]; then
-            echo "Directory exists. Listing contents before cleanup:"
-            ls -la "$LINA_PATH" || echo "Unable to list directory"
-            ls -la "$NGFW_PATH" || echo "Unable to list directory"
-            
-            echo "Deleting all contents in $LINA_PATH..."
-            rm -rf "$LINA_PATH"/* "$LINA_PATH"/.[!.]* "$LINA_PATH"/..?* 2>/dev/null || true
-            echo "Deleting all contents in $NGFW_PATH..."
-            rm -rf "$NGFW_PATH"/* "$NGFW_PATH"/.[!.]* "$NGFW_PATH"/..?* 2>/dev/null || true
-            
-            echo "Cleanup completed. Verifying:"
-            ls -la "$LINA_PATH" || echo "Directory is now empty or doesn't exist"
-            ls -la "$NGFW_PATH" || echo "Directory is now empty or doesn't exist"
-            echo "SUCCESS: Persistent storage cleaned at $LINA_PATH and $NGFW_PATH"
-          else
-            echo "Directory $LINA_PATH or $NGFW_PATH does not exist. Nothing to clean."
-          fi
+          # Cleanup lina, ngfw, platform-logs, and disk0-logs paths
+          for TARGET_PATH in "$LINA_PATH" "$NGFW_PATH" "$PLATFORM_LOGS_PATH" "$DISK0_LOGS_PATH"; do
+            echo "Target path: $TARGET_PATH"
+            if [ -d "$TARGET_PATH" ]; then
+              echo "Directory exists. Listing contents before cleanup:"
+              ls -la "$TARGET_PATH" || echo "Unable to list directory"
+              echo "Deleting all contents in $TARGET_PATH..."
+              rm -rf "$TARGET_PATH"/* "$TARGET_PATH"/.[!.]* "$TARGET_PATH"/..?* 2>/dev/null || true
+              echo "Cleanup completed. Verifying:"
+              ls -la "$TARGET_PATH" || echo "Directory is now empty or doesn't exist"
+              echo "SUCCESS: Persistent storage cleaned at $TARGET_PATH"
+            else
+              echo "Directory $TARGET_PATH does not exist. Nothing to clean."
+            fi
+          done
           
           exit 0
         volumeMounts:
@@ -264,6 +263,10 @@ spec:
           mountPath: {{ .Values.worker_nodes.persistence.lina.hostPath }}
         - name: ngfw-path
           mountPath: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
+        - name: platform-logs-path
+          mountPath: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+        - name: disk0-logs-path
+          mountPath: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
       volumes:
       - name: lina-path
         hostPath:
@@ -273,4 +276,96 @@ spec:
         hostPath:
           path: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
           type: DirectoryOrCreate
+      - name: platform-logs-path
+        hostPath:
+          path: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+      - name: disk0-logs-path
+        hostPath:
+          path: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+
+{{- if $isHA }}
+---
+# Cleanup job for secondary worker node (HA mode)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cleanup-persistent-storage-secondary
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: {{ dig "name" "" .Values.worker_node2 }}
+      containers:
+      - name: cleanup-storage
+        image: busybox:latest
+        securityContext:
+          privileged: true
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          LINA_PATH="{{ .Values.worker_nodes.persistence.lina.hostPath }}"
+          NGFW_PATH="{{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}"
+          PLATFORM_LOGS_PATH="{{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}"
+          DISK0_LOGS_PATH="{{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}"
+          
+          echo "=========================================="
+          echo "Cleaning up persistent storage (Secondary)"
+          echo "=========================================="
+          
+          # Cleanup lina, ngfw, platform-logs, and disk0-logs paths
+          for TARGET_PATH in "$LINA_PATH" "$NGFW_PATH" "$PLATFORM_LOGS_PATH" "$DISK0_LOGS_PATH"; do
+            echo "Target path: $TARGET_PATH"
+            if [ -d "$TARGET_PATH" ]; then
+              echo "Directory exists. Listing contents before cleanup:"
+              ls -la "$TARGET_PATH" || echo "Unable to list directory"
+              echo "Deleting all contents in $TARGET_PATH..."
+              rm -rf "$TARGET_PATH"/* "$TARGET_PATH"/.[!.]* "$TARGET_PATH"/..?* 2>/dev/null || true
+              echo "Cleanup completed. Verifying:"
+              ls -la "$TARGET_PATH" || echo "Directory is now empty or doesn't exist"
+              echo "SUCCESS: Persistent storage cleaned at $TARGET_PATH"
+            else
+              echo "Directory $TARGET_PATH does not exist. Nothing to clean."
+            fi
+          done
+          
+          exit 0
+        volumeMounts:
+        - name: lina-path
+          mountPath: {{ .Values.worker_nodes.persistence.lina.hostPath }}
+        - name: ngfw-path
+          mountPath: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
+        - name: platform-logs-path
+          mountPath: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+        - name: disk0-logs-path
+          mountPath: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
+      volumes:
+      - name: lina-path
+        hostPath:
+          path: {{ .Values.worker_nodes.persistence.lina.hostPath }}
+          type: DirectoryOrCreate
+      - name: ngfw-path
+        hostPath:
+          path: {{ dig "persistence" "ngfw" "hostPath" "/home/ubuntu/ngfw-path" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+      - name: platform-logs-path
+        hostPath:
+          path: {{ dig "persistence" "platform_logs" "hostPath" "/home/ubuntu/platform-logs" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+      - name: disk0-logs-path
+        hostPath:
+          path: {{ dig "persistence" "disk0_logs" "hostPath" "/home/ubuntu/disk0-logs" .Values.worker_nodes }}
+          type: DirectoryOrCreate
+{{- end }}
 

@@ -70,6 +70,76 @@ spec:
 
 ---
 
+{{- if (dig "persistence" "platform_logs" "enabled" false .Values.worker_nodes) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: platform-logs-pv
+spec:
+  capacity:
+    storage: {{ .Values.worker_nodes.persistence.platform_logs.size }}
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.platform_logs.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.worker_nodes.persistence.platform_logs.storageClass }}
+  hostPath:
+    path: {{ .Values.worker_nodes.persistence.platform_logs.hostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "platform_logs" "enabled" false .Values.worker_nodes) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: platform-logs-pvc
+spec:
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.platform_logs.accessMode }}
+  storageClassName: {{ .Values.worker_nodes.persistence.platform_logs.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.worker_nodes.persistence.platform_logs.size }}
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: disk0-logs-pv
+spec:
+  capacity:
+    storage: {{ .Values.worker_nodes.persistence.disk0_logs.size }}
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.disk0_logs.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.worker_nodes.persistence.disk0_logs.storageClass }}
+  hostPath:
+    path: {{ .Values.worker_nodes.persistence.disk0_logs.hostPath }}
+    type: DirectoryOrCreate
+{{- end }}
+
+---
+
+{{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: disk0-logs-pvc
+spec:
+  accessModes:
+  - {{ .Values.worker_nodes.persistence.disk0_logs.accessMode }}
+  storageClassName: {{ .Values.worker_nodes.persistence.disk0_logs.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.worker_nodes.persistence.disk0_logs.size }}
+{{- end }}
+
+---
+
 {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
 apiVersion: v1
 kind: PersistentVolume
@@ -171,13 +241,23 @@ spec:
           path: /dev/vfio
           type: Directory
       {{- end }}
-      - name: persistent-storage
+      - name: lina-storage
         persistentVolumeClaim:
           claimName: lina-pvc
       {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
       - name: ngfw-storage
         persistentVolumeClaim:
           claimName: ngfw-pvc
+      {{- end }}
+      {{- if (dig "persistence" "platform_logs" "enabled" false .Values.worker_nodes) }}
+      - name: platform-logs-storage
+        persistentVolumeClaim:
+          claimName: platform-logs-pvc
+      {{- end }}
+      {{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+      - name: disk0-logs-storage
+        persistentVolumeClaim:
+          claimName: disk0-logs-pvc
       {{- end }}
       containers:
       - name: ftdc
@@ -237,11 +317,19 @@ spec:
           - name: day0
             mountPath: /mnt/disk0/day0.json
             subPath: day0.json
-          - name: persistent-storage
-            mountPath: /mnt/disk0/.private
+          - name: lina-storage
+            mountPath: /mnt/disk0/.private2
           {{- if (dig "persistence" "ngfw" "enabled" false .Values.worker_nodes) }}
           - name: ngfw-storage
             mountPath: /ftd/app_data/Volume/root2
+          {{- end }}
+          {{- if (dig "persistence" "platform_logs" "enabled" false .Values.worker_nodes) }}
+          - name: platform-logs-storage
+            mountPath: /opt/cisco/platform/logs
+          {{- end }}
+          {{- if (dig "persistence" "disk0_logs" "enabled" false .Values.worker_nodes) }}
+          - name: disk0-logs-storage
+            mountPath: /mnt/disk0/log
           {{- end }}
           {{- if eq .Values.worker_nodes.cni.type "sriov" }}
           - name: pci-bus

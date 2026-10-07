@@ -115,6 +115,7 @@ Resources:
 
   FMCvEIPAssociation:
     Type: AWS::EC2::EIPAssociation
+    DependsOn: FMCv
     Properties:
       AllocationId: !GetAtt FMCvEIP.AllocationId
       NetworkInterfaceId: !Ref FMCvNetworkInterface

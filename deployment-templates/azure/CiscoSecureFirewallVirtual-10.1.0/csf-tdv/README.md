@@ -106,7 +106,7 @@ e.g. 10.8.3.55
 
 18. **vmSize**: The VM size to use for the CSF-TDv VM. Standard_D8s_v3 is the default.<br>
 e.g. Standard_D8s_v3 <br>
-Supported Gen2 VM sizes for 10.0: <br>
+Supported Gen2 VM sizes for 10.1: <br>
   * Standard_D8s_v3
   * Standard_D16s_v3
   * Standard_F8s_v2
@@ -119,6 +119,8 @@ Supported Gen2 VM sizes for 10.0: <br>
   * Standard_D16_v5
   * Standard_D8s_v5
   * Standard_D16s_v5
+  * Standard_D8s_v6
+  * Standard_D16s_v6
 
 19. **location**: This shouldn't be changed and should always be set to the below value.<br>
 resourceGroup().location

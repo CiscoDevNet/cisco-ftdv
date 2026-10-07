@@ -269,6 +269,7 @@ resource "oci_core_vnic_attachment" "test_vnic_attachment_in" {
     instance_id = oci_core_instance.test_instance.id
     #Optional
     display_name = "inside"
+    depends_on = [oci_core_vnic_attachment.test_vnic_attachment_diag]
 }
 
 resource "oci_core_vnic_attachment" "test_vnic_attachment_out" {

@@ -84,9 +84,76 @@ FTDc/
 ### Worker Node Requirements
 
 - Sufficient CPU and memory (default: 4 CPUs, 8GB RAM per FTDc pod)
-- Hugepages configured: `echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages`
 - For Macvlan: Host interfaces available with MTU 9000
 - For SR-IOV: SR-IOV Network Operator installed and VFs configured
+
+#### Hugepages Requirements
+
+FTDc requires 2Mi hugepages for its data plane (DPDK). The amount of hugepages each pod
+reserves scales with the number of **data NICs** attached to the pod and the number of
+**CPU cores** assigned to it.
+
+The Helm chart computes the per-pod hugepages request automatically as the larger of the
+following two terms, rounded up to the nearest 256Mi:
+
+- a **DPDK queue term**, scaling with the number of data NICs and CPU cores
+- a **minimum baseline**, determined by the number of CPU cores and data NICs
+
+```
+queues_Mi   = numInterfaces * cpus * 40
+baseline_Mi = (cpus * 200) + (numInterfaces * 200)
+hugepages_Mi = roundUp256( max( queues_Mi, baseline_Mi ) )
+```
+
+Where `numInterfaces` is the length of the configured data networks list —
+`worker_nodes.cni.macvlan.networks` or `worker_nodes.cni.sriov.networks`, selected by
+`worker_nodes.cni.type` (`macvlan` or `sriov`) — and `cpus` is `ftdc.cpus` in `values.yaml`.
+The `baseline_Mi` term (200Mi per CPU core plus 200Mi per data NIC) acts as the minimum,
+so the queue term only dominates at high NIC-to-core ratios. The final value is rounded up
+to the nearest 256Mi. See [`templates/_helpers.tpl`](helm-deploy-FTDc/ftdc-helm/templates/_helpers.tpl)
+for the exact logic.
+
+Examples (per pod):
+
+| CPUs | Data NICs | queues_Mi | baseline_Mi | Raw max (Mi) | Reserved (Mi) | 2Mi pages |
+|------|-----------|-----------|-------------|--------------|---------------|-----------|
+| 4    | 4         | 640       | 1600        | 1600         | 1792          | 896       |
+| 4    | 6         | 960       | 2000        | 2000         | 2048          | 1024      |
+| 8    | 4         | 1280      | 2400        | 2400         | 2560          | 1280      |
+| 16   | 8         | 5120      | 4800        | 5120         | 5120          | 2560      |
+| 16   | 9         | 5760      | 5000        | 5760         | 5888          | 2944      |
+
+**Hugepages must be allocated on each worker node before scheduling FTDc pods.**
+Kubernetes only exposes hugepages it finds already reserved by the kernel; it will not
+allocate them on demand. If a node has insufficient `hugepages-2Mi` capacity, the pod
+will stay `Pending` with an `Insufficient hugepages-2Mi` scheduling error.
+
+
+Reserve at runtime (lost on reboot):
+
+```bash
+# Example: 1024 pages = 2048Mi, enough for 2 pods at 4 CPUs / 6 NICs
+echo 1024 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+```
+
+Reserve persistently via `/etc/sysctl.conf`:
+
+```
+vm.nr_hugepages = 1024
+```
+
+Then reboot the worker node so the kernel reserves the pages early in boot (large
+contiguous allocations are unreliable on a long-running system):
+
+```bash
+sudo reboot
+```
+
+After the node comes back up, verify the capacity is advertised to the scheduler:
+
+```bash
+kubectl describe node <worker> | grep hugepages-2Mi
+```
 
 ### FMC Requirements
 
@@ -101,7 +168,7 @@ FTDc/
 
 ### Components
 
-- **FTDc Pod**: A single containerized firewall pod with data plane interfaces via Macvlan or SR-IOV. Only one FTDc pod per deployment is supported.
+- **FTDc Pod**: A containerized firewall pod with data plane interfaces via Macvlan or SR-IOV. Supports standalone (single pod) and HA (primary + secondary pods on separate worker nodes) deployments.
 - **FMC**: Centralized management for policies, monitoring, and reporting.
 
 ### Lifecycle Flow
