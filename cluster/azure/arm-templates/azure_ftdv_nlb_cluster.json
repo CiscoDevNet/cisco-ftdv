@@ -1,5 +1,5 @@
 {
-   "$schema":"http://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json",
+   "$schema":"https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json",
    "contentVersion":"1.0.0.0",
    "parameters":{
       "resourceNamePrefix":{
@@ -1132,6 +1132,9 @@
          "apiVersion":"2023-09-01",
          "name":"[variables('vmssName')]",
          "location":"[resourceGroup().location]",
+         "tags":{
+            "LegacyVMNVA":"true"
+         },
          "dependsOn":[
             "[concat('Microsoft.Network/loadBalancers/', variables('elbName'))]",
             "[concat('Microsoft.Network/loadBalancers/', variables('ilbName'))]",

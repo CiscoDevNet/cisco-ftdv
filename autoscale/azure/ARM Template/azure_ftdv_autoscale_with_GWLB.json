@@ -891,6 +891,9 @@
         "name": "[variables('vmssName')]",
         "location": "[resourceGroup().location]",
         "apiVersion": "2021-11-01",
+        "tags": {
+          "LegacyVMNVA": "true"
+        },
         "dependsOn": [
             "[concat('Microsoft.Network/loadBalancers/', variables('gwlbName'))]",
             "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
