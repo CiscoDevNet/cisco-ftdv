@@ -94,7 +94,8 @@
                 "Standard_D16_v5",
                 "Standard_D8s_v5",
                 "Standard_D16s_v5",
-                "Standard_F16s_v2"
+                "Standard_F16s_v2",
+                "Standard_D32ds_v5"
             ],
             "metadata": {
                 "description": "CSF-MCv VM Size"

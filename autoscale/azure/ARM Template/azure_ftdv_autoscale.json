@@ -118,7 +118,19 @@
             "Standard_D4_v2",
             "Standard_D5_v2",
             "Standard_D8s_v6",
-            "Standard_D16s_v6"
+            "Standard_D16s_v6",
+            "Standard_D4ns_v6",
+            "Standard_D8ns_v6",
+            "Standard_D16ns_v6",
+            "Standard_D4nds_v6",
+            "Standard_D8nds_v6",
+            "Standard_D16nds_v6",
+            "Standard_D4nls_v6",
+            "Standard_D8nls_v6",
+            "Standard_D16nls_v6",
+            "Standard_D4nlds_v6",
+            "Standard_D8nlds_v6",
+            "Standard_D16nlds_v6"
         ],
         "metadata" : {
             "description" : "Size of the Virtual Machine"
