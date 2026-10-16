@@ -1,0 +1,156 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceNamePrefix": {
+      "value": "ftdv"
+    },
+    "virtualNetworkRg": {
+      "value": "cisco-virtualnet-rg"
+    },
+    "virtualNetworkName": {
+      "value": "cisco-virtualnet"
+    },
+    "virtualNetworkCidr": {
+      "value": "192.168.0.0/16"
+    },
+    "subnet1": {
+      "value": "cisco-mgmt-subnet"
+    },
+    "subnet2": {
+      "value": "cisco-outside-subnet"
+    },
+    "subnet3": {
+      "value": "cisco-inside-subnet"
+    },
+    "subnet4": {
+      "value": ""
+    },
+    "subnet5": {
+      "value": ""
+    },
+    "subnet6": {
+      "value": ""
+    },
+    "subnet7": {
+      "value": ""
+    },
+    "subnet8": {
+      "value": ""
+    },
+    "subnet9": {
+      "value": ""
+    },
+    "subnet10": {
+      "value": ""
+    },
+    "numberOfInterfaces": {
+      "value": 3
+    },
+    "diagnostic": {
+      "value": "OFF"
+    },
+    "gatewayLoadBalancerIP": {
+      "value": "192.168.3.100"
+    },
+    "outsideNetworkGatewayIp": {
+      "value": "192.168.3.1"
+    },
+    "outsideZoneName": {
+      "value": "outside"
+    },
+    "functionHostingPlan": {
+      "value": "premium"
+    },
+    "functionAppSubnet": {
+      "value": "function-app-subnet"
+    },
+    "functionAppSubnetCIDR": {
+      "value": "192.168.6.0/24"
+    },
+    "imageId": {
+      "value": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Compute/galleries/<gallery-name>/images/<image-name>/versions/<version>"
+    },
+    "bootMode": {
+      "value": "uefi_secure"
+    },
+    "vmSize": {
+      "value": "Standard_D8s_v5"
+    },
+    "ftdVmManagementUserName": {
+      "value": "cisco"
+    },
+    "ftdVmManagementUserPassword": {
+      "value": ""
+    },
+    "fmcIpAddress": {
+      "value": "1.2.3.4"
+    },
+    "registrationUsingPublicFMCIP": {
+      "value": "NO"
+    },
+    "fmcUserName": {
+      "value": "fmcUser"
+    },
+    "fmcPassword": {
+      "value": ""
+    },
+    "policyName": {
+      "value": "myPolicy"
+    },
+    "deviceGroupName": {
+      "value": "AutoScaleGroup"
+    },
+    "licenseCapability": {
+      "value": "BASE, MALWARE, URLFilter, THREAT"
+    },
+    "performanceTier": {
+      "value": "FTDv30"
+    },
+    "scalingMetricsList": {
+      "value": "CPU"
+    },
+    "cpuScaleInThreshold": {
+      "value": "10"
+    },
+    "cpuScaleOutThreshold": {
+      "value": "80"
+    },
+    "memoryScaleInThreshold": {
+      "value": "0"
+    },
+    "memoryScaleOutThreshold": {
+      "value": "0"
+    },
+    "minFtdCount": {
+      "value": 1
+    },
+    "maxFtdCount": {
+      "value": 5
+    },
+    "metricsAverageDuration": {
+      "value": "1"
+    },
+    "initDeploymentMode": {
+      "value": "BULK"
+    },
+    "scalingPolicy": {
+      "value": "POLICY-1"
+    },
+    "healthCheckPortNumber": {
+      "value": "7777"
+    },
+    "AutoDeleteUnhealthyVm": {
+      "value": "YES"
+    },
+    "logicAppState": {
+      "value": "Disabled"
+    },
+    "functionAppScmBasicPublishingEnabled": {
+      "value": "true"
+    },
+    "functionAppFtpBasicPublishingEnabled": {
+      "value": "false"
+    }
+  }
+}
