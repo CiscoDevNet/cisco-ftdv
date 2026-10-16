@@ -153,6 +153,14 @@ Parameters:
       - c5.xlarge
       - c5.2xlarge
       - c5.4xlarge
+      - c6i.xlarge
+      - c6i.2xlarge
+      - c6i.4xlarge
+      - c6in.xlarge
+      - c6in.2xlarge
+      - c6in.4xlarge
+      - c6in.8xlarge
+      - c6in.16xlarge
     Default: c4.xlarge
   LicenseType:
     Description: >-

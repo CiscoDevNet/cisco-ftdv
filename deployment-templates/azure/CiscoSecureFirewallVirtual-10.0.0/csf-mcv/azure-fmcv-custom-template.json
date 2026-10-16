@@ -93,7 +93,8 @@
                 "Standard_D8_v5",
                 "Standard_D16_v5",
                 "Standard_D8s_v5",
-                "Standard_D16s_v5"
+                "Standard_D16s_v5",
+                "Standard_D32ds_v5"
             ],
             "metadata": {
                 "description": "CSF-MCv VM Size"
@@ -263,7 +264,7 @@
                 "name": "Standard_LRS"
             },
             "location": "[parameters('location')]",
-            "kind": "Storage",
+            "kind": "StorageV2",
             "properties": {}
         },
         {

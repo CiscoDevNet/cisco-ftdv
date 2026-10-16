@@ -332,20 +332,20 @@ variable "assign_public_ip_to_mgmt" {
 }
 
 variable "ilb_frontend_protocol" {
-  description = "Frontend protocol for the internal LB (Allowed Values: TCP, UDP)."
+  description = "Frontend protocol for the internal LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = var.ilb_frontend_protocol == "TCP" || var.ilb_frontend_protocol == "UDP"
-    error_message = "Frontend protocol for the internal LB must be either 'TCP' or 'UDP'."
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.ilb_frontend_protocol)
+    error_message = "Frontend protocol for the internal LB must be TCP, UDP, or L3_DEFAULT."
   }
 }
 
 variable "ilb_backend_protocol" {
-  description = "Frontend protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+  description = "Backend protocol for the internal LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = var.ilb_backend_protocol == "TCP" || var.ilb_backend_protocol == "UDP" || var.ilb_backend_protocol == "UNSPECIFIED"
-    error_message = "Please provide a valid LB protocol."
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.ilb_backend_protocol)
+    error_message = "Please provide a valid ILB backend protocol (TCP, UDP, or UNSPECIFIED)."
   }
 }
 
@@ -398,20 +398,40 @@ variable "elb_health_check_port" {
 }
 
 variable "elb_frontend_protocol" {
-  description = "Frontend protocol for the external LB (Allowed Values: TCP, UDP)."
+  description = "Frontend protocol for the external LB (Allowed Values: TCP, UDP, L3_DEFAULT)."
   type        = string
   validation {
-    condition     = var.elb_frontend_protocol == "TCP" || var.elb_frontend_protocol == "UDP"
-    error_message = "Please provide a valid LB protocol."
+    condition     = contains(["TCP", "UDP", "L3_DEFAULT"], var.elb_frontend_protocol)
+    error_message = "Please provide a valid ELB frontend protocol (TCP, UDP, or L3_DEFAULT)."
   }
 }
 
 variable "elb_backend_protocol" {
-  description = "Frontend protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
+  description = "Backend protocol for the external LB (Allowed Values: TCP, UDP, UNSPECIFIED)."
   type        = string
   validation {
-    condition     = var.elb_backend_protocol == "TCP" || var.elb_backend_protocol == "UDP" || var.elb_backend_protocol == "UNSPECIFIED"
-    error_message = "Please provide a valid LB protocol."
+    condition     = contains(["TCP", "UDP", "UNSPECIFIED"], var.elb_backend_protocol)
+    error_message = "Please provide a valid ELB backend protocol (TCP, UDP, or UNSPECIFIED)."
+  }
+}
+
+check "ilb_protocol_pair" {
+  assert {
+    condition = (
+      (var.ilb_frontend_protocol == "L3_DEFAULT" && var.ilb_backend_protocol == "UNSPECIFIED") ||
+      (var.ilb_frontend_protocol != "L3_DEFAULT" && var.ilb_backend_protocol != "UNSPECIFIED")
+    )
+    error_message = "When ILB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
+  }
+}
+
+check "elb_protocol_pair" {
+  assert {
+    condition = (
+      (var.elb_frontend_protocol == "L3_DEFAULT" && var.elb_backend_protocol == "UNSPECIFIED") ||
+      (var.elb_frontend_protocol != "L3_DEFAULT" && var.elb_backend_protocol != "UNSPECIFIED")
+    )
+    error_message = "When ELB frontend protocol is L3_DEFAULT, backend protocol must be UNSPECIFIED, and vice versa."
   }
 }
 

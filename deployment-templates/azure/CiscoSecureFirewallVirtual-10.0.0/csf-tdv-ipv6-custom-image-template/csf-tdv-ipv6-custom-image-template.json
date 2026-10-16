@@ -803,7 +803,7 @@
             "name": "Standard_LRS"
          },
          "location": "[parameters('location')]",
-         "kind": "Storage",
+         "kind": "StorageV2",
          "properties": {}
       },
       {
