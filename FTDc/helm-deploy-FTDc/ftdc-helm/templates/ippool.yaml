@@ -22,6 +22,10 @@ metadata:
 spec:
   addresses:
   - {{ .Values.worker_node1.ip }}-{{ .Values.worker_node1.ip }}
+  {{- $ip2 := dig "ip" "" .Values.worker_node2 }}
+  {{- if $ip2 }}
+  - {{ $ip2 }}-{{ $ip2 }}
+  {{- end }}
   autoAssign: true
 ---
 apiVersion: metallb.io/v1beta1
@@ -34,4 +38,8 @@ spec:
   - ftdc-pool
   interfaces:
   - {{ .Values.worker_node1.iface_name }}
+  {{- $iface2 := dig "iface_name" "" .Values.worker_node2 }}
+  {{- if $iface2 }}
+  - {{ $iface2 }}
+  {{- end }}
 

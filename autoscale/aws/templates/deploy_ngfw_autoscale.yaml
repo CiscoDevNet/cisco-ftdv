@@ -161,6 +161,48 @@ Parameters:
       - c6in.4xlarge
       - c6in.8xlarge
       - c6in.16xlarge
+      - c6id.xlarge
+      - c6id.2xlarge
+      - c6id.4xlarge
+      - c7i.xlarge
+      - c7i.2xlarge
+      - c7i.4xlarge
+      - c7a.xlarge
+      - c7a.2xlarge
+      - c7a.4xlarge
+      - c7i-flex.xlarge
+      - c7i-flex.2xlarge
+      - c7i-flex.4xlarge
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m6i.xlarge
+      - m6i.2xlarge
+      - m6i.4xlarge
+      - m6in.xlarge
+      - m6in.2xlarge
+      - m6in.4xlarge
+      - m6a.xlarge
+      - m6a.2xlarge
+      - m6a.4xlarge
+      - r6i.xlarge
+      - r6i.2xlarge
+      - r6i.4xlarge
+      - r6id.xlarge
+      - r6id.2xlarge
+      - r6id.4xlarge
+      - m7i.xlarge
+      - m7i.2xlarge
+      - m7i.4xlarge
+      - m7a.xlarge
+      - m7a.2xlarge
+      - m7a.4xlarge
+      - m7i-flex.xlarge
+      - m7i-flex.2xlarge
+      - m7i-flex.4xlarge
+      - r7i.xlarge
+      - r7i.2xlarge
+      - r7i.4xlarge
     Default: c4.xlarge
   LicenseType:
     Description: >-

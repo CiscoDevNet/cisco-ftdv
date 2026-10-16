@@ -52,3 +52,46 @@ spec:
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: 10800
+
+---
+
+{{- if eq (.Values.ftdc.enable_ha | default "false") "true" }}
+# Service template for FTD secondary pods
+# This creates a LoadBalancer service for each FTD secondary pod to get unique MetalLB IPs
+
+# Service for ftdc-secondary on worker-node2
+apiVersion: v1
+kind: Service
+metadata:
+  name: ftdc-k8s-worker2
+  labels:
+    app: FTDC_SECONDARY
+    node: {{ dig "name" "" .Values.worker_node2 }}
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: {{ dig "ip" "" .Values.worker_node2 }}
+spec:
+  type: LoadBalancer
+  selector:
+    app: FTDC_SECONDARY
+  ports:
+  - name: ssh
+    port: 3000
+    targetPort: 22
+    protocol: TCP
+  - name: https
+    port: 8305
+    targetPort: 8305
+    protocol: TCP
+  - name: snmp
+    port: 161
+    targetPort: 161
+    protocol: UDP
+  - name: fmc-reg
+    port: 8302
+    targetPort: 8302
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+{{- end }}

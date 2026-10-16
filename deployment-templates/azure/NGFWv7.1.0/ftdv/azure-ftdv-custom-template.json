@@ -391,6 +391,9 @@
          "type": "Microsoft.Compute/virtualMachines",
          "name": "[parameters('vmName')]",
          "location": "[resourceGroup().location]",
+         "tags": {
+            "LegacyVMNVA": "true"
+         },
          "dependsOn": [
             "[resourceId('Microsoft.Storage/storageAccounts', parameters('vmStorageAccount'))]",
             "[resourceId('Microsoft.Network/networkInterfaces',variables('vmNic0Name'))]",
