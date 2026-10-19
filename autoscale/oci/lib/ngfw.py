@@ -256,7 +256,7 @@ class NgfwInstance (OCIInstance):
         Raises:
         """
         try: 
-            cmd = 'configure network hostname' + ' ' + self.vm_name
+            cmd = 'configure network hostname' + ' ' + self.vm_name.replace('_', '-')
             r, output, error = self.run_ftdv_command(cmd)
             logger.debug("NGFW:configure_hostname: Instance hostname configuration: " + output)
             return r
