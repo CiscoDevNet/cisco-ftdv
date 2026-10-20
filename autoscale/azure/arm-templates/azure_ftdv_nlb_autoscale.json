@@ -1,0 +1,2306 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceNamePrefix": {
+      "type": "string",
+      "defaultValue": "ftdv",
+      "minLength": 3,
+      "metadata": {
+        "description": "Prefix used in resource names created by this template. Use lowercase letters; short prefixes are recommended because some Azure resource names have length limits."
+      }
+    },
+    "virtualNetworkRg": {
+      "type": "string",
+      "defaultValue": "cisco-virtualnet-rg",
+      "metadata": {
+        "description": "Virtual network resource group name"
+      }
+    },
+    "virtualNetworkName": {
+      "type": "string",
+      "defaultValue": "cisco-virtualnet",
+      "metadata": {
+        "description": "Virtual network name"
+      }
+    },
+    "virtualNetworkCidr": {
+      "type": "string",
+      "defaultValue": "1.2.0.0/16",
+      "metadata": {
+        "description": "CIDR of virtual network"
+      }
+    },
+    "subnet1": {
+      "type": "string",
+      "defaultValue": "cisco-mgmt-subnet",
+      "metadata": {
+        "description": "Subnet 1: existing management subnet name. Mandatory."
+      }
+    },
+    "subnet2": {
+      "type": "string",
+      "defaultValue": "cisco-diag-subnet",
+      "metadata": {
+        "description": "Subnet 2 / NIC 2: existing diagnostic subnet name. Required when numberOfInterfaces is 4 or higher; not used when numberOfInterfaces is 3 (no diagnostic NIC is created)."
+      }
+    },
+    "subnet3": {
+      "type": "string",
+      "defaultValue": "cisco-inside-subnet",
+      "metadata": {
+        "description": "Subnet 3 / NIC 3 (NIC 2 when numberOfInterfaces is 3): existing inside/data subnet name. Mandatory first data interface."
+      }
+    },
+    "subnet4": {
+      "type": "string",
+      "defaultValue": "cisco-outside-subnet",
+      "metadata": {
+        "description": "Subnet 4 / NIC 4 (NIC 3 when numberOfInterfaces is 3): existing outside/data subnet name. Mandatory for NLB deployments."
+      }
+    },
+    "subnet5": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 5: optional additional data subnet name. Required only when numberOfInterfaces is 5 or higher."
+      }
+    },
+    "subnet6": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 6: optional additional data subnet name. Required only when numberOfInterfaces is 6 or higher."
+      }
+    },
+    "subnet7": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 7: optional additional data subnet name. Required only when numberOfInterfaces is 7 or higher."
+      }
+    },
+    "subnet8": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 8: optional additional data subnet name. Required only when numberOfInterfaces is 8 or higher."
+      }
+    },
+    "subnet9": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 9: optional additional data subnet name. Required only when numberOfInterfaces is 9 or higher."
+      }
+    },
+    "subnet10": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet 10: optional additional data subnet name. Required only when numberOfInterfaces is 10 or higher."
+      }
+    },
+    "numberOfInterfaces": {
+      "type": "int",
+      "defaultValue": 4,
+      "minValue": 3,
+      "maxValue": 10,
+      "metadata": {
+        "description": "Number of FTDv VMSS NICs to create. When set to 3, NLB uses NIC1 management, NIC2 inside, and NIC3 outside with no diagnostic NIC. When set to 4 or higher, NLB uses NIC1 management, NIC2 diagnostic slot, NIC3 inside, and NIC4 outside; subnet5 through subnet10 are optional additional data NICs."
+      }
+    },
+    "diagnostic": {
+      "type": "string",
+      "defaultValue": "OFF",
+      "allowedValues": [
+        "ON",
+        "OFF"
+      ],
+      "metadata": {
+        "description": "Diagnostic setting written into FTDv day0 custom data. When ON, subnet2/NIC2 is used as the diagnostic interface. When OFF, no diagnostic NIC is created and the inside subnet (subnet3) is attached at NIC2 instead of NIC3."
+      }
+    },
+    "insideNetworkGatewayIp": {
+      "type": "string",
+      "defaultValue": "1.2.3.4",
+      "metadata": {
+        "description": "Inside Subnet Gateway IP"
+      }
+    },
+    "internalLoadBalancerIP": {
+      "type": "string",
+      "defaultValue": "1.2.3.5",
+      "metadata": {
+        "description": "Internal load balancer IP in inside subnet."
+      }
+    },
+    "outsideNetworkGatewayIp": {
+      "type": "string",
+      "defaultValue": "1.2.4.4",
+      "metadata": {
+        "description": "Outside Subnet Gateway IP"
+      }
+    },
+    "insideZoneName": {
+      "type": "string",
+      "defaultValue": "inside",
+      "metadata": {
+        "description": "Inside Zone Name"
+      }
+    },
+    "outsideZoneName": {
+      "type": "string",
+      "defaultValue": "outside",
+      "metadata": {
+        "description": "Outside Zone Name"
+      }
+    },
+    "functionHostingPlan": {
+      "type": "string",
+      "defaultValue": "premium",
+      "allowedValues": [
+        "consumption",
+        "premium"
+      ],
+      "metadata": {
+        "description": "Deployment plan. Premium is recommended for private FMC deployments because it enables VNet integration; consumption can be used when FMC is reachable without VNet integration."
+      }
+    },
+    "functionAppSubnet": {
+      "type": "string",
+      "defaultValue": "function-app-subnet",
+      "metadata": {
+        "description": "Function App subnet name used when functionHostingPlan is premium."
+      }
+    },
+    "functionAppSubnetCIDR": {
+      "type": "string",
+      "defaultValue": "1.2.6.0/24",
+      "metadata": {
+        "description": "Function App subnet CIDR used when functionHostingPlan is premium."
+      }
+    },
+    "softwareVersion": {
+      "type": "string",
+      "defaultValue": "10.00.140",
+      "allowedValues": [
+        "10.00.140",
+        "7.711.1061",
+        "77089.0.0",
+        "7.64.69",
+        "760113.0.0",
+        "7.44.462",
+        "742172.0.0"
+      ],
+      "metadata": {
+        "description": "FTD Software version to use. 10.00.140 maps to FTDv 10.0.0-140 in Azure Marketplace."
+      }
+    },
+    "enableSecureBoot": {
+      "type": "string",
+      "defaultValue": "false",
+      "allowedValues": [
+        "true",
+        "false"
+      ],
+      "metadata": {
+        "description": "[Only applicable for FTDv 10.0.0-140 marketplace deployments] Enable Secure Boot for UEFI-based deployment."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D8s_v5",
+      "allowedValues": [
+        "Standard_D3_v2",
+        "Standard_D4_v2",
+        "Standard_D5_v2",
+        "Standard_D8s_v3",
+        "Standard_D16s_v3",
+        "Standard_F8s_v2",
+        "Standard_F16s_v2",
+        "Standard_D8_v4",
+        "Standard_D16_v4",
+        "Standard_D8s_v4",
+        "Standard_D16s_v4",
+        "Standard_D8_v5",
+        "Standard_D16_v5",
+        "Standard_D8s_v5",
+        "Standard_D16s_v5",
+        "Standard_D8s_v6",
+        "Standard_D16s_v6"
+      ],
+      "metadata": {
+        "description": "Size of the Virtual Machine"
+      }
+    },
+    "ftdLicensingSku": {
+      "type": "string",
+      "defaultValue": "ftdv-azure-payg",
+      "allowedValues": [
+        "ftdv-azure-byol",
+        "ftdv-azure-payg"
+      ],
+      "metadata": {
+        "description": "Licensing model (ftdv-azure-byol : Bring-your-own-license, ftdv-azure-payg : Pay-as-you-go)"
+      }
+    },
+    "ftdVmManagementUserName": {
+      "type": "string",
+      "defaultValue": "cisco",
+      "metadata": {
+        "description": "Username for primary account on the virtual machine (used only for vm management). This is not the admin username and 'admin' is reserved."
+      }
+    },
+    "ftdVmManagementUserPassword": {
+      "type": "securestring",
+      "minLength": 12,
+      "maxLength": 72,
+      "metadata": {
+        "description": "Password used for both the FTD VM management user and the FTD admin user. Passwords must be 12 to 72 characters long and satisfy Azure/Cisco complexity requirements."
+      }
+    },
+    "fmcIpAddress": {
+      "type": "string",
+      "defaultValue": "1.2.3.4",
+      "metadata": {
+        "description": "FMC Public IP Address"
+      }
+    },
+    "registrationUsingPublicFMCIP": {
+      "type": "string",
+      "defaultValue": "NO",
+      "allowedValues": [
+        "YES",
+        "NO"
+      ],
+      "metadata": {
+        "description": "Set to YES when FMC registration/API uses the FMC public IP address supplied in fmcIpAddress. This also allows FMC public IP ingress to FTD management interfaces."
+      }
+    },
+    "fmcUserName": {
+      "type": "string",
+      "defaultValue": "fmcUser",
+      "metadata": {
+        "description": "FMC User name"
+      }
+    },
+    "fmcPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "FMC Password"
+      }
+    },
+    "policyName": {
+      "type": "string",
+      "defaultValue": "myPolicy",
+      "metadata": {
+        "description": "Security Policy Name created in FMC"
+      }
+    },
+    "deviceGroupName": {
+      "type": "string",
+      "defaultValue": "AutoScaleGroup",
+      "metadata": {
+        "description": "Device group name created in FMC"
+      }
+    },
+    "licenseCapability": {
+      "type": "string",
+      "defaultValue": "BASE, MALWARE, URLFilter, THREAT",
+      "metadata": {
+        "description": "Comma separated License Capability list (Valid values : BASE, MALWARE, URLFilter, THREAT)"
+      }
+    },
+    "performanceTier": {
+      "type": "string",
+      "defaultValue": "FTDv30",
+      "allowedValues": [
+        "FTDv",
+        "FTDv5",
+        "FTDv10",
+        "FTDv20",
+        "FTDv30",
+        "FTDv50",
+        "FTDv100",
+        "FTDvU"
+      ],
+      "metadata": {
+        "description": "Performance tier value to use while registering FTDv instances to FMC."
+      }
+    },
+    "scalingMetricsList": {
+      "type": "string",
+      "defaultValue": "CPU",
+      "allowedValues": [
+        "CPU",
+        "CPU,MEMORY"
+      ],
+      "metadata": {
+        "description": "Metrics used in taking scaling decision"
+      }
+    },
+    "cpuScaleInThreshold": {
+      "type": "string",
+      "defaultValue": "10",
+      "metadata": {
+        "description": "Scale-IN threshold in % for CPU Metrics"
+      }
+    },
+    "cpuScaleOutThreshold": {
+      "type": "string",
+      "defaultValue": "80",
+      "metadata": {
+        "description": "Scale-OUT threshold in % for CPU Metrics"
+      }
+    },
+    "memoryScaleInThreshold": {
+      "type": "string",
+      "defaultValue": "0",
+      "metadata": {
+        "description": "Scale-IN threshold in % for Memory Metrics"
+      }
+    },
+    "memoryScaleOutThreshold": {
+      "type": "string",
+      "defaultValue": "0",
+      "metadata": {
+        "description": "Scale-OUT threshold in % for Memory Metrics"
+      }
+    },
+    "minFtdCount": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 0,
+      "metadata": {
+        "description": "Minimum required FTDs in Scale Set. Use 0 to keep the scale set empty."
+      }
+    },
+    "maxFtdCount": {
+      "type": "int",
+      "defaultValue": 5,
+      "minValue": 0,
+      "metadata": {
+        "description": "Maximum allowed FTDs in Scale Set. Must be greater than or equal to minFtdCount."
+      }
+    },
+    "metricsAverageDuration": {
+      "type": "string",
+      "defaultValue": "1",
+      "allowedValues": [
+        "1",
+        "5",
+        "15",
+        "30"
+      ],
+      "metadata": {
+        "description": "Duration in minutes for which metrics samples are collected and averaged"
+      }
+    },
+    "initDeploymentMode": {
+      "type": "string",
+      "defaultValue": "BULK",
+      "allowedValues": [
+        "BULK",
+        "STEP"
+      ],
+      "metadata": {
+        "description": "Initial deployment mode BULK/STEP"
+      }
+    },
+    "scalingPolicy": {
+      "type": "string",
+      "defaultValue": "POLICY-1",
+      "allowedValues": [
+        "POLICY-1",
+        "POLICY-2"
+      ],
+      "metadata": {
+        "description": "Scaling Policy.. Refer user guide for details"
+      }
+    },
+    "healthCheckPortNumber": {
+      "type": "string",
+      "defaultValue": "7777",
+      "metadata": {
+        "description": "FTDv health check port number."
+      }
+    },
+    "AutoDeleteUnhealthyVm": {
+      "type": "string",
+      "defaultValue": "NO",
+      "allowedValues": [
+        "NO",
+        "YES"
+      ],
+      "metadata": {
+        "description": "Deletes Unhealthy VMs automatically based on health"
+      }
+    },
+    "logicAppState": {
+      "type": "string",
+      "defaultValue": "Disabled",
+      "allowedValues": [
+        "Enabled",
+        "Disabled"
+      ],
+      "metadata": {
+        "description": "Controls whether the autoscale Logic App workflow starts enabled after deployment."
+      }
+    },
+    "functionAppScmBasicPublishingEnabled": {
+      "type": "string",
+      "defaultValue": "true",
+      "allowedValues": [
+        "true",
+        "false"
+      ],
+      "metadata": {
+        "description": "Set to true to allow Portal/SCM zip deployment to the Function App. Disable after uploading the function package if required by security policy."
+      }
+    },
+    "functionAppFtpBasicPublishingEnabled": {
+      "type": "string",
+      "defaultValue": "false",
+      "allowedValues": [
+        "true",
+        "false"
+      ],
+      "metadata": {
+        "description": "Set to true to allow FTP basic publishing credentials for the Function App. Portal zip deployment does not require FTP."
+      }
+    }
+  },
+  "variables": {
+    "networkApiVersion": "2025-09-01",
+    "webApiVersion": "2026-03-15",
+    "computeApiVersion": "2026-03-01",
+    "storageApiVersion": "2026-04-01",
+    "insightsApiVersion": "2020-02-02",
+    "roleAssignmentApiVersion": "2022-04-01",
+    "vmssName": "[concat(parameters('resourceNamePrefix'),'-vmss')]",
+    "elbName": "[concat(parameters('resourceNamePrefix'),'-elb')]",
+    "ilbName": "[concat(parameters('resourceNamePrefix'),'-ilb')]",
+    "dataSecGrp": "[concat(parameters('resourceNamePrefix'),'-dataIntfSecGrp')]",
+    "blockAllSecGrp": "[concat(parameters('resourceNamePrefix'),'-blockAllSecGrp')]",
+    "mgmtSecGrp": "[concat(parameters('resourceNamePrefix'),'-mgmtIntfSecGrp')]",
+    "logicAppName": "[concat(parameters('resourceNamePrefix'),'-logic-app')]",
+    "functionAppName": "[concat(parameters('resourceNamePrefix'),'-function-app')]",
+    "appInsightsName": "[concat(parameters('resourceNamePrefix'),'-appinsight')]",
+    "elbPublicIpName": "[concat(variables('elbName'),'-public-ip')]",
+    "elbId": "[resourceId('Microsoft.Network/loadBalancers',variables('elbName'))]",
+    "ilbId": "[resourceId('Microsoft.Network/loadBalancers',variables('ilbName'))]",
+    "vnetId": "[resourceId(parameters('virtualNetworkRg'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+    "subnet1Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet1'))]",
+    "subnet2Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet2'))]",
+    "subnet3Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet3'))]",
+    "subnet4Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet4'))]",
+    "subnet5Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet5'))]",
+    "subnet6Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet6'))]",
+    "subnet7Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet7'))]",
+    "subnet8Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet8'))]",
+    "subnet9Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet9'))]",
+    "subnet10Id": "[concat(variables('vnetId'),'/subnets/', parameters('subnet10'))]",
+    "mgmtSubnetId": "[variables('subnet1Id')]",
+    "outsideSubnetId": "[variables('subnet4Id')]",
+    "insideSubnetId": "[variables('subnet3Id')]",
+    "elbBackendPoolReference": {
+      "id": "[concat(variables('elbId'), '/backendAddressPools/backendPool')]"
+    },
+    "ilbBackendPoolReference": {
+      "id": "[concat(variables('ilbId'), '/backendAddressPools/backendPool')]"
+    },
+    "elbBackendPoolReferences": "[createArray(variables('elbBackendPoolReference'))]",
+    "ilbBackendPoolReferences": "[createArray(variables('ilbBackendPoolReference'))]",
+    "storageAccountName": "[concat(take(toLower(parameters('resourceNamePrefix')), 11), uniquestring(resourceGroup().id))]",
+    "storageAccountid": "[concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+    "consumptionHostingPlanName": "[concat(parameters('resourceNamePrefix'),'-consumption-plan')]",
+    "premiumHostingPlanName": "[concat(parameters('resourceNamePrefix'),'-premium-plan')]",
+    "hostingPlanName": "[if(equals(variables('functionHostingPlanType'), 'premium'), variables('premiumHostingPlanName'), variables('consumptionHostingPlanName'))]",
+    "functionAppId": "[concat(resourceGroup().id,'/providers/','Microsoft.Web/sites/', variables('functionAppName'))]",
+    "functionWorkerRuntime": "python",
+    "appInsightsSourceName": "IbizaWebAppExtensionCreate",
+    "hostNameBindingsName": "[concat(variables('functionAppName'), '/', variables('functionAppName'), '.azurewebsites.net')]",
+    "hostSslName1": "[concat(toLower(variables('functionAppName')), '.azurewebsites.net')]",
+    "hostSslName2": "[concat(toLower(variables('functionAppName')), '.scm.azurewebsites.net')]",
+    "vmssVmMgmtNicName": "mgmtNic",
+    "vmssVmOutsideNicName": "outsideNic",
+    "vmssVmInsideNicName": "insideNic",
+    "vmssVmDataNic4Name": "dataNic4",
+    "vmssVmDataNic5Name": "dataNic5",
+    "vmssVmDataNic6Name": "dataNic6",
+    "vmssVmDataNic7Name": "dataNic7",
+    "vmssVmDataNic8Name": "dataNic8",
+    "vmssVmDataNic9Name": "dataNic9",
+    "vmssVmDataNic10Name": "dataNic10",
+    "idleTimeoutInMinutes": 30,
+    "publisher": "cisco",
+    "offer": "cisco-ftdv",
+    "sku": "[if(contains(variables('gen2Version'), parameters('softwareVersion')), if(equals(parameters('ftdLicensingSku'), 'ftdv-azure-byol'), variables('gen2Byol'), variables('gen2Payg')), parameters('ftdLicensingSku'))]",
+    "contributorRoleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+    "storageQueueDataContributorRoleDefinitionId": "974c5e8b-45b9-4653-ba55-5f855dd0fb88",
+    "customData": "[variables('defaultCustomData')]",
+    "publicIpAddressName": "[concat(parameters('resourceNamePrefix'),'-outbound-IP')]",
+    "natGatewayName": "[concat(parameters('resourceNamePrefix'),'-nat-gw')]",
+    "functionAppSubnetId": "[resourceId(parameters('virtualNetworkRg'), 'Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('functionAppSubnet'))]",
+    "functionAppSubnetDeployment": "[concat(parameters('resourceNamePrefix'),'-functionAppSubnetDeployment')]",
+    "functionHostingPlanType": "[parameters('functionHostingPlan')]",
+    "gen2Version": [
+      "10.00.140"
+    ],
+    "isUefiVersion": "[contains(variables('gen2Version'), parameters('softwareVersion'))]",
+    "securityType": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), 'TrustedLaunch', 'Standard')]",
+    "secureBoot": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), 'true', 'false')]",
+    "vTpm": "false",
+    "securityProfileBlock": "[if(and(variables('isUefiVersion'), equals(parameters('enableSecureBoot'), 'true')), json(concat('{','\"securityType\": \"', variables('securityType'), '\",','\"uefiSettings\": {','\"secureBootEnabled\": ', toLower(variables('secureBoot')), ',','\"vTpmEnabled\": ', toLower(variables('vTpm')),'}','}')), json('null'))]",
+    "gen1Byol": "ftdv-azure-byol",
+    "gen1Payg": "ftdv-azure-payg",
+    "gen2Byol": "cisco-ftdv-x86-byol",
+    "gen2Payg": "cisco-ftdv-x86-payg",
+    "defaultCustomData": "[concat('{\"AdminPassword\":\"', parameters('ftdVmManagementUserPassword'), '\",\"Hostname\": \"cisco-ftdv\", \"Diagnostic\":\"', variables('effectiveDiagnostic'), '\"}')]",
+    "deviceGroupName": "[parameters('deviceGroupName')]",
+    "internalLoadBalancerIP": "[parameters('internalLoadBalancerIP')]",
+    "effectiveDiagnostic": "[parameters('diagnostic')]",
+    "vmssVmMgmtNicConfiguration": {
+      "name": "[variables('vmssVmMgmtNicName')]",
+      "properties": {
+        "primary": true,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('mgmtSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('mgmtSubnetId')]"
+              },
+              "publicipaddressconfiguration": {
+                "name": "mgmtPublicIP",
+                "properties": {
+                  "idleTimeoutInMinutes": "[variables('idleTimeoutInMinutes')]"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "vmssVmOutsideNicConfiguration": {
+      "name": "[variables('vmssVmOutsideNicName')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('outsideSubnetId')]"
+              },
+              "loadBalancerBackendAddressPools": "[variables('elbBackendPoolReferences')]"
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmInsideNicConfiguration": {
+      "name": "[variables('vmssVmInsideNicName')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('insideSubnetId')]"
+              },
+              "loadBalancerBackendAddressPools": "[variables('ilbBackendPoolReferences')]"
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic4Configuration": {
+      "name": "[variables('vmssVmDataNic4Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet4Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic4Configurations": "[createArray()]",
+    "vmssVmDataNic5Configuration": {
+      "name": "[variables('vmssVmDataNic5Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet5Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic5Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 5), createArray(variables('vmssVmDataNic5Configuration')), createArray())]",
+    "vmssVmDataNic6Configuration": {
+      "name": "[variables('vmssVmDataNic6Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet6Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic6Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 6), createArray(variables('vmssVmDataNic6Configuration')), createArray())]",
+    "vmssVmDataNic7Configuration": {
+      "name": "[variables('vmssVmDataNic7Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet7Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic7Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 7), createArray(variables('vmssVmDataNic7Configuration')), createArray())]",
+    "vmssVmDataNic8Configuration": {
+      "name": "[variables('vmssVmDataNic8Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet8Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic8Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 8), createArray(variables('vmssVmDataNic8Configuration')), createArray())]",
+    "vmssVmDataNic9Configuration": {
+      "name": "[variables('vmssVmDataNic9Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet9Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic9Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 9), createArray(variables('vmssVmDataNic9Configuration')), createArray())]",
+    "vmssVmDataNic10Configuration": {
+      "name": "[variables('vmssVmDataNic10Name')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('dataSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnet10Id')]"
+              }
+            }
+          }
+        ],
+        "enableIPForwarding": true
+      }
+    },
+    "vmssVmDataNic10Configurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 10), createArray(variables('vmssVmDataNic10Configuration')), createArray())]",
+    "vmssNetworkInterfaceConfigurations": "[concat(createArray(variables('vmssVmMgmtNicConfiguration')), variables('vmssVmDiagNicConfigurations'), createArray(variables('vmssVmInsideNicConfiguration')), createArray(variables('vmssVmOutsideNicConfiguration')), variables('vmssVmDataNic5Configurations'), variables('vmssVmDataNic6Configurations'), variables('vmssVmDataNic7Configurations'), variables('vmssVmDataNic8Configurations'), variables('vmssVmDataNic9Configurations'), variables('vmssVmDataNic10Configurations'))]",
+    "diagSubnetId": "[variables('subnet2Id')]",
+    "vmssVmDiagNicName": "diagNic",
+    "ftdManagerHost": "[if(equals(parameters('registrationUsingPublicFMCIP'), 'YES'), parameters('fmcIpAddress'), 'DONTRESOLVE')]",
+    "vmssVmDiagNicConfiguration": {
+      "name": "[variables('vmssVmDiagNicName')]",
+      "properties": {
+        "primary": false,
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('blockAllSecGrp'))]"
+        },
+        "ipConfigurations": [
+          {
+            "name": "myIpConfig",
+            "properties": {
+              "subnet": {
+                "id": "[variables('diagSubnetId')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "vmssVmDiagNicConfigurations": "[if(greaterOrEquals(parameters('numberOfInterfaces'), 4), createArray(variables('vmssVmDiagNicConfiguration')), createArray())]"
+  },
+  "resources": [
+    {
+      "name": "[variables('logicAppName')]",
+      "type": "Microsoft.Logic/workflows",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2019-05-01",
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "properties": {
+        "state": "[parameters('logicAppState')]",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "AutoScaleManager": {
+              "inputs": {
+                "method": "POST",
+                "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/AutoScaleManager')]"
+              },
+              "runAfter": {
+                "MinimumConfigVerification": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Http"
+            },
+            "No Action: True, Scaling Required: False": {
+              "actions": {
+                "No_Action_required": {
+                  "inputs": {
+                    "runStatus": "Succeeded"
+                  },
+                  "runAfter": {},
+                  "type": "Terminate"
+                }
+              },
+              "else": {
+                "actions": {
+                  "True: Scalein, False: Scaleout": {
+                    "actions": {
+                      "Delay_For_connection_Draining": {
+                        "inputs": {
+                          "interval": {
+                            "count": 5,
+                            "unit": "Minute"
+                          }
+                        },
+                        "runAfter": {
+                          "Deploy_Changes_to_FTD": [
+                            "Succeeded",
+                            "Failed"
+                          ]
+                        },
+                        "type": "Wait"
+                      },
+                      "Deploy_Changes_to_FTD": {
+                        "inputs": {
+                          "body": "@body('AutoScaleManager')",
+                          "method": "POST",
+                          "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeployConfiguration')]"
+                        },
+                        "runAfter": {
+                          "DisableHealthProbe": [
+                            "Succeeded",
+                            "Failed"
+                          ]
+                        },
+                        "type": "Http"
+                      },
+                      "DeleteAlertRules": {
+                        "inputs": {
+                          "body": "@body('AutoScaleManager')",
+                          "method": "POST",
+                          "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeleteAlertRules')]"
+                        },
+                        "runAfter": {
+                          "DeviceDeregister": [
+                            "Succeeded"
+                          ]
+                        },
+                        "type": "Http"
+                      },
+                      "DeviceDeregister": {
+                        "inputs": {
+                          "body": "@body('AutoScaleManager')",
+                          "method": "POST",
+                          "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeviceDeregister')]"
+                        },
+                        "runAfter": {
+                          "Delay_For_connection_Draining": [
+                            "Succeeded"
+                          ]
+                        },
+                        "type": "Http"
+                      },
+                      "DisableHealthProbe": {
+                        "inputs": {
+                          "body": "@body('AutoScaleManager')",
+                          "retryPolicy": {
+                            "type": "none"
+                          },
+                          "method": "POST",
+                          "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DisableHealthProbe')]"
+                        },
+                        "runAfter": {},
+                        "type": "Http"
+                      },
+                      "FtdScaleIn": {
+                        "inputs": {
+                          "body": "@body('AutoScaleManager')",
+                          "retryPolicy": {
+                            "type": "none"
+                          },
+                          "method": "POST",
+                          "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/FtdScaleIn')]"
+                        },
+                        "runAfter": {
+                          "DeleteAlertRules": [
+                            "Succeeded",
+                            "Failed"
+                          ]
+                        },
+                        "type": "Http"
+                      }
+                    },
+                    "else": {
+                      "actions": {
+                        "Branch_based_on_Scale-Out_or_Invalid_condition": {
+                          "actions": {
+                            "Cooldown_time": {
+                              "inputs": {
+                                "interval": {
+                                  "count": 10,
+                                  "unit": "Second"
+                                }
+                              },
+                              "runAfter": {
+                                "Wait_until_post_deployment_completes": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Wait"
+                            },
+                            "Delay": {
+                              "inputs": {
+                                "interval": {
+                                  "count": 330,
+                                  "unit": "Second"
+                                }
+                              },
+                              "runAfter": {
+                                "Set_variable_2": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Wait"
+                            },
+                            "FtdScaleOut": {
+                              "inputs": {
+                                "body": "@body('AutoScaleManager')",
+                                "retryPolicy": {
+                                  "type": "none"
+                                },
+                                "method": "POST",
+                                "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/FtdScaleOut')]"
+                              },
+                              "runAfter": {},
+                              "type": "Http"
+                            },
+                            "Parse_JSON": {
+                              "inputs": {
+                                "content": "@body('AutoScaleManager')",
+                                "schema": {
+                                  "properties": {
+                                    "COMMAND": {
+                                      "type": "string"
+                                    },
+                                    "COUNT": {
+                                      "type": "string"
+                                    },
+                                    "TYPE": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                }
+                              },
+                              "runAfter": {
+                                "FtdScaleOut": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "ParseJson"
+                            },
+                            "Set_variable": {
+                              "inputs": {
+                                "name": "FTDCOUNT",
+                                "value": "@int(body('Parse_JSON')?['COUNT'])"
+                              },
+                              "runAfter": {
+                                "Parse_JSON": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "SetVariable"
+                            },
+                            "Set_variable_2": {
+                              "inputs": {
+                                "name": "SCALEOUTTYPE",
+                                "value": "@body('Parse_JSON')?['TYPE']"
+                              },
+                              "runAfter": {
+                                "Set_variable": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "SetVariable"
+                            },
+                            "GetFtdIPs_Batch": {
+                              "inputs": {
+                                "body": {
+                                  "COUNT": "@{variables('FTDCOUNT')}",
+                                  "TYPE": "@{variables('SCALEOUTTYPE')}",
+                                  "MODE": "BATCH"
+                                },
+                                "method": "POST",
+                                "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/GetFtdIPs')]"
+                              },
+                              "runAfter": {
+                                "Delay": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Http"
+                            },
+                            "Register_and_Stage_FTDs": {
+                              "actions": {
+                                "Wait_for_FTD_to_come_up_and_ready_for_registration_with_FMC": {
+                                  "actions": {
+                                    "WaitForFtdToComeUp": {
+                                      "inputs": {
+                                        "body": "@items('Register_and_Stage_FTDs')",
+                                        "method": "POST",
+                                        "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/WaitForFtdToComeUp')]"
+                                      },
+                                      "runAfter": {},
+                                      "type": "Http"
+                                    },
+                                    "Delay_3": {
+                                      "inputs": {
+                                        "interval": {
+                                          "count": 10,
+                                          "unit": "Second"
+                                        }
+                                      },
+                                      "runAfter": {
+                                        "WaitForFtdToComeUp": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "type": "Wait"
+                                    }
+                                  },
+                                  "expression": "@contains(body('WaitForFtdToComeUp'), 'READY')",
+                                  "limit": {
+                                    "count": 5000,
+                                    "timeout": "PT15M"
+                                  },
+                                  "runAfter": {},
+                                  "type": "Until"
+                                },
+                                "DeviceRegister": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeviceRegister')]"
+                                  },
+                                  "runAfter": {
+                                    "Wait_for_FTD_to_come_up_and_ready_for_registration_with_FMC": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                },
+                                "Delay_For_FMC_To_Update_State": {
+                                  "inputs": {
+                                    "interval": {
+                                      "count": 2,
+                                      "unit": "Minute"
+                                    }
+                                  },
+                                  "runAfter": {
+                                    "DeviceRegister": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Wait"
+                                },
+                                "Wait_untill_deployment_is_in_progress": {
+                                  "actions": {
+                                    "Delay_2": {
+                                      "inputs": {
+                                        "interval": {
+                                          "count": 30,
+                                          "unit": "Second"
+                                        }
+                                      },
+                                      "runAfter": {},
+                                      "type": "Wait"
+                                    },
+                                    "WaitForDeploymentTask": {
+                                      "inputs": {
+                                        "body": "@items('Register_and_Stage_FTDs')",
+                                        "method": "POST",
+                                        "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/WaitForDeploymentTask')]"
+                                      },
+                                      "runAfter": {
+                                        "Delay_2": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "type": "Http"
+                                    }
+                                  },
+                                  "expression": "@contains(body('WaitForDeploymentTask'), 'COMPLETED')",
+                                  "limit": {
+                                    "count": 1000,
+                                    "timeout": "PT10M"
+                                  },
+                                  "runAfter": {
+                                    "Delay_For_FMC_To_Update_State": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Until"
+                                },
+                                "DeleteUnregisteredFtd": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeleteUnregisteredFtd')]"
+                                  },
+                                  "runAfter": {
+                                    "Wait_untill_deployment_is_in_progress": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                },
+                                "ConfigureFtdInterfaces": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/ConfigureFtdInterfaces')]",
+                                    "retryPolicy": {
+                                      "type": "fixed",
+                                      "count": 15,
+                                      "interval": "PT1M"
+                                    }
+                                  },
+                                  "runAfter": {
+                                    "DeleteUnregisteredFtd": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                },
+                                "CreateStaticRoutes": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/CreateStaticRoutes')]"
+                                  },
+                                  "runAfter": {
+                                    "ConfigureFtdInterfaces": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                },
+                                "ConfigureHealthProbe": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/ConfigureHealthProbe')]"
+                                  },
+                                  "runAfter": {
+                                    "CreateStaticRoutes": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                },
+                                "CreateAlertRules": {
+                                  "inputs": {
+                                    "body": "@items('Register_and_Stage_FTDs')",
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/CreateAlertRules')]"
+                                  },
+                                  "runAfter": {
+                                    "ConfigureHealthProbe": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                }
+                              },
+                              "foreach": "@body('GetFtdIPs_Batch')",
+                              "runAfter": {
+                                "GetFtdIPs_Batch": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "runtimeConfiguration": {
+                                "concurrency": {
+                                  "repetitions": 5
+                                }
+                              },
+                              "type": "Foreach"
+                            },
+                            "DeployConfiguration": {
+                              "inputs": {
+                                "body": {
+                                  "devices": "@body('GetFtdIPs_Batch')"
+                                },
+                                "method": "POST",
+                                "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/DeployConfiguration')]"
+                              },
+                              "runAfter": {
+                                "Register_and_Stage_FTDs": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Http"
+                            },
+                            "Wait_until_post_deployment_completes": {
+                              "actions": {
+                                "Delay_PostDeploy": {
+                                  "inputs": {
+                                    "interval": {
+                                      "count": 30,
+                                      "unit": "Second"
+                                    }
+                                  },
+                                  "runAfter": {},
+                                  "type": "Wait"
+                                },
+                                "WaitForDeploymentTask_PostDeploy": {
+                                  "inputs": {
+                                    "body": {
+                                      "devices": "@body('GetFtdIPs_Batch')",
+                                      "VALIDATE_INTERFACE": "YES"
+                                    },
+                                    "method": "POST",
+                                    "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/WaitForDeploymentTask')]"
+                                  },
+                                  "runAfter": {
+                                    "Delay_PostDeploy": [
+                                      "Succeeded"
+                                    ]
+                                  },
+                                  "type": "Http"
+                                }
+                              },
+                              "expression": "@contains(body('WaitForDeploymentTask_PostDeploy'), 'COMPLETED')",
+                              "limit": {
+                                "count": 1000,
+                                "timeout": "PT20M"
+                              },
+                              "runAfter": {
+                                "DeployConfiguration": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Until"
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Invalid_condition..Terminate": {
+                                "inputs": {
+                                  "runError": {
+                                    "code": "500",
+                                    "message": "Return value in invalid"
+                                  },
+                                  "runStatus": "Failed"
+                                },
+                                "runAfter": {},
+                                "type": "Terminate"
+                              }
+                            }
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "contains": [
+                                  "@body('AutoScaleManager')",
+                                  "SCALEOUT"
+                                ]
+                              }
+                            ]
+                          },
+                          "runAfter": {},
+                          "type": "If"
+                        }
+                      }
+                    },
+                    "expression": {
+                      "and": [
+                        {
+                          "contains": [
+                            "@body('AutoScaleManager')",
+                            "SCALEIN"
+                          ]
+                        }
+                      ]
+                    },
+                    "runAfter": {},
+                    "type": "If"
+                  }
+                }
+              },
+              "expression": {
+                "and": [
+                  {
+                    "contains": [
+                      "@body('AutoScaleManager')",
+                      "NOACTION"
+                    ]
+                  }
+                ]
+              },
+              "runAfter": {
+                "Initialize_action_type": [
+                  "Succeeded"
+                ]
+              },
+              "type": "If"
+            },
+            "Initialize_action_type": {
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "SCALEOUTTYPE",
+                    "type": "String",
+                    "value": "none"
+                  }
+                ]
+              },
+              "runAfter": {
+                "Initialize_counters_": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable"
+            },
+            "Initialize_counters_": {
+              "inputs": {
+                "variables": [
+                  {
+                    "name": "FTDCOUNT",
+                    "type": "Integer",
+                    "value": 0
+                  }
+                ]
+              },
+              "runAfter": {
+                "AutoScaleManager": [
+                  "Succeeded"
+                ]
+              },
+              "type": "InitializeVariable"
+            },
+            "MinimumConfigVerification": {
+              "inputs": {
+                "retryPolicy": {
+                  "type": "none"
+                },
+                "method": "POST",
+                "uri": "[concat('https://', variables('functionAppName'), '.azurewebsites.net/api/MinimumConfigVerification')]"
+              },
+              "runAfter": {},
+              "type": "Http"
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {},
+          "parameters": {},
+          "triggers": {
+            "Recurrence": {
+              "conditions": [],
+              "inputs": {},
+              "recurrence": {
+                "frequency": "Minute",
+                "interval": 5
+              },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "runs": 1
+                }
+              },
+              "type": "Recurrence"
+            }
+          }
+        },
+        "parameters": {}
+      }
+    },
+    {
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('mgmtSecGrp')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "SSH-Rule",
+            "properties": {
+              "description": "Allow SSH from Azure Functions only.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "[if(equals(variables('functionHostingPlanType'), 'premium'), reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpAddressName'))).ipAddress, concat('AzureCloud.', resourceGroup().location))]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "HTTPS-Rule",
+            "properties": {
+              "description": "Allow HTTPS from Azure Functions only.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "[if(equals(variables('functionHostingPlanType'), 'premium'), reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpAddressName'))).ipAddress, concat('AzureCloud.', resourceGroup().location))]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Fmc-Port",
+            "properties": {
+              "description": "Allow FMC to reach FTD management tunnel port. When registrationUsingPublicFMCIP is YES, fmcIpAddress is the FMC public IP.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8305",
+              "sourceAddressPrefix": "[parameters('fmcIpAddress')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "FMC-HTTPS",
+            "properties": {
+              "description": "Allow FMC IP to reach FTD management HTTPS. When registrationUsingPublicFMCIP is YES, fmcIpAddress is the FMC public IP.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "[parameters('fmcIpAddress')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 103,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "FunctionApp-To-FMC-HTTPS",
+            "properties": {
+              "description": "Allow the VNet-integrated Function App to reach private FMC REST APIs.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "[parameters('functionAppSubnetCIDR')]",
+              "destinationAddressPrefix": "[parameters('fmcIpAddress')]",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "MgmtSubnet-To-FMC-Sftunnel",
+            "properties": {
+              "description": "Allow FTD management interfaces to reach FMC registration tunnel port.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "8305",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "[parameters('fmcIpAddress')]",
+              "access": "Allow",
+              "priority": 111,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "FunctionApp-To-FTD-SSH",
+            "properties": {
+              "description": "Allow the VNet-integrated Function App to bootstrap FTD instances over private SSH.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "[parameters('functionAppSubnetCIDR')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 112,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('dataSecGrp')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow-HTTPS-Traffic",
+            "properties": {
+              "description": "Allow HTTPS traffic on the data interface.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "health-probe",
+            "properties": {
+              "description": "Allow Azure Load Balancer health probe traffic.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "[parameters('healthCheckPortNumber')]",
+              "sourceAddressPrefix": "168.63.129.16",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 110,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[variables('blockAllSecGrp')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Block-All",
+            "properties": {
+              "description": "block all traffic",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[variables('storageAccountName')]",
+      "apiVersion": "[variables('storageApiVersion')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2"
+      },
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      }
+    },
+    {
+      "condition": "[equals(variables('functionHostingPlanType'), 'consumption')]",
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "[variables('webApiVersion')]",
+      "name": "[variables('consumptionHostingPlanName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Y1",
+        "tier": "Dynamic",
+        "size": "Y1",
+        "family": "Y",
+        "capacity": 0
+      },
+      "kind": "linux",
+      "properties": {
+        "computeMode": "Dynamic",
+        "reserved": true
+      }
+    },
+    {
+      "condition": "[equals(variables('functionHostingPlanType'), 'premium')]",
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "[variables('webApiVersion')]",
+      "name": "[variables('premiumHostingPlanName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "tier": "ElasticPremium",
+        "name": "EP1"
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true,
+        "maximumElasticWorkerCount": 20,
+        "zoneRedundant": false
+      }
+    },
+    {
+      "condition": "[equals(variables('functionHostingPlanType'), 'premium')]",
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('publicIpAddressName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "publicIPAddressVersion": "IPv4"
+      }
+    },
+    {
+      "condition": "[equals(variables('functionHostingPlanType'), 'premium')]",
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/natGateways",
+      "name": "[variables('natGatewayName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAddresses": [
+          {
+            "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpAddressName'))]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpAddressName'))]"
+      ]
+    },
+    {
+      "condition": "[equals(variables('functionHostingPlanType'), 'premium')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[variables('functionAppSubnetDeployment')]",
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "networkApiVersion": {
+              "type": "string"
+            },
+            "natGatewayId": {
+              "type": "string"
+            },
+            "virtualNetworkName": {
+              "type": "string"
+            },
+            "functionAppSubnet": {
+              "type": "string"
+            },
+            "functionAppSubnetCIDR": {
+              "type": "string"
+            }
+          },
+          "variables": {},
+          "resources": [
+            {
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "[parameters('networkApiVersion')]",
+              "name": "[concat(parameters('virtualNetworkName'), '/', parameters('functionAppSubnet'))]",
+              "properties": {
+                "delegations": [
+                  {
+                    "name": "delegation",
+                    "properties": {
+                      "serviceName": "Microsoft.Web/serverfarms",
+                      "actions": [
+                        "Microsoft.Network/virtualNetworks/subnets/action"
+                      ]
+                    },
+                    "type": "Microsoft.Network/virtualNetworks/subnets/delegations"
+                  }
+                ],
+                "addressPrefixes": [
+                  "[parameters('functionAppSubnetCIDR')]"
+                ],
+                "natGateway": {
+                  "id": "[parameters('natGatewayId')]"
+                }
+              }
+            }
+          ]
+        },
+        "parameters": {
+          "networkApiVersion": {
+            "value": "[variables('networkApiVersion')]"
+          },
+          "natGatewayId": {
+            "value": "[resourceId('Microsoft.Network/natGateways', variables('natGatewayName'))]"
+          },
+          "virtualNetworkName": {
+            "value": "[parameters('virtualNetworkName')]"
+          },
+          "functionAppSubnet": {
+            "value": "[parameters('functionAppSubnet')]"
+          },
+          "functionAppSubnetCIDR": {
+            "value": "[parameters('functionAppSubnetCIDR')]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('premiumHostingPlanName'))]",
+        "[resourceId('Microsoft.Network/natGateways', variables('natGatewayName'))]"
+      ],
+      "resourceGroup": "[parameters('virtualNetworkRg')]"
+    },
+    {
+      "apiVersion": "[variables('webApiVersion')]",
+      "type": "Microsoft.Web/sites",
+      "name": "[variables('functionAppName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+        "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
+        "[variables('functionAppSubnetDeployment')]"
+      ],
+      "properties": {
+        "enabled": true,
+        "reserved": true,
+        "vnetRouteAllEnabled": true,
+        "siteConfig": {
+          "linuxFxVersion": "Python|3.11",
+          "appSettings": [
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountid'), variables('storageApiVersion')).keys[0].value)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountid'), variables('storageApiVersion')).keys[0].value)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[toLower(variables('functionAppName'))]"
+            },
+            {
+              "name": "FUNCTION_APP_NAME",
+              "value": "[variables('functionAppName')]"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~4"
+            },
+            {
+              "name": "WEBSITE_NODE_DEFAULT_VERSION",
+              "value": "8.11.1"
+            },
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(resourceId('microsoft.insights/components/', variables('appInsightsName')), variables('insightsApiVersion')).InstrumentationKey]"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "[variables('functionWorkerRuntime')]"
+            },
+            {
+              "name": "ANY_IPV4_NAME",
+              "value": "[concat(parameters('resourceNamePrefix'),'-anyipv4')]"
+            },
+            {
+              "name": "AZURE_UTILITY_IP",
+              "value": "168.63.129.16"
+            },
+            {
+              "name": "AZURE_UTILITY_IP_NAME",
+              "value": "azure-utility-ip"
+            },
+            {
+              "name": "FMC_DOMAIN_UUID",
+              "value": "e276abec-e0f2-11e3-8169-6d9ed49b625f"
+            },
+            {
+              "name": "FMC_IP",
+              "value": "[parameters('fmcIpAddress')]"
+            },
+            {
+              "name": "FMC_PASSWORD",
+              "value": "[parameters('fmcPassword')]"
+            },
+            {
+              "name": "FMC_USERNAME",
+              "value": "[parameters('fmcUserName')]"
+            },
+            {
+              "name": "FTD_PASSWORD",
+              "value": "[parameters('ftdVmManagementUserPassword')]"
+            },
+            {
+              "name": "FTD_USERNAME",
+              "value": "admin"
+            },
+            {
+              "name": "FUNCTION_APP_EDIT_MODE",
+              "value": "readwrite"
+            },
+            {
+              "name": "IN_NET_GW",
+              "value": "[parameters('insideNetworkGatewayIp')]"
+            },
+            {
+              "name": "INSIDE_GW_OBJ_NAME",
+              "value": "[concat(parameters('resourceNamePrefix'),'-inside-gw')]"
+            },
+            {
+              "name": "INSIDE_AZURE_NIC_NAME",
+              "value": "[variables('vmssVmInsideNicName')]"
+            },
+            {
+              "name": "INSIDE_NIC_NAME",
+              "value": "asminside"
+            },
+            {
+              "name": "INSIDE_ZONE",
+              "value": "[parameters('insideZoneName')]"
+            },
+            {
+              "name": "OUT_NET_GW",
+              "value": "[parameters('outsideNetworkGatewayIp')]"
+            },
+            {
+              "name": "OUTSIDE_GW_OBJ_NAME",
+              "value": "[concat(parameters('resourceNamePrefix'),'-outside-gw')]"
+            },
+            {
+              "name": "OUTSIDE_AZURE_NIC_NAME",
+              "value": "[variables('vmssVmOutsideNicName')]"
+            },
+            {
+              "name": "OUTSIDE_NIC_NAME",
+              "value": "asmoutside"
+            },
+            {
+              "name": "OUTSIDE_ZONE",
+              "value": "[parameters('outsideZoneName')]"
+            },
+            {
+              "name": "MAX_FTD_COUNT",
+              "value": "[string(parameters('maxFtdCount'))]"
+            },
+            {
+              "name": "MIN_FTD_COUNT",
+              "value": "[string(parameters('minFtdCount'))]"
+            },
+            {
+              "name": "FTD_COUNT_RANGE_VALIDATION",
+              "value": "[string(length(range(0, sub(parameters('maxFtdCount'), parameters('minFtdCount')))))]"
+            },
+            {
+              "name": "MNGT_IP_CONFIG_NAME",
+              "value": "myIpConfig"
+            },
+            {
+              "name": "MNGT_NET_INTERFACE_NAME",
+              "value": "mgmtNic"
+            },
+            {
+              "name": "MNGT_PUBLIC_IP_NAME",
+              "value": "mgmtPublicIP"
+            },
+            {
+              "name": "NAT_ID",
+              "value": "5678"
+            },
+            {
+              "name": "FTD_MANAGER_HOST",
+              "value": "[variables('ftdManagerHost')]"
+            },
+            {
+              "name": "REGISTRATION_USING_PUBLIC_FMC_IP",
+              "value": "[parameters('registrationUsingPublicFMCIP')]"
+            },
+            {
+              "name": "NETWORK_CIDR",
+              "value": "[parameters('virtualNetworkCidr')]"
+            },
+            {
+              "name": "NETWORK_NAME",
+              "value": "[parameters('virtualNetworkName')]"
+            },
+            {
+              "name": "POLICY_NAME",
+              "value": "[parameters('policyName')]"
+            },
+            {
+              "name": "REG_KEY",
+              "value": "1234"
+            },
+            {
+              "name": "RESOURCE_GROUP_NAME",
+              "value": "[resourceGroup().name]"
+            },
+            {
+              "name": "RESOURCE_PREFIX_NAME",
+              "value": "[parameters('resourceNamePrefix')]"
+            },
+            {
+              "name": "SUBSCRIPTION_ID",
+              "value": "[subscription().subscriptionId]"
+            },
+            {
+              "name": "SAMPLING_TIME_MIN",
+              "value": "[parameters('metricsAverageDuration')]"
+            },
+            {
+              "name": "SCALE_IN_THRESHLD_CPU",
+              "value": "[parameters('cpuScaleInThreshold')]"
+            },
+            {
+              "name": "SCALE_OUT_THRESHLD_CPU",
+              "value": "[parameters('cpuScaleOutThreshold')]"
+            },
+            {
+              "name": "SCALE_IN_THRESHLD_MEM",
+              "value": "[parameters('memoryScaleInThreshold')]"
+            },
+            {
+              "name": "SCALE_OUT_THRESHLD_MEM",
+              "value": "[parameters('memoryScaleOutThreshold')]"
+            },
+            {
+              "name": "VMSS_NAME",
+              "value": "[variables('vmssName')]"
+            },
+            {
+              "name": "DELETE_FAULTY_FTD",
+              "value": "YES"
+            },
+            {
+              "name": "DELETE_UNHEALTHY_FTD",
+              "value": "[parameters('AutoDeleteUnhealthyVm')]"
+            },
+            {
+              "name": "INITIAL_DEPLOYMENT_MODE",
+              "value": "[parameters('initDeploymentMode')]"
+            },
+            {
+              "name": "SCALING_POLICY",
+              "value": "[parameters('scalingPolicy')]"
+            },
+            {
+              "name": "DEVICE_GROUP_NAME",
+              "value": "[variables('deviceGroupName')]"
+            },
+            {
+              "name": "SET_UNIQUE_HOST_NAME",
+              "value": "YES"
+            },
+            {
+              "name": "LICENSE_CAPABILITY",
+              "value": "[parameters('licenseCapability')]"
+            },
+            {
+              "name": "PERFORMANCE_TIER",
+              "value": "[parameters('performanceTier')]"
+            },
+            {
+              "name": "SCALING_METRICS_LIST",
+              "value": "[parameters('scalingMetricsList')]"
+            },
+            {
+              "name": "GWLB_SUPPORT",
+              "value": "NO"
+            },
+            {
+              "name": "HEALTH_CHECK_PORT_NUMBER",
+              "value": "[parameters('healthCheckPortNumber')]"
+            },
+            {
+              "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+              "value": "true"
+            },
+            {
+              "name": "ENABLE_ORYX_BUILD",
+              "value": "true"
+            }
+          ]
+        },
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
+        "virtualNetworkSubnetId": "[if(equals(variables('functionHostingPlanType'), 'premium'), variables('functionAppSubnetId'), json('null'))]"
+      }
+    },
+    {
+      "apiVersion": "2022-03-01",
+      "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+      "name": "[concat(variables('functionAppName'), '/scm')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+      ],
+      "properties": {
+        "allow": "[equals(parameters('functionAppScmBasicPublishingEnabled'), 'true')]"
+      }
+    },
+    {
+      "apiVersion": "2022-03-01",
+      "type": "Microsoft.Web/sites/basicPublishingCredentialsPolicies",
+      "name": "[concat(variables('functionAppName'), '/ftp')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+      ],
+      "properties": {
+        "allow": "[equals(parameters('functionAppFtpBasicPublishingEnabled'), 'true')]"
+      }
+    },
+    {
+      "apiVersion": "[variables('insightsApiVersion')]",
+      "name": "[variables('appInsightsName')]",
+      "type": "Microsoft.Insights/components",
+      "kind": "web",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "[concat('hidden-link:', resourceGroup().id, '/providers/Microsoft.Web/sites/', variables('functionAppName'))]": "Resource"
+      },
+      "properties": {
+        "Application_Type": "web",
+        "ApplicationId": "[variables('appInsightsName')]",
+        "Request_Source": "[variables('appInsightsSourceName')]"
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites/hostNameBindings",
+      "apiVersion": "[variables('webApiVersion')]",
+      "name": "[variables('hostNameBindingsName')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]"
+      ],
+      "properties": {
+        "siteName": "[concat(variables('functionAppName'),'-site')]",
+        "hostNameType": "Verified"
+      }
+    },
+    {
+      "apiVersion": "[variables('networkApiVersion')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[variables('elbPublicIpName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": {
+          "domainNameLabel": "[variables('elbPublicIpName')]"
+        },
+        "idleTimeoutInMinutes": "[variables('idleTimeoutInMinutes')]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[variables('elbName')]",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "[variables('networkApiVersion')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', variables('elbPublicIpName'))]"
+      ],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerFrontEnd",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses/', variables('elbPublicIpName'))]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "backendPool"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "lbrule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('elbName')), '/frontendIpConfigurations/LoadBalancerFrontend')]"
+              },
+              "backendAddressPool": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('elbName')), '/backendAddressPools/BackendPool')]"
+              },
+              "probe": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('elbName')), '/probes/lbprobe')]"
+              },
+              "protocol": "TCP",
+              "frontendPort": "80",
+              "backendPort": "80",
+              "idleTimeoutInMinutes": "[variables('idleTimeoutInMinutes')]"
+            }
+          }
+        ],
+        "probes": [
+          {
+            "properties": {
+              "protocol": "Tcp",
+              "port": "[parameters('healthCheckPortNumber')]",
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            },
+            "name": "lbprobe"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[variables('ilbName')]",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "[variables('networkApiVersion')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "dependsOn": [],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerFrontEnd",
+            "properties": {
+              "subnet": {
+                "id": "[variables('insideSubnetId')]"
+              },
+              "privateIPAddress": "[variables('internalLoadBalancerIP')]",
+              "privateIPAllocationMethod": "Static"
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "backendPool"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "properties": {
+              "frontendIPConfiguration": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('ilbName')), '/frontendIpConfigurations/LoadBalancerFrontend')]"
+              },
+              "backendAddressPool": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('ilbName')), '/backendAddressPools/BackendPool')]"
+              },
+              "probe": {
+                "Id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('ilbName')), '/probes/lbprobe')]"
+              },
+              "protocol": "All",
+              "frontendPort": 0,
+              "backendPort": 0,
+              "idleTimeoutInMinutes": "[variables('idleTimeoutInMinutes')]"
+            },
+            "name": "lbrule"
+          }
+        ],
+        "probes": [
+          {
+            "properties": {
+              "protocol": "Tcp",
+              "port": "[parameters('healthCheckPortNumber')]",
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            },
+            "name": "lbprobe"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachineScaleSets",
+      "name": "[variables('vmssName')]",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "[variables('computeApiVersion')]",
+      "tags": {
+        "LegacyVMNVA": "true"
+      },
+      "dependsOn": [
+        "[concat('Microsoft.Network/loadBalancers/', variables('elbName'))]",
+        "[concat('Microsoft.Network/loadBalancers/', variables('ilbName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('mgmtSecGrp'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('dataSecGrp'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/',variables('blockAllSecGrp'))]"
+      ],
+      "sku": {
+        "name": "[parameters('vmSize')]",
+        "capacity": 0
+      },
+      "zones": [
+        "1",
+        "2",
+        "3"
+      ],
+      "plan": {
+        "name": "[variables('sku')]",
+        "publisher": "[variables('publisher')]",
+        "product": "[variables('offer')]"
+      },
+      "properties": {
+        "singlePlacementGroup": false,
+        "upgradePolicy": {
+          "mode": "Manual"
+        },
+        "virtualMachineProfile": {
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "[variables('publisher')]",
+              "offer": "[variables('offer')]",
+              "sku": "[variables('sku')]",
+              "version": "[parameters('softwareVersion')]"
+            }
+          },
+          "osProfile": {
+            "computerNamePrefix": "[variables('vmssName')]",
+            "adminUsername": "[parameters('ftdVmManagementUserName')]",
+            "adminPassword": "[parameters('ftdVmManagementUserPassword')]",
+            "customData": "[base64(variables('customData'))]"
+          },
+          "diagnosticsProfile": {
+            "bootDiagnostics": {
+              "enabled": true,
+              "storageUri": "[concat('https://',variables('storageAccountName'),'.blob.core.windows.net')]"
+            }
+          },
+          "networkProfile": {
+            "networkInterfaceConfigurations": "[variables('vmssNetworkInterfaceConfigurations')]"
+          },
+          "securityProfile": "[variables('securityProfileBlock')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "[variables('roleAssignmentApiVersion')]",
+      "name": "[guid(deployment().name, resourceGroup().id, variables('functionAppName'), variables('contributorRoleDefinitionId'))]",
+      "dependsOn": [
+        "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', variables('contributorRoleDefinitionId'))]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "[variables('roleAssignmentApiVersion')]",
+      "name": "[guid(deployment().name, resourceGroup().id, variables('functionAppName'), variables('storageQueueDataContributorRoleDefinitionId'))]",
+      "dependsOn": [
+        "[resourceID('Microsoft.Compute/virtualMachineScaleSets', variables('vmssName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', variables('storageQueueDataContributorRoleDefinitionId'))]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2016-03-01', 'Full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ]
+}
