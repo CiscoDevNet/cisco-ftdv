@@ -11,6 +11,15 @@
 - **Flexible Networking**: Support for multiple CNI options including Macvlan and SR-IOV for high-performance data plane
 - **Helm-Based Deployment**: Simplified installation and configuration using Helm charts
 
+### What's New in 10.1
+
+Secure Firewall 10.1 brings two major enhancements to FTDc:
+
+- **Upgrade Support**: FTDc now supports in-service upgrades, allowing you to move to newer software versions. This capability is available starting with fresh 10.1 deployments.
+- **High Availability (HA)**: FTDc 10.1 introduces active/standby High Availability, enabling resilient, failover-capable deployments across separate worker nodes for production-grade reliability.
+
+> **Note:** Upgrade and HA for FTDc are new capabilities introduced in Secure Firewall 10.1 and require a fresh 10.1 deployment. These features are not available in earlier FTDc releases.
+
 ### Use Cases
 
 - **Kubernetes Cluster Security**: Protect east-west and north-south traffic in Kubernetes environments
