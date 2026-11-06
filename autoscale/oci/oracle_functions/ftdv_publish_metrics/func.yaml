@@ -1,7 +1,0 @@
-schema_version: 20180708
-name: ftdv_publish_metrics
-version: 0.0.0
-runtime: python
-entrypoint: /python/bin/fdk /function/ftdv_publish_metrics.py handler
-memory: 256
-timeout: 300

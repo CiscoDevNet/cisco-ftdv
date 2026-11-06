@@ -1,0 +1,75 @@
+! ASA Day-0 example; verify compatibility with the selected image.
+!
+! OPTIONAL EXAMPLE - CUSTOMIZE EVERY REPLACE_* VALUE
+! Submit as raw, non-Base64 IBM VPC user_data. This is not a production
+! configuration and does not define topology-specific policy, NAT, routing, or
+! licensing. Follow the Cisco ASAv 9.24 documentation linked in the README.
+! User data and Terraform/Schematics state are not secret stores.
+! This example configures an explicit inline public key for the chosen user.
+! Passing IBM SSH key IDs alone does not configure the guest user or SSH policy.
+! Qualify any image-managed IBM key-injection path separately before relying on it.
+!
+hostname REPLACE_ASAV_HOSTNAME
+!
+interface Management0/0
+ management-only
+ nameif management
+ security-level 100
+ ip address dhcp setroute
+ no shutdown
+ exit
+!
+interface GigabitEthernet0/0
+ nameif REPLACE_DATA_1_NAMEIF
+ security-level REPLACE_DATA_1_SECURITY_LEVEL
+ ip address dhcp
+ no shutdown
+ exit
+!
+interface GigabitEthernet0/1
+ nameif REPLACE_DATA_2_NAMEIF
+ security-level REPLACE_DATA_2_SECURITY_LEVEL
+ ip address dhcp
+ no shutdown
+ exit
+!
+crypto key generate ecdsa elliptic-curve 384
+ssh key-exchange hostkey ecdsa
+ssh timeout 15
+! Repeat this line for every approved administrator IPv4 address.
+ssh REPLACE_ADMIN_IPV4_ADDRESS 255.255.255.255 management
+!
+! Supply only the Base64 body (the middle field) of a raw RSA-2048 public key.
+! Do not paste the "ssh-rsa" prefix, comment, private key, or an RSA key larger
+! than 2048 bits into this inline command.
+username REPLACE_ADMIN_USERNAME privilege 15
+username REPLACE_ADMIN_USERNAME attributes
+ ssh authentication publickey REPLACE_RSA_2048_BASE64_PUBLIC_KEY_BODY_ONLY
+ service-type admin
+ exit
+!
+aaa authentication ssh console LOCAL
+aaa authorization exec LOCAL auto-enable
+!
+! IBM VPC private DNS resolvers and NTP service.
+dns domain-lookup management
+dns server-group DefaultDNS
+ name-server 161.26.0.10
+ name-server 161.26.0.11
+ exit
+!
+ntp server 161.26.0.6 source management prefer
+!
+! PASSWORD/ASDM COMMAND REFERENCE ONLY - KEEP COMMENTED IN USER DATA.
+! Initialize a unique enable password interactively on first privileged login,
+! then run "write memory". If product approval requires password or ASDM access,
+! configure a one-time credential interactively and restrict the source to
+! approved /32 addresses. Never reuse the illustrative forms below verbatim.
+! enable password REPLACE_ONE_TIME_ENABLE_PASSWORD
+! username REPLACE_ADMIN_USERNAME password REPLACE_ONE_TIME_ADMIN_PASSWORD privilege 15
+! username REPLACE_ASDM_USERNAME password REPLACE_ONE_TIME_ASDM_PASSWORD privilege 15
+! http server enable
+! aaa authentication http console LOCAL
+! http REPLACE_ADMIN_IPV4_ADDRESS 255.255.255.255 management
+!
+! Do not add a global permit-any ACL merely to enable management access.

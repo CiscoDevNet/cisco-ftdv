@@ -1,0 +1,85 @@
+{
+  "created_at_utc": "2026-11-06T07:55:58.599467+00:00",
+  "build_time_local": "2026-11-06T13:25:58.599467+05:30",
+  "filename_timezone": "Asia/Kolkata",
+  "status": "local_candidate_not_uploaded_or_IBM_validated",
+  "software_package_version": "1.0.0",
+  "changelog": {
+    "version": "1.0.0",
+    "date": "2026-11-05",
+    "changes": [
+      "Initial TF template creation"
+    ]
+  },
+  "module": "asav-ibm-tf",
+  "source": "solutions/asav-ibm-tf",
+  "source_path_base": "project",
+  "archive_filename": "asav-ibm-tf-1-0-0-132558-20261106.tgz",
+  "archive_sha256": "fff7a9bf77aebb5bc57913a85efab3d6b6b3773110b6e56013648fa5c3caf93d",
+  "archive_root": "root/",
+  "archive_layout": "single root/ folder containing all 14 customer files; README.md beside main.tf",
+  "files_sha256": {
+    ".terraform.lock.hcl": "f9ec7c79e35746b6fc913ddf385ab5ce7270113a2000ceff35032cef656467bb",
+    "README.md": "4685bdfb02d4b06b8dd3787b36399999e175064460c3ac2ca7fb5b7eff932f95",
+    "asav-images.json": "244276c0f86e9e84c28b756e814f6e752355e001ba2a2ec808cfe8a06969a169",
+    "bootstrap/asav-day0.example.txt": "15f04b3050137ef2efec610510ae5378aff32a4ff4c4b489b8ae90139e6d3a52",
+    "changelog.txt": "59e5d46450bc14187fa80c2f46186e998192cf5b55a4c2c163451d67600a8cff",
+    "data.tf": "629104c0e8cce01f879565cf664eee191b55d6a841d670d1745f776bbf36b563",
+    "docs/asav-existing-vpc.png": "096ef20b6efbebcb007ce060483983f59cf6e1e7d57851a7057dccd99aab38fd",
+    "docs/routing-guide.md": "cd468ab77c9f4660868aacc7c9c062d42fbf1401a7730d38b9589d9025c47195",
+    "locals.tf": "4d3d5d6ebd7f01238e2cbaa7cf795893b36061344d1a0ee8e200cac422fa7d22",
+    "main.tf": "590c1c6f8644f68bef0f0cb35f6182247c1152819b3abf5d5c30646e6ae4cdf9",
+    "outputs.tf": "58b79e0d6f9cabf09e6bf6308bb93420941fc8c2ec61f3b28b8e6b4d7f86f0e9",
+    "provider.tf": "b5815fcd378e7f0e27570768629bb5c57146fc4913bcb4c1ce0953dca116fc1f",
+    "variables.tf": "4357ed65e3be52f4a7625697eb95dd0495d018ef77ca588308f1e18dd696ddaf",
+    "version.tf": "b219d2bb5c9becf7e5e3bc63824da46375b799b17e1cbfae2871993764857eda"
+  },
+  "relative_links_verified": [
+    {
+      "from": "README.md",
+      "target": "docs/asav-existing-vpc.png"
+    },
+    {
+      "from": "README.md",
+      "target": "bootstrap/asav-day0.example.txt"
+    },
+    {
+      "from": "README.md",
+      "target": "asav-images.json"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/routing-guide.md"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "outputs.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "changelog.txt"
+    }
+  ],
+  "default_asav_image_label": "9.24.10.1",
+  "packaged_image_labels": [
+    "9.24.10.1"
+  ],
+  "checks": [
+    "single root/ directory",
+    "14-file allowlist",
+    "changelog version/date",
+    "README sections",
+    "JSON/reference format",
+    "relative links",
+    "archive round trip"
+  ],
+  "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval."
+}
