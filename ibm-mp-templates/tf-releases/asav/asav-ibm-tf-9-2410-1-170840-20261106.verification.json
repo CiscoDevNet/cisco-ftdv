@@ -1,32 +1,35 @@
 {
-  "created_at_utc": "2026-11-06T10:03:37.994074+00:00",
-  "build_time_local": "2026-11-06T15:33:37.994074+05:30",
+  "created_at_utc": "2026-11-06T11:38:40.309349+00:00",
+  "build_time_local": "2026-11-06T17:08:40.309349+05:30",
   "filename_timezone": "Asia/Kolkata",
   "status": "local_candidate_not_uploaded_or_IBM_validated",
-  "software_package_version": "1.0.1",
+  "software_package_version": "9.2410.1",
   "changelog": {
-    "version": "1.0.1",
+    "version": "9.2410.1",
     "date": "2026-11-06",
     "changes": [
+      "Initial TF template creation for ASAv 9.24.10.1 using VSI Catalog package 9.2410.1.",
       "Allow Terraform >= 1.13.4 and < 1.14.0 for Schematics-managed patch updates.",
-      "Update runtime metadata, local checks and deployment guidance.",
+      "Use IBM provider 2.4.0 and include deployment, update and destroy guidance.",
       "Record the verified Darwin AMD64 provider checksum for read-only local checks.",
-      "Replace the ssh_key_ids list input with one required ssh_key_id string."
+      "Accept one required ssh_key_id string and resolve image options from asav-images.json.",
+      "Include the Day-0 example, architecture diagram and routing guide in the release archive.",
+      "Document Catalog image choices, customer-facing input labels and validation overrides."
     ]
   },
   "module": "asav-ibm-tf",
   "source": "solutions/asav-ibm-tf",
   "source_path_base": "project",
-  "archive_filename": "asav-ibm-tf-1-0-1-153337-20261106.tgz",
-  "archive_sha256": "f90d5ffe2b453b52c1f59918fd5fa5e3b76b85c02acfe07acb80e88f8769c1c0",
+  "archive_filename": "asav-ibm-tf-9-2410-1-170840-20261106.tgz",
+  "archive_sha256": "aaa03637db2d86a97968bf4444a56bf4206ef1cee7b3cb539afa8df8cb5bf666",
   "archive_root": "root/",
   "archive_layout": "single root/ folder containing all 14 customer files; README.md beside main.tf",
   "files_sha256": {
     ".terraform.lock.hcl": "88c060c16604781908be0400670626e385ad9d2054e7a62871881939feff5032",
-    "README.md": "e19fbfec64c034ce2abd3bcaee95ca0021d290020c35711a4ecd0125c2c3cadd",
+    "README.md": "e2beff9f5bdff6251d1c865446eb165a8fcc834f6922b295549f31bb9e41a59b",
     "asav-images.json": "244276c0f86e9e84c28b756e814f6e752355e001ba2a2ec808cfe8a06969a169",
     "bootstrap/asav-day0.example.txt": "cbe717e5fe458a6a4c2dea8198f26bf346f0b043f546656f3db682db74981666",
-    "changelog.txt": "2ecb82488d534f99fe1de282fc71d79f42364eea2651400351d35c7220d8ab9a",
+    "changelog.txt": "6a16c1a9f1811703ac01f8466ddcfe511217609608d14c20b9a928fefe1e0e2b",
     "data.tf": "9854ad8bd6d0d13ac2b83bad01fcd9546ff075003d6ac4d1e5f5da24c59ee3b0",
     "docs/asav-existing-vpc.png": "096ef20b6efbebcb007ce060483983f59cf6e1e7d57851a7057dccd99aab38fd",
     "docs/routing-guide.md": "cd468ab77c9f4660868aacc7c9c062d42fbf1401a7730d38b9589d9025c47195",
@@ -57,6 +60,10 @@
     {
       "from": "README.md",
       "target": "docs/routing-guide.md"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
     },
     {
       "from": "README.md",

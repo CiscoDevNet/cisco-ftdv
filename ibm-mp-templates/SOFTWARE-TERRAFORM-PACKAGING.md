@@ -54,7 +54,8 @@ an installed provider directory. The provider is pinned to **2.4.0**.
 
 The package builder needs no IBM credentials. It writes the `.tgz`, `.sha256` and
 `.verification.json` directly into `tf-releases/asav/`. The version comes from the
-latest entry in the module's `changelog.txt` (initial version `1.0.0`).
+topmost dated version entry in the module's `changelog.txt` (initial version `9.2410.1`, matching
+the IBM Software listing).
 
 Verification reports record the source relative to this IBM project and the
 archive filename, so moving the artifact triplet does not leave absolute paths
@@ -63,7 +64,7 @@ records only its directory name; `source_path_base` identifies that case.
 
 ```text
 asav-ibm-tf-<version-with-hyphens>-<HHMMSS>-<YYYYMMDD>.tgz
-asav-ibm-tf-1-0-0-180500-20261105.tgz  # example
+asav-ibm-tf-9-2410-1-180500-20261106.tgz  # example
 ```
 
 Time/date use **Asia/Kolkata (UTC+05:30)**; `HHMMSS` has six digits. A filename's
@@ -129,36 +130,81 @@ The packaged diagram supports the README. Listing media needs its own configured
 hosted URL. There is no active DA manifest or automatic README-to-marketing sync.
 See [IBM's README outline](https://cloud.ibm.com/media/docs/downloads/software/sw-readme-tab-template.md).
 
-### Terraform runtime mismatch during validation
+### Runtime and input configuration
 
-The 2026-11-06 Partner Center job ran `terraform1.13` with Terraform **1.13.5**.
-Package 1.0.0 required exactly 1.13.4, so `init` stopped before provisioning.
-Package **1.0.1** accepts `>= 1.13.4, < 1.14.0`. Keep provider 2.4.0 pinned and
-leave the `TF_VERSION` metadata input out of the customer form; it accepts legacy
-1.13 patch labels but does not select the executable.
+The initial release accepts Terraform `>= 1.13.4, < 1.14.0` and pins IBM provider
+2.4.0. Select runtime series **1.13**; Schematics manages the patch version.
+An exact Core pin can fail when the service advances its patch. `TF_VERSION`
+accepts legacy 1.13 patch labels but does not select the executable; leave it out
+of the customer form.
 
-For a retry, publish the new archive under a new filename/commit and import it as
-a new draft version (package version **1.0.1**). Reuse the reviewed input/IAM
-configuration and validation values, select runtime series **1.13**, then rerun
-validation. A retry against the unchanged 1.0.0 archive retains its exact-version
-failure. Preserve the original archive and the failed job logs.
-
-Package 1.0.1 also replaces the draft's `ssh_key_ids` array with the required
-`ssh_key_id` string. When copying deployment values from the old draft, omit the
-old parameter and add `ssh_key_id` from the new source. Keep it required, visible
-and without a default resource ID. Update validation JSON/tfvars from
-`"ssh_key_ids": ["KEY_ID"]` to `"ssh_key_id": "KEY_ID"`. The module resolves one
-regional key registration and supplies the provider's one-element key list
-internally. The Day-0 key/user setup remains separate.
+Keep `ssh_key_id` required, visible and without a default account resource ID.
+For earlier test inputs, replace `"ssh_key_ids": ["KEY_ID"]` with
+`"ssh_key_id": "KEY_ID"`. The module resolves one regional key registration and
+supplies the provider's one-element key list internally. Day-0 key/user setup
+remains separate.
 
 [IBM managed runtime constraints](https://cloud.ibm.com/docs/schematics?topic=schematics-version-constraints),
 [Terraform version constraint syntax](https://developer.hashicorp.com/terraform/language/expressions/version-constraints).
 
-The same job's cart preparation reported `No README file is found`, while the
-archive contains `root/README.md` beside `root/main.tf`. This warning is separate
-from the Core-version failure. Check the Catalog **Edit readme** preview and the
-Schematics **Readme** view after reimport; README rendering remains pending.
-Keep the single `root/` archive layout while investigating the preview.
+An earlier cart-preparation job reported `No README file is found`, while the
+archive contains `root/README.md` beside `root/main.tf`. Catalog import subsequently
+included the customer README. Check both **Edit readme** and the Schematics
+**Readme** view after each source reload; retain the required single `root/` layout.
+
+### Customer-facing input labels
+
+The existing Catalog version was updated on 2026-11-06 with these display names.
+Terraform input identifiers stay unchanged. Import/review the deployment-value
+configuration when onboarding another version; README text does not populate
+these labels automatically.
+
+| Terraform key | Catalog display name |
+|---|---|
+| `prefix` | Resource name prefix |
+| `region` | Deployment region |
+| `resource_group_name` | Deployment resource group |
+| `vpc_id` | Existing VPC ID |
+| `instance_profile` | Virtual server profile |
+| `management_subnet_id` | Management subnet ID |
+| `data_subnet_1_id` | Data interface 1 subnet ID |
+| `data_subnet_2_id` | Data interface 2 subnet ID |
+| `management_security_group_id` | Management security group ID |
+| `data_security_group_1_id` | Data interface 1 security group ID |
+| `data_security_group_2_id` | Data interface 2 security group ID |
+| `ssh_key_id` | SSH key ID |
+| `asav_image_version` | ASAv image version |
+| `enable_secure_boot` | Enable Secure Boot |
+| `create_management_floating_ip` | Create management floating IP |
+| `user_data` | ASAv Day-0 configuration |
+| `all_interface_allow_ip_spoofing` | Allow IP spoofing on all interfaces |
+| `tags` | Resource tags |
+
+Subnet descriptions identify Management0/0 (IBM eth0), GigabitEthernet0/0
+(eth1) and GigabitEthernet0/1 (eth2), with Data 1/2 roles customer-defined.
+Region and resource-group descriptions distinguish deployment settings from the
+Schematics workspace settings. Day-0 and SSH-key descriptions explain the guest
+bootstrap requirement; IP-spoofing help explains its scope and IAM requirement.
+
+Keep `TF_VERSION`, `enable_metadata_service` and `metadata_service_protocol`
+out of the standard customer form. Protocol filtering is currently unimported;
+if exposing it as an advanced option later, use the display name **Protocol state
+filtering mode — all interfaces** and retain its compatibility guidance.
+Catalog-only label/description changes do not rebuild the deployment archive.
+
+### Validation with IP spoofing disabled
+
+On 2026-11-06, the Catalog API reported an earlier prepublication draft as valid;
+the publisher used `all_interface_allow_ip_spoofing = false` for that validation.
+The configured customer-form default remains **true**. This validation does not
+qualify the intended forwarding default. For a restricted-account
+boot/management test, import this optional Boolean and set **false** in the
+validation inputs. Review the customer-form default separately before publication.
+
+Rebuilding the archive creates new source bytes. A version already validated
+against an older archive does not automatically validate the replacement. Reload
+or import the reviewed new source using the supported draft workflow and rerun
+validation; preserve the previous source URL, hash and logs.
 
 ### Catalog IAM requirements
 
@@ -212,11 +258,13 @@ the subnet-update action used to allocate the VNIs' reserved IPs. See
   (`globalcatalog`) requirement is declared for this package; it uses an existing
   `globalcatalog-collection` version CRN. Reassess if that dependency changes.
 
-Status: **11 declarations configured in the supplied screenshots; effective IAM
-and complete deployment/update/destroy validation remain pending for this imported
-version.** During validation, identify the actual user/service ID/trusted profile
-used by Schematics, or the explicit API-key override if supplied. Retain any denied
-actions and their resource scopes; this table is not a proven minimum custom role.
+Status: **11 IAM declarations configured.** A run with the intended IP-spoofing
+default was denied the VNI `manage-ip-spoofing` action. An earlier draft validated
+with that input set to false. The replacement release needs validation against its
+new archive; default forwarding access and imported-version update/destroy
+qualification remain pending. Identify the actual runtime user/service ID/trusted
+profile or explicit API-key identity.
+Retain denied actions and scopes; this table is not a proven minimum custom role.
 
 ## Release history
 
@@ -232,7 +280,7 @@ New ASAv builds go directly into the product directory. Replace the example stem
 with the generated filename and run from `ibm-mp-templates/` to inspect a build:
 
 ```bash
-ASAV_STEM='asav-ibm-tf-1-0-0-180500-20261105'  # actual filename stem
+ASAV_STEM='asav-ibm-tf-9-2410-1-180500-20261106'  # actual filename stem
 (
   cd tf-releases/asav
   shasum -a 256 -c "$ASAV_STEM.sha256"
@@ -248,24 +296,42 @@ release/tag, source URL and IBM Catalog version. Future products use sibling
 project before cleaning them up. No nested candidate/uploaded folders or upload
 ledger are needed.
 
-Keep changelog entries newest first, with increasing unique `major.minor.patch`
-versions. Dates accept abbreviated/full English months; use `Changes` or
-`Changes:`. Initial format:
+Prepend each new release at the **top** of `changelog.txt`. The packager selects
+the first dated `version MAJOR.MINOR.PATCH` entry, ignoring blank lines and `#`
+separator/comment lines. It validates the complete history: versions must be
+unique and decrease numerically from top to bottom. File length does not change
+which entry is selected. Dates accept abbreviated/full English months; use
+`Changes` or `Changes:`. Initial format:
 
 ```text
 ######################################################################
-2026-Nov-05
-version 1.0.0
+2026-Nov-06
+version 9.2410.1
 Changes
 Initial TF template creation
 ######################################################################
 ```
 
-For each subsequent shipped change, prepend a new dated version/change entry;
-freeze released entries and assets. Software package versions are separate from
-VSI package and ASAv image versions. Retain the source tag/commit, release URL,
-SHA-256 and Partner Center version identifier with your release records, and keep
-an external backup of published assets.
+The initial entry consolidates the earlier unpublished test-package changes.
+Use **9.2410.1** in the changelog, generated verification report and IBM Software
+listing. The package builder reads this three-part value directly; no separate
+hardcoded release version needs updating.
+
+| Identifier | Initial value | Purpose |
+|---|---|---|
+| Terraform package / IBM Software listing | `9.2410.1` | Matches the backing VSI Catalog package version. |
+| Guest ASAv / `asav_image_version` label | `9.24.10.1` | Input used to select the packaged image entry. |
+| Backing VSI Catalog package | `9.2410.1` | Existing image tile's package reference. |
+
+For subsequent shipped changes, prepend a unique agreed listing version and
+freeze released entries/assets. The builder currently accepts three numeric
+components only. A possible `9.2410.1-v1` / `-v2` convention remains a future
+decision; such suffixes have prerelease semantics under SemVer and are not enabled
+by this change. Track interim template revisions through Git commits/tags and the
+existing timestamped filenames; agree the IBM version before shipping a revision.
+Retain the source commit/tag, release URL, SHA-256 and Partner Center version ID.
+[IBM version format](https://cloud.ibm.com/docs/sell?topic=sell-add-version-software),
+[SemVer prerelease ordering](https://semver.org/#spec-item-9).
 
 ## Maintain image versions in one file
 
@@ -282,6 +348,37 @@ Then update the changelog for the next release, run checks/build, and review the
 imported form's image choices/default. Compatible image-list changes need only
 this JSON deployment-data edit; a new NIC, metadata or bootstrap contract needs
 additional code/qualification. Region/profile input defaults are separate.
+
+### Customer image selector in Catalog
+
+Configure `asav_image_version` as a visible, optional string with display name
+**ASAv image version**. Set its default from `default_version` in
+`asav-images.json` and its selectable `options` from that file's `releases` keys.
+These settings were saved in the existing Catalog version on 2026-11-06; review
+or reapply them whenever importing/reloading a release. They do not synchronize
+from the Terraform JSON at deployment time.
+
+Generate the current field values from the single image-list source:
+
+```bash
+python3 - <<'PYCONFIG'
+import json
+from pathlib import Path
+images = json.loads(Path("solutions/asav-ibm-tf/asav-images.json").read_text())
+print(json.dumps({
+    "key": "asav_image_version",
+    "display_name": "ASAv image version",
+    "default_value": images["default_version"],
+    "options": list(images["releases"]),
+    "required": False,
+    "hidden": False
+}, indent=2))
+PYCONFIG
+```
+
+Preview the customer deployment form after saving. Include only image labels
+supported by the imported package. Catalog-only presentation changes do not
+require rebuilding the deployment archive.
 
 Omitted/null labels follow the packaged default. A default change can select a
 new image for unpinned deployments; a removed label fails validation and can block

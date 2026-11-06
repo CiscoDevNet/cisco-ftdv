@@ -23,7 +23,7 @@ class PackageChecks(unittest.TestCase):
         self.source = self.work / 'source'
         shutil.copytree(SCRIPT.parent.parent / 'solutions/asav-ibm-tf', self.source)
         self.fixed_time = datetime(2026, 11, 5, 6, 30, 45, tzinfo=timezone.utc)
-        (self.source / 'changelog.txt').write_text('2026-Nov-05\nversion 1.0.0\nChanges\nInitial TF template creation\n')
+        (self.source / 'changelog.txt').write_text('2026-Nov-05\nversion 9.2410.1\nChanges\nInitial TF template creation\n')
 
     def build(self, output=None, **kwargs):
         kwargs.setdefault("build_time", self.fixed_time)
@@ -139,10 +139,10 @@ class PackageChecks(unittest.TestCase):
 
     def test_default_name_uses_changelog_version_and_ist_clock(self):
         archive, checksum, manifest = self.build(self.work / 'out')
-        self.assertEqual(archive.name, 'asav-ibm-tf-1-0-0-120045-20261105.tgz')
+        self.assertEqual(archive.name, 'asav-ibm-tf-9-2410-1-120045-20261105.tgz')
         record = json.loads(manifest.read_text())
         self.assertEqual(record['archive_root'], 'root/')
-        self.assertEqual(record['software_package_version'], '1.0.0')
+        self.assertEqual(record['software_package_version'], '9.2410.1')
         self.assertEqual(record['filename_timezone'], 'Asia/Kolkata')
         self.assertEqual(record['changelog']['changes'], ['Initial TF template creation'])
         self.assertIn(archive.name, checksum.read_text())
@@ -150,13 +150,13 @@ class PackageChecks(unittest.TestCase):
     def test_date_and_time_roll_over_together_in_ist(self):
         at = datetime(2026, 11, 5, 21, 45, tzinfo=timezone.utc)
         archive, _, _ = self.build(self.work / 'out', build_time=at)
-        self.assertEqual(archive.name, 'asav-ibm-tf-1-0-0-031500-20261106.tgz')
+        self.assertEqual(archive.name, 'asav-ibm-tf-9-2410-1-031500-20261106.tgz')
 
     def test_custom_filename_keeps_changelog_version(self):
         archive, checksum, manifest = self.build(self.work / 'out', filename='my-asav-pilot.tgz')
         self.assertEqual(archive.name, 'my-asav-pilot.tgz')
         self.assertEqual(checksum.name, 'my-asav-pilot.sha256')
-        self.assertEqual(json.loads(manifest.read_text())['software_package_version'], '1.0.0')
+        self.assertEqual(json.loads(manifest.read_text())['software_package_version'], '9.2410.1')
 
     def test_rejects_unsafe_or_wrong_extension_filename(self):
         for name in ['../escape.tgz', '/tmp/absolute.tgz', 'file.zip', '.hidden.tgz', '']:
@@ -165,7 +165,7 @@ class PackageChecks(unittest.TestCase):
 
     def test_version_argument_cannot_disagree_with_changelog(self):
         with self.assertRaises(ValueError):
-            self.build(self.work / 'out', version='1.1.0')
+            self.build(self.work / 'out', version='9.2410.99')
 
     def test_default_output_is_used(self):
         self.assertEqual(package.DEFAULT_OUTPUT, SCRIPT.parent.parent / 'tf-releases/asav')
@@ -199,9 +199,9 @@ class PackageChecks(unittest.TestCase):
 
     def test_latest_entry_controls_version(self):
         p = self.source / 'changelog.txt'
-        p.write_text('2026-Nov-06\nversion 1.0.1\nChanges:\nExample next change\n' + '#' * 30 + '\n' + p.read_text())
+        p.write_text('2026-Nov-06\nversion 9.2410.2\nChanges:\nExample next change\n' + '#' * 30 + '\n' + p.read_text())
         archive, _, manifest = self.build(self.work / 'out')
-        self.assertTrue(archive.name.startswith('asav-ibm-tf-1-0-1-'))
+        self.assertTrue(archive.name.startswith('asav-ibm-tf-9-2410-2-'))
         self.assertEqual(json.loads(manifest.read_text())['changelog']['date'], '2026-11-06')
 
     def test_rejects_duplicate_changelog_versions(self):
@@ -212,7 +212,7 @@ class PackageChecks(unittest.TestCase):
 
     def test_rejects_oldest_first_changelog(self):
         p = self.source / 'changelog.txt'
-        p.write_text(p.read_text() + '\n2026-Nov-06\nversion 1.0.1\nChanges\nExample next change\n')
+        p.write_text(p.read_text() + '\n2026-Nov-06\nversion 9.2410.2\nChanges\nExample next change\n')
         with self.assertRaises(ValueError):
             self.build(self.work / 'out')
 
@@ -224,7 +224,7 @@ class PackageChecks(unittest.TestCase):
 
     def test_rejects_empty_change_entry(self):
         p = self.source / 'changelog.txt'
-        p.write_text('2026-Nov-05\nversion 1.0.0\nChanges\n')
+        p.write_text('2026-Nov-05\nversion 9.2410.1\nChanges\n')
         with self.assertRaises(ValueError):
             self.build(self.work / 'out')
 

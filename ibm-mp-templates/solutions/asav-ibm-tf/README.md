@@ -2,6 +2,8 @@
 
 Deploy one three-interface ASAv from a Cisco VSI Catalog version into your existing IBM Cloud VPC. Obtain ASAv BYOL entitlement and eligible Cisco support separately.
 
+Initial Terraform package / IBM Software listing version: **9.2410.1**. The packaged image label is **9.24.10.1**, backed by VSI Catalog package **9.2410.1**. Use the image label, not the Software listing version, for `asav_image_version`.
+
 ![ASAv existing-VPC architecture](docs/asav-existing-vpc.png)
 
 | IBM interface | ASAv interface | Role |
@@ -18,7 +20,7 @@ Prepare an existing resource group, VPC, three distinct subnets in the same VPC/
 
 | Scope | Required access |
 |---|---|
-| VPC Infrastructure Services | Platform **Administrator** is the verified built-in role for the default VNI settings. Scope access to the deployment resources where possible, with reads of existing VPCs, subnets, SGs, keys and profiles. |
+| VPC deployment resources | Create/update/delete access for the VSI, VNIs, boot volume and optional floating IP; appropriate access to the existing VPC, subnets, SGs, keys and profiles. The default VNI settings require **Virtual Network Interface → Administrator**, or equivalent custom actions. Scope access to the deployment resources where possible. |
 | Selected Cisco VSI offering | Catalog read access and entitlement to consume the selected version. |
 | Target resource group | Viewer access to resolve the group by name. |
 
@@ -58,6 +60,8 @@ Supply the resource group, VPC, three subnet/security-group pairs and one region
 4. Inspect `selected_asav_image`, `interface_map` and `management_floating_ip`. Through management access, run `show version`, `show vm` and `show interface ip brief`; verify the guest version, hostname, interfaces and Day-0 results.
 5. Configure licensing and guest policy, then follow the [routing guide](docs/routing-guide.md) before changing customer routes. Instance `running` status alone does not establish forwarding readiness.
 
+The Catalog form can show friendly labels such as **Resource name prefix** and **ASAv Day-0 configuration**. Local/API inputs retain the Terraform keys `prefix` and `user_data`; see [variables.tf](variables.tf) for the complete schema.
+
 For local deployment, use a runtime satisfying `version.tf` and provider environment authentication. Keep variables/state outside the release package. Run `terraform init`, review `terraform plan`, apply the intended plan, then inspect `terraform output`. The Catalog Create form lists deployment values; [variables.tf](variables.tf) supplies the full local input reference.
 
 ### Production configuration
@@ -72,7 +76,7 @@ Outputs include instance identity/status, zone, `selected_asav_image`, `secure_b
 
 ## Upgrading to a new version
 
-See [changelog.txt](changelog.txt) for Software Terraform package history. Its version is separate from the VSI Catalog package and guest ASAv version.
+See [changelog.txt](changelog.txt) for Software Terraform package history. The initial package uses the IBM Software listing version **9.2410.1**, aligned with the backing VSI Catalog package. The guest label **9.24.10.1** and VSI Catalog package **9.2410.1** identify the backing image separately.
 
 Adopt a new package in the existing workspace/state and inspect the plan before applying. Omitted/null image labels follow the new package's default; pin a retained label when the image should remain unchanged. Changing the Terraform package does not perform an in-guest ASA upgrade.
 

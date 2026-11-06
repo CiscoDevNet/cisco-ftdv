@@ -1,14 +1,12 @@
 ##############################################################################################################################################################################################
 2026-Nov-06
-version 1.0.1
+version 9.2410.1
 Changes
+Initial TF template creation for ASAv 9.24.10.1 using VSI Catalog package 9.2410.1.
 Allow Terraform >= 1.13.4 and < 1.14.0 for Schematics-managed patch updates.
-Update runtime metadata, local checks and deployment guidance.
+Use IBM provider 2.4.0 and include deployment, update and destroy guidance.
 Record the verified Darwin AMD64 provider checksum for read-only local checks.
-Replace the ssh_key_ids list input with one required ssh_key_id string.
-##############################################################################################################################################################################################
-2026-Nov-05
-version 1.0.0
-Changes
-Initial TF template creation
+Accept one required ssh_key_id string and resolve image options from asav-images.json.
+Include the Day-0 example, architecture diagram and routing guide in the release archive.
+Document Catalog image choices, customer-facing input labels and validation overrides.
 ##############################################################################################################################################################################################

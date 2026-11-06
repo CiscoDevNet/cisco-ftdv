@@ -12,6 +12,8 @@ The customer module is `solutions/asav-ibm-tf/`. Terraform must satisfy `>= 1.13
 
 Provide one existing regional SSH-key registration through the required `ssh_key_id` string input. Configure guest SSH access separately using the module's Day-0 guidance.
 
+The initial Terraform package and IBM Software listing version are **9.2410.1**. This release deploys guest ASAv **9.24.10.1** from VSI Catalog package **9.2410.1**; those image identifiers remain unchanged.
+
 ### Resources
 
 * ASAv: [Deployment Guide](solutions/asav-ibm-tf/README.md)     |     [Architecture Diagram](solutions/asav-ibm-tf/docs/asav-existing-vpc.png)     |     [Routing Guide](solutions/asav-ibm-tf/docs/routing-guide.md)
@@ -25,7 +27,7 @@ Run from this directory, `ibm-mp-templates/`, using Python 3.9+:
 python3 publisher/package_asav.py
 ```
 
-The builder reads the module's `changelog.txt` and writes a `.tgz`, SHA-256 checksum and verification report directly into `tf-releases/asav/`. The archive contains one `root/` folder holding the 14 customer files, with `README.md` beside `main.tf`. Publisher tools and the repository/project overview READMEs stay outside the deployment archive.
+The builder reads the topmost dated version entry in the module's `changelog.txt` and writes a `.tgz`, SHA-256 checksum and verification report directly into `tf-releases/asav/`. Add new entries at the top; the complete history must contain unique versions in descending order. The archive contains one `root/` folder holding the 14 customer files, with `README.md` beside `main.tf`. Publisher tools and the repository/project overview READMEs stay outside the deployment archive.
 
 The verification report uses a project-relative source path and archive filename. Product-folder placement identifies the product; release confirmation is recorded separately through the Git release/tag and IBM Catalog version.
 
