@@ -8,7 +8,9 @@ Deploy one three-interface ASAv into an existing IBM Cloud VPC using a Cisco VSI
 
 Terraform creates the VSI, boot volume, three virtual network interfaces and an optional management floating IP. Existing resource groups, VPCs, subnets, security groups and SSH keys are reused. Customer routes and guest firewall policy are managed separately.
 
-The customer module is `solutions/asav-ibm-tf/`. Terraform is pinned to `1.13.4` and the IBM provider to `2.4.0`.
+The customer module is `solutions/asav-ibm-tf/`. Terraform must satisfy `>= 1.13.4, < 1.14.0`; the IBM provider is pinned to `2.4.0`. Select the `1.13` runtime series in the Catalog version settings and verify the managed patch in the validation logs.
+
+Provide one existing regional SSH-key registration through the required `ssh_key_id` string input. Configure guest SSH access separately using the module's Day-0 guidance.
 
 ### Resources
 
@@ -29,6 +31,6 @@ The verification report uses a project-relative source path and archive filename
 
 ### Resources
 
-* Publishing: [Packaging and Lifecycle Guide](SOFTWARE-TERRAFORM-PACKAGING.md)     |     [ASAv Release Artifacts](tf-releases/asav/)
+* Publishing: [Packaging and Lifecycle Guide](SOFTWARE-TERRAFORM-PACKAGING.md)     |     [Catalog IAM Setup](SOFTWARE-TERRAFORM-PACKAGING.md#catalog-iam-requirements)     |     [ASAv Release Artifacts](tf-releases/asav/)
 
 The publisher guide contains validation, custom-filename, image-maintenance and release commands. The ASAv deployment guide contains the customer installation, update and removal instructions.

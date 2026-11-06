@@ -6,7 +6,7 @@
 ! licensing. Follow the Cisco ASAv 9.24 documentation linked in the README.
 ! User data and Terraform/Schematics state are not secret stores.
 ! This example configures an explicit inline public key for the chosen user.
-! Passing IBM SSH key IDs alone does not configure the guest user or SSH policy.
+! Passing an IBM SSH key ID alone does not configure the guest user or SSH policy.
 ! Qualify any image-managed IBM key-injection path separately before relying on it.
 !
 hostname REPLACE_ASAV_HOSTNAME

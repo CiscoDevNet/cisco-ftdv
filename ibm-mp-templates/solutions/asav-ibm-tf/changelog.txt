@@ -1,4 +1,12 @@
 ##############################################################################################################################################################################################
+2026-Nov-06
+version 1.0.1
+Changes
+Allow Terraform >= 1.13.4 and < 1.14.0 for Schematics-managed patch updates.
+Update runtime metadata, local checks and deployment guidance.
+Record the verified Darwin AMD64 provider checksum for read-only local checks.
+Replace the ssh_key_ids list input with one required ssh_key_id string.
+##############################################################################################################################################################################################
 2026-Nov-05
 version 1.0.0
 Changes

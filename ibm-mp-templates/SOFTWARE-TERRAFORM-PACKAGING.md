@@ -37,7 +37,7 @@ Keep state, plans, active `.tfvars`, credentials and logs outside the module.
 
 ## Local checks and build
 
-Run from `ibm-mp-templates/`, using Python 3.9+ and Terraform **1.13.4**:
+Run from `ibm-mp-templates/`, using Python 3.9+ and Terraform **>= 1.13.4, < 1.14.0**:
 
 ```bash
 python3 -m unittest discover -s publisher/tests -p 'test_*.py'
@@ -94,8 +94,10 @@ active release directory; rebuild them before using them for an IBM import.
 
 ## Partner Center import and configuration
 
-1. Create an immutable Git release/tag and upload the generated deployment `.tgz`
-   as its asset. Record the download URL and SHA-256. The repository's automatic
+1. Commit and push the generated deployment `.tgz`, then use its commit-pinned
+   `raw.githubusercontent.com` URL (accepted by this validation workflow), or
+   upload it as a GitHub Release asset and use that download URL. Record the source
+   commit, URL and SHA-256. A GitHub `blob` URL serves HTML. The repository's automatic
    source archive includes publisher files and is not the curated module package.
 2. In **Partner Center → product → Software → Import a version**, select Terraform,
    enter the asset URL and the dotted changelog version. For private source,
@@ -104,8 +106,10 @@ active release directory; rebuild them before using them for an IBM import.
 3. Review deployment values, required/sensitive/advanced settings, output
    descriptions and IAM. Match image choices/defaults to `asav-images.json`;
    dropdowns are not synchronized automatically. Confirm the actual workspace
-   uses Terraform **1.13.4** and IBM provider **2.4.0**. `TF_VERSION` is metadata,
-   not a runtime selector. The API-key override is optional.
+   uses a Terraform patch satisfying **>= 1.13.4, < 1.14.0** and IBM provider
+   **2.4.0**. Enable the runtime override and enter **1.13**; confirm the actual
+   patch in the job logs. `TF_VERSION` is legacy metadata, not a runtime selector.
+   The API-key override is optional.
 4. Preview the imported README and links, complete applicable BYOL/license and
    product fields, then run the version's validation workflow. Retain logs and
    remove validation resources. Public publication follows IBM approval; initial
@@ -124,6 +128,95 @@ active release directory; rebuild them before using them for an IBM import.
 The packaged diagram supports the README. Listing media needs its own configured
 hosted URL. There is no active DA manifest or automatic README-to-marketing sync.
 See [IBM's README outline](https://cloud.ibm.com/media/docs/downloads/software/sw-readme-tab-template.md).
+
+### Terraform runtime mismatch during validation
+
+The 2026-11-06 Partner Center job ran `terraform1.13` with Terraform **1.13.5**.
+Package 1.0.0 required exactly 1.13.4, so `init` stopped before provisioning.
+Package **1.0.1** accepts `>= 1.13.4, < 1.14.0`. Keep provider 2.4.0 pinned and
+leave the `TF_VERSION` metadata input out of the customer form; it accepts legacy
+1.13 patch labels but does not select the executable.
+
+For a retry, publish the new archive under a new filename/commit and import it as
+a new draft version (package version **1.0.1**). Reuse the reviewed input/IAM
+configuration and validation values, select runtime series **1.13**, then rerun
+validation. A retry against the unchanged 1.0.0 archive retains its exact-version
+failure. Preserve the original archive and the failed job logs.
+
+Package 1.0.1 also replaces the draft's `ssh_key_ids` array with the required
+`ssh_key_id` string. When copying deployment values from the old draft, omit the
+old parameter and add `ssh_key_id` from the new source. Keep it required, visible
+and without a default resource ID. Update validation JSON/tfvars from
+`"ssh_key_ids": ["KEY_ID"]` to `"ssh_key_id": "KEY_ID"`. The module resolves one
+regional key registration and supplies the provider's one-element key list
+internally. The Day-0 key/user setup remains separate.
+
+[IBM managed runtime constraints](https://cloud.ibm.com/docs/schematics?topic=schematics-version-constraints),
+[Terraform version constraint syntax](https://developer.hashicorp.com/terraform/language/expressions/version-constraints).
+
+The same job's cart preparation reported `No README file is found`, while the
+archive contains `root/README.md` beside `root/main.tf`. This warning is separate
+from the Core-version failure. Check the Catalog **Edit readme** preview and the
+Schematics **Readme** view after reimport; README rendering remains pending.
+Keep the single `root/` archive layout while investigating the preview.
+
+### Catalog IAM requirements
+
+Recorded from the configured Software → Terraform version form on **2026-11-06**.
+These are declared installation requirements; adding them does not grant IAM
+policies. The deployment identity must have the corresponding access.
+
+In **Configure version → Define IAM access**, add the following entries. A dash
+means leave that role field unselected. Use **All resources** for this reusable
+catalog declaration; scope actual IAM policies to permitted deployment resources.
+
+| Service name in the version form | Service ID | Platform role | Service role |
+|---|---|---|---|
+| Virtual Private Cloud | `is.vpc` | Operator | — |
+| Subnet | `is.subnet` | Editor | — |
+| Security Group for VPC | `is.security-group` | Operator | — |
+| SSH Key for VPC | `is.key` | Viewer | — |
+| Virtual Network Interface | `is.virtual-network-interface` | Administrator | — |
+| Virtual Server for VPC | `is.instance` | Editor | — |
+| Block Storage for VPC | `is.volume` | Editor | — |
+| Floating IP for VPC | `is.floating-ip` | Editor | — |
+| Image Service for VPC | `is.image` | Operator | — |
+| Schematics | `schematics` | — | Manager |
+| Instance Management | `globalcatalog-instance` | Editor | — |
+
+Floating-IP permissions apply when that option is enabled. Image permissions
+apply where image use is IAM-controlled; catalog availability and entitlement
+must also be checked. Exact component names and built-in role actions are in
+[IBM's IAM reference](https://cloud.ibm.com/docs/iam?topic=iam-iam-service-roles-actions).
+
+The default VNI IP-spoofing setting needs the VNI Administrator action; the older
+instance IP Spoofing Operator role alone does not cover it. Subnet Editor covers
+the subnet-update action used to allocate the VNIs' reserved IPs. See
+[VNI creation authorization](https://cloud.ibm.com/apidocs/vpc/latest#create-virtual-network-interface).
+
+#### Access handled outside this version form
+
+- Assign **Catalog Management → Viewer** (`globalcatalog-collection`) on the
+  intended private catalog through **Manage → Access (IAM)**. The version form
+  labeled this service **Personal Catalog** and offered only Administrator and
+  Service Configuration Reader (`ConfigReader`). Omit that declaration rather
+  than substituting either role for Viewer. This is an observed form limitation;
+  the actual catalog Viewer prerequisite still applies. Follow
+  [IBM's catalog-access instructions](https://cloud.ibm.com/docs/account?topic=account-catalog-access).
+- Ensure Viewer access on the deployment resource group itself and, for private
+  catalog access, its resource group. These groups can differ. Also cover the
+  existing VPC, subnet, security-group and SSH-key resources if they are in other
+  groups. See [resource-group access](https://cloud.ibm.com/docs/iam?topic=iam-assign-access-resources).
+- Keep the selected ASAv Catalog version accessible to the deployment identity;
+  customers obtain ASAv BYOL entitlement separately. No separate **Global Catalog**
+  (`globalcatalog`) requirement is declared for this package; it uses an existing
+  `globalcatalog-collection` version CRN. Reassess if that dependency changes.
+
+Status: **11 declarations configured in the supplied screenshots; effective IAM
+and complete deployment/update/destroy validation remain pending for this imported
+version.** During validation, identify the actual user/service ID/trusted profile
+used by Schematics, or the explicit API-key override if supplied. Retain any denied
+actions and their resource scopes; this table is not a proven minimum custom role.
 
 ## Release history
 
@@ -230,7 +323,7 @@ data_subnet_2_id             = "REPLACE_DATA_2_SUBNET"
 management_security_group_id = "REPLACE_MANAGEMENT_SG"
 data_security_group_1_id     = "REPLACE_DATA_1_SG"
 data_security_group_2_id     = "REPLACE_DATA_2_SG"
-ssh_key_ids                  = ["REPLACE_KEY_ID"]
+ssh_key_id                   = "REPLACE_KEY_ID"
 asav_image_version           = "REPLACE_RETAINED_LABEL_FROM_JSON"
 ```
 

@@ -3,6 +3,7 @@
 mock_provider "ibm" {
   mock_data "ibm_resource_group" { defaults = { id = "rg-test" } }
   mock_data "ibm_is_vpc" { defaults = { id = "vpc-test" } }
+  mock_data "ibm_is_ssh_key" { defaults = { id = "key-test" } }
   mock_data "ibm_is_security_groups" {
     defaults = { security_groups = [{ id = "sg-mgmt" }, { id = "sg-one" }, { id = "sg-two" }] }
   }
@@ -36,7 +37,7 @@ variables {
   management_security_group_id = "sg-mgmt"
   data_security_group_1_id     = "sg-one"
   data_security_group_2_id     = "sg-two"
-  ssh_key_ids                  = ["key-test"]
+  ssh_key_id                   = "key-test"
 }
 run "deploy_defaults" {
   command = apply
@@ -51,6 +52,10 @@ run "deploy_defaults" {
   assert {
     condition     = output.selected_asav_image.asav_version == local.asav_image_catalog.default_version
     error_message = "Null image input must resolve to the packaged default."
+  }
+  assert {
+    condition     = data.ibm_is_ssh_key.selected.id == var.ssh_key_id && length(ibm_is_instance.asav.keys) == 1 && contains(ibm_is_instance.asav.keys, var.ssh_key_id)
+    error_message = "The selected single SSH key must be passed to the instance as a one-element provider list."
   }
 }
 run "update_tags" {
@@ -92,15 +97,15 @@ run "explicit_current_image" {
     error_message = "An explicit retained label must stay pinned."
   }
 }
-run "reject_missing_keys" {
+run "reject_empty_key" {
   command = plan
-  variables { ssh_key_ids = [] }
-  expect_failures = [var.ssh_key_ids]
+  variables { ssh_key_id = "" }
+  expect_failures = [var.ssh_key_id]
 }
-run "reject_duplicate_keys" {
+run "reject_whitespace_key" {
   command = plan
-  variables { ssh_key_ids = ["key-test", "key-test"] }
-  expect_failures = [var.ssh_key_ids]
+  variables { ssh_key_id = "  \t  " }
+  expect_failures = [var.ssh_key_id]
 }
 run "reject_bad_prefix" {
   command = plan

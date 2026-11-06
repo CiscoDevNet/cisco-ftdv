@@ -14,7 +14,7 @@ from package_asav import ARCHIVE_ROOT, build
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--terraform", default="terraform", help="Terraform 1.13.4 executable")
+    parser.add_argument("--terraform", default="terraform", help="Terraform executable; init enforces the module version.tf constraint")
     parser.add_argument("--installed-providers", type=Path, help="Optional existing .terraform/providers directory to reuse")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
@@ -22,8 +22,8 @@ def main():
     env = dict(os.environ, CHECKPOINT_DISABLE="1", TF_IN_AUTOMATION="1")
     print("Local check workspace: " + str(work), flush=True)
     version = subprocess.run([args.terraform, "version", "-json"], check=True, text=True, capture_output=True, env=env)
-    if json.loads(version.stdout)["terraform_version"] != "1.13.4":
-        parser.exit(1, "Use Terraform 1.13.4 for this pinned package.\n")
+    actual_version = json.loads(version.stdout)["terraform_version"]
+    print("Terraform runtime: " + actual_version + " (version.tf is enforced during init)", flush=True)
     try:
         archive, _, _ = build(repo / "solutions/asav-ibm-tf", work / "package")
     except (ValueError, KeyError, TypeError, OSError, AttributeError) as error:

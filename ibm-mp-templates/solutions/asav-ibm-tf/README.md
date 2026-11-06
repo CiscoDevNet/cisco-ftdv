@@ -14,7 +14,7 @@ Deploy one three-interface ASAv from a Cisco VSI Catalog version into your exist
 
 ### Prerequisites and IAM
 
-Prepare an existing resource group, VPC, three distinct subnets in the same VPC/zone, security groups in that VPC, and at least one regional VPC SSH-key registration. The selected image/profile must be available in the zone, support three attachments and fit your account quota. Arrange a management access path.
+Prepare an existing resource group, VPC, three distinct subnets in the same VPC/zone, security groups in that VPC, and one regional VPC SSH-key registration. The selected image/profile must be available in the zone, support three attachments and fit your account quota. Arrange a management access path.
 
 | Scope | Required access |
 |---|---|
@@ -36,7 +36,7 @@ Supply a unique deployment `prefix`: 1–35 lowercase letters, numbers or hyphen
 - This image requires metadata enabled over **HTTP**, hop limit 1. Permit outbound TCP 80 from the management interface to `169.254.169.254/32`; HTTPS metadata is not supported by this package's image contract.
 - With the default inputs, all three VNIs allow IP spoofing, disable protocol state filtering and enable infrastructure NAT. Customer SGs, ACLs, routes and ASAv policy still control the traffic path.
 
-Customize [the Day-0 example](bootstrap/asav-day0.example.txt), including its inline RSA public key and SSH/AAA settings. Selecting IBM SSH-key IDs alone does not establish a usable guest login. If omitting Day-0, arrange console access or another verified first-configuration path. Submit raw text, not Base64.
+Customize [the Day-0 example](bootstrap/asav-day0.example.txt), including its inline RSA public key and SSH/AAA settings. Selecting an IBM SSH-key ID alone does not establish a usable guest login. If omitting Day-0, arrange console access or another verified first-configuration path. Submit raw text, not Base64.
 
 `user_data` is sensitive but can remain in workspace/Terraform state. Keep private keys, API keys and reusable credentials out of the published package. See [IBM VPC user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data).
 
@@ -44,11 +44,11 @@ Customize [the Day-0 example](bootstrap/asav-day0.example.txt), including its in
 
 Choose an `asav_image_version` label from [asav-images.json](asav-images.json). Omitted/null values use its `default_version`; an explicit retained label pins the image. Empty strings and arbitrary custom-image IDs/CRNs are not accepted. Use that entry's supported regions, profiles and Secure Boot modes; live profile availability is also checked during planning.
 
-Defaults are `region = "us-east"`, `instance_profile = "cx3d-2x5"`, `enable_secure_boot = true` and `create_management_floating_ip = false`. Image compatibility lists do not change these input defaults. Requires Terraform `1.13.4` and IBM provider `2.4.0`. See [variables.tf](variables.tf) for the complete input schema.
+Defaults are `region = "us-east"`, `instance_profile = "cx3d-2x5"`, `enable_secure_boot = true` and `create_management_floating_ip = false`. Image compatibility lists do not change these input defaults. Requires Terraform `>= 1.13.4, < 1.14.0` and IBM provider `2.4.0`. In the Software version settings, select the Terraform `1.13` runtime series; Schematics manages its patch version. Confirm the actual runtime in the job logs. See [variables.tf](variables.tf) for the complete input schema.
 
 ## Required resources
 
-Supply the resource group, VPC, three subnet/security-group pairs and regional SSH-key IDs. The template reads these existing resources; it creates the ASAv VSI, boot volume, three VNIs and optional management floating IP. It does not change existing subnets, security groups, ACLs, gateways or routes.
+Supply the resource group, VPC, three subnet/security-group pairs and one regional SSH-key ID as the required string `ssh_key_id`, for example `ssh_key_id = "r014-REPLACE_KEY_ID"`. Enter the ID without array brackets. The template reads these existing resources; it creates the ASAv VSI, boot volume, three VNIs and optional management floating IP. It does not change existing subnets, security groups, ACLs, gateways or routes.
 
 ## Installing the software
 
@@ -58,7 +58,7 @@ Supply the resource group, VPC, three subnet/security-group pairs and regional S
 4. Inspect `selected_asav_image`, `interface_map` and `management_floating_ip`. Through management access, run `show version`, `show vm` and `show interface ip brief`; verify the guest version, hostname, interfaces and Day-0 results.
 5. Configure licensing and guest policy, then follow the [routing guide](docs/routing-guide.md) before changing customer routes. Instance `running` status alone does not establish forwarding readiness.
 
-For local deployment, use the pinned runtime and provider environment authentication. Keep variables/state outside the release package. Run `terraform init`, review `terraform plan`, apply the intended plan, then inspect `terraform output`. The Catalog Create form lists deployment values; [variables.tf](variables.tf) supplies the full local input reference.
+For local deployment, use a runtime satisfying `version.tf` and provider environment authentication. Keep variables/state outside the release package. Run `terraform init`, review `terraform plan`, apply the intended plan, then inspect `terraform output`. The Catalog Create form lists deployment values; [variables.tf](variables.tf) supplies the full local input reference.
 
 ### Production configuration
 

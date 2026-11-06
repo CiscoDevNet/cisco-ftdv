@@ -68,7 +68,7 @@ resource "ibm_is_instance" "asav" {
     }
   }
 
-  keys      = sort([for ssh_key in data.ibm_is_ssh_key.selected : ssh_key.id])
+  keys      = [data.ibm_is_ssh_key.selected.id]
   user_data = local.effective_user_data
   tags      = var.tags
 

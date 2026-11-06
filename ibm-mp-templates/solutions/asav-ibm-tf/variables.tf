@@ -2,13 +2,13 @@
 # Software version's runtime separately; version.tf enforces the actual binary.
 # tflint-ignore: terraform_unused_declarations
 variable "TF_VERSION" {
-  description = "Publisher runtime metadata for this release. Configure the Software Terraform runtime to 1.13.4; version.tf enforces the actual Terraform version. This variable does not select the Terraform executable."
+  description = "Legacy runtime metadata for callers that supply TF_VERSION. Configure the Software Terraform runtime series to 1.13; version.tf requires the actual CLI to be at least 1.13.4 and below 1.14.0. This input does not select the Terraform executable."
   type        = string
-  default     = "1.13.4"
+  default     = "1.13"
 
   validation {
-    condition     = var.TF_VERSION == "1.13.4"
-    error_message = "TF_VERSION is publisher-pinned to 1.13.4 for this release."
+    condition     = var.TF_VERSION == "1.13" || can(regex("^1\\.13\\.[0-9]+$", var.TF_VERSION))
+    error_message = "TF_VERSION metadata must identify the 1.13 series or a 1.13 patch label. The actual CLI version is checked separately by version.tf."
   }
 }
 
@@ -128,17 +128,14 @@ variable "data_security_group_2_id" {
   }
 }
 
-variable "ssh_key_ids" {
-  description = "IDs of existing VPC SSH keys in the deployment region, passed to IBM when creating the VSI. Guest user, SSH and key configuration are still required; see the README for the inline-key example and the separate image-managed injection path."
-  type        = list(string)
+variable "ssh_key_id" {
+  description = "ID of one existing VPC SSH-key registration in the deployment region, passed to IBM when creating the VSI. Enter the ID as a string. Guest user, SSH and key configuration are still required; see the README for the inline-key example and the separate image-managed injection path."
+  type        = string
+  nullable    = false
 
   validation {
-    condition = (
-      length(var.ssh_key_ids) > 0 &&
-      length(var.ssh_key_ids) == length(toset(var.ssh_key_ids)) &&
-      alltrue([for ssh_key_id in var.ssh_key_ids : length(trimspace(ssh_key_id)) > 0])
-    )
-    error_message = "ssh_key_ids must contain at least one non-empty, unique SSH key ID."
+    condition     = length(trimspace(var.ssh_key_id)) > 0
+    error_message = "ssh_key_id must be one non-empty SSH key ID."
   }
 }
 

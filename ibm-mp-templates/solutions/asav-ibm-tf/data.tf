@@ -23,9 +23,7 @@ data "ibm_is_security_groups" "target_vpc" {
 }
 
 data "ibm_is_ssh_key" "selected" {
-  for_each = toset(var.ssh_key_ids)
-
-  id = each.value
+  id = var.ssh_key_id
 }
 
 data "ibm_is_instance_profile" "selected" {
