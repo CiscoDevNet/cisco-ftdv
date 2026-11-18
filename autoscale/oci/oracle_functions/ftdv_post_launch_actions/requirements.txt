@@ -1,5 +1,0 @@
---index-url https://pypi.org/simple
-fdk
-oci
-requests
-jsonschema
