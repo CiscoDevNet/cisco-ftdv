@@ -3,7 +3,7 @@
 Contributions to this code are welcome and appreciated.
 Please adhere to our [Code of Conduct](./CODE_OF_CONDUCT.md) at all times.
 
-> All contributions to this code will be released under the terms of the [LICENSE](./LICENSE) of this code. By submitting an issue, you are agreeing to comply with this waiver of copyright interest. Details can be found in our [LICENSE](./LICENSE).
+> Contributions to this code are provided under the terms of the [LICENSE](./LICENSE).
 
 Contributions to this code should be made using the issue tracker.
 

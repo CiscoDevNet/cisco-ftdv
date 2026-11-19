@@ -1,0 +1,42 @@
+{
+  "default_version": "10.1.1.1",
+  "metadata_checked_date": "2026-11-18",
+  "releases": {
+    "10.1.1.1": {
+      "catalog_version": "10.11.1",
+      "catalog_version_locator": "1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc.ad6f311f-d0c0-41de-b438-69e235225a04-global",
+      "version_crn": "crn:v1:bluemix:public:globalcatalog-collection:global::1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc:version:29e54f20-ff16-45e5-9a18-469652bbeab1-global/ad6f311f-d0c0-41de-b438-69e235225a04-global",
+      "catalog_sha256": "92b5ee667f28ffcdffb1daf22fdb49e7ece356ad1d78a4193ebcd849c3920393",
+      "plan_crn": null,
+      "supported_regions": [
+        "au-syd",
+        "br-sao",
+        "ca-mon",
+        "ca-tor",
+        "eu-de",
+        "eu-es",
+        "eu-gb",
+        "in-che",
+        "in-mum",
+        "jp-osa",
+        "jp-tok",
+        "us-east",
+        "us-south"
+      ],
+      "supported_profiles": [
+        "cx3d-16x40",
+        "cx3d-4x10",
+        "cx3d-8x20",
+        "cx4d-16x32",
+        "cx4d-4x8",
+        "cx4d-8x16"
+      ],
+      "secure_boot_modes": [
+        true
+      ],
+      "minimum_boot_volume_gb": 100,
+      "catalog_reference_verified": true,
+      "reference_access_scope": "selected_accounts"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "AdminPassword": "<customer-strong-admin-password>",
+  "Hostname": "<customer-hostname>",
+  "ManageLocally": "No",
+  "FirewallMode": "routed",
+  "Diagnostic": "OFF"
+}

@@ -1,0 +1,85 @@
+name: IBM Terraform PR checks
+
+on:
+  pull_request:
+    branches: [cisco-secure-firewall-ibm-marketplace]
+    paths:
+      - 'ibm-mp-templates/**'
+      - '.github/workflows/ibm-terraform-pr.yml'
+      - 'LICENSE'
+      - 'NOTICE'
+  push:
+    branches: [cisco-secure-firewall-ibm-marketplace]
+    paths:
+      - 'ibm-mp-templates/**'
+      - '.github/workflows/ibm-terraform-pr.yml'
+      - 'LICENSE'
+      - 'NOTICE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ibm-terraform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  CHECKPOINT_DISABLE: '1'
+  TF_IN_AUTOMATION: '1'
+
+jobs:
+  package:
+    name: Package and stored-artifact checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+        working-directory: ibm-mp-templates
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run Python regression tests
+        run: python3 -m unittest discover -s publisher/tests -p 'test_*.py'
+      - name: Verify retained archive triplets
+        run: python3 publisher/verify_releases.py
+
+  terraform:
+    name: Terraform mocks (${{ matrix.product }})
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        product: [asav, ftdv, fmcv]
+    defaults:
+      run:
+        shell: bash
+        working-directory: ibm-mp-templates
+    env:
+      TERRAFORM_VERSION: '1.13.5'
+      PRODUCT: ${{ matrix.product }}
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified Terraform
+        run: |
+          set -euo pipefail
+          TF_SETUP_DIR="$(mktemp -d "${RUNNER_TEMP}/ibm-terraform.XXXXXX")"
+          TF_ARCHIVE="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          TF_SUMS="terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          TF_RELEASE_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          curl --fail --silent --show-error --location --retry 3 "${TF_RELEASE_URL}/${TF_ARCHIVE}" -o "${TF_SETUP_DIR}/${TF_ARCHIVE}"
+          curl --fail --silent --show-error --location --retry 3 "${TF_RELEASE_URL}/${TF_SUMS}" -o "${TF_SETUP_DIR}/${TF_SUMS}"
+          (cd "${TF_SETUP_DIR}" && sha256sum --check --ignore-missing "${TF_SUMS}")
+          unzip -q "${TF_SETUP_DIR}/${TF_ARCHIVE}" -d "${TF_SETUP_DIR}"
+          printf '%s\n' "${TF_SETUP_DIR}" >> "${GITHUB_PATH}"
+      - name: Run isolated product checks
+        run: python3 "publisher/check_${PRODUCT}.py" --terraform terraform

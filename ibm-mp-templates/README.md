@@ -1,38 +1,39 @@
 # Cisco Secure Firewall Terraform packages for IBM Cloud
 
-This directory contains the IBM Cloud Marketplace Terraform project: customer solutions, publisher tools and release artifacts. It currently includes ASAv; future FTDv and FMCv packages can use sibling solution and release directories.
+Independent **Software → Terraform** packages reuse existing resource groups, VPCs, subnets, security groups and one regional SSH-key registration. Each creates one appliance, its boot volume and native virtual network interfaces, with an optional management floating IP. Customers obtain applicable BYOL entitlements separately; customer routes and guest policy remain separate.
 
-## ASAv deployment package
+| Product | Customer deployment guide | Fixed interface layout | Initial package / image label |
+|---|---|---|---|
+| ASAv | [asav-ibm-tf](solutions/asav-ibm-tf/README.md) | Management eth0; data eth1/eth2 | 9.2410.1 / 9.24.10.1 |
+| FTDv | [ftdv-ibm-tf](solutions/ftdv-ibm-tf/README.md) | Data eth0/eth1/eth3; management eth2; Diagnostic OFF | 10.11.1 / 10.1.1.1 |
+| FMCv | [fmcv-ibm-tf](solutions/fmcv-ibm-tf/README.md) | One management NIC, eth0 | 10.11.1 / 10.1.1.1 |
 
-Deploy one three-interface ASAv into an existing IBM Cloud VPC using a Cisco VSI Catalog image. Customers obtain ASAv BYOL entitlement separately.
+All packages require Terraform **>= 1.13.4, < 1.14.0** and IBM provider **2.4.0**. Select runtime series **1.13** in Catalog and verify the managed patch in validation logs. Provide a customer-unique prefix and one required `ssh_key_id` string. Guest SSH/bootstrap remains product-specific: ASAv accepts raw ASA Day-0 text; FTDv/FMCv accept optional sensitive raw JSON. FTDv JSON may optionally include image-supported FMC registration fields; manager-side device addition remains separate.
 
-Terraform creates the VSI, boot volume, three virtual network interfaces and an optional management floating IP. Existing resource groups, VPCs, subnets, security groups and SSH keys are reused. Customer routes and guest firewall policy are managed separately.
+FTDv/FMCv source qualification on 18 November 2026 covered Washington/Dallas with default profiles, management, registration/policy, controlled traffic, selected lifecycle operations and complete cleanup. Their backing VSI versions currently require selected-account access. Other combinations and each final archive's Partner Center validation require separate verification. See [publisher tools and coverage](publisher/README.md).
 
-The customer module is `solutions/asav-ibm-tf/`. Terraform must satisfy `>= 1.13.4, < 1.14.0`; the IBM provider is pinned to `2.4.0`. Select the `1.13` runtime series in the Catalog version settings and verify the managed patch in the validation logs.
-
-Provide one existing regional SSH-key registration through the required `ssh_key_id` string input. Configure guest SSH access separately using the module's Day-0 guidance.
-
-The initial Terraform package and IBM Software listing version are **9.2410.1**. This release deploys guest ASAv **9.24.10.1** from VSI Catalog package **9.2410.1**; those image identifiers remain unchanged.
-
-### Resources
-
-* ASAv: [Deployment Guide](solutions/asav-ibm-tf/README.md)     |     [Architecture Diagram](solutions/asav-ibm-tf/docs/asav-existing-vpc.png)     |     [Routing Guide](solutions/asav-ibm-tf/docs/routing-guide.md)
-* Configuration: [Day-0 Example](solutions/asav-ibm-tf/bootstrap/asav-day0.example.txt)     |     [Image Versions](solutions/asav-ibm-tf/asav-images.json)     |     [Changelog](solutions/asav-ibm-tf/changelog.txt)
+**Pending ASAv Catalog update:** a fresh 16-file ASAv candidate has been generated with the README and legal-file updates. Its import and exact-archive Partner Center validation remain pending. The historical submitted TGZ/checksum/report are preserved unchanged; the local build does not update the existing Catalog version. See the [ASAv candidate status](publisher/README.md#asav-candidate-and-pending-catalog-update).
 
 ## Building release packages
 
-Run from this directory, `ibm-mp-templates/`, using Python 3.9+:
+Run from this directory using Python 3.9+:
 
-```bash
+```sh
 python3 publisher/package_asav.py
+python3 publisher/package_ftdv.py
+python3 publisher/package_fmcv.py
 ```
 
-The builder reads the topmost dated version entry in the module's `changelog.txt` and writes a `.tgz`, SHA-256 checksum and verification report directly into `tf-releases/asav/`. Add new entries at the top; the complete history must contain unique versions in descending order. The archive contains one `root/` folder holding the 14 customer files, with `README.md` beside `main.tf`. Publisher tools and the repository/project overview READMEs stay outside the deployment archive.
+Each builder selects the topmost dated version in the module's `changelog.txt`, validates the newest-first history and writes a TGZ, SHA-256 checksum and verification report directly into `tf-releases/PRODUCT/`. New archives contain one `root/` folder and exactly 16 files: 14 module files plus byte-identical copies of the repository-root `LICENSE` and `NOTICE`, with `README.md` beside `main.tf`. Publisher tools, tests, plans, state and local evidence stay outside the customer archive.
 
-The verification report uses a project-relative source path and archive filename. Product-folder placement identifies the product; release confirmation is recorded separately through the Git release/tag and IBM Catalog version.
+```text
+publisher/                  # builders, check runners, tests and Catalog helper
+solutions/asav-ibm-tf/       # ASAv customer files
+solutions/ftdv-ibm-tf/       # FTDv customer files
+solutions/fmcv-ibm-tf/       # FMCv customer files
+tf-releases/asav/            # retained ASAv artifact triplets
+tf-releases/ftdv/            # FTDv artifact triplets
+tf-releases/fmcv/            # FMCv artifact triplets
+```
 
-### Resources
-
-* Publishing: [Packaging and Lifecycle Guide](SOFTWARE-TERRAFORM-PACKAGING.md)     |     [Catalog IAM Setup](SOFTWARE-TERRAFORM-PACKAGING.md#catalog-iam-requirements)     |     [ASAv Release Artifacts](tf-releases/asav/)
-
-The publisher guide contains validation, custom-filename, image-maintenance and release commands. The ASAv deployment guide contains the customer installation, update and removal instructions.
+See [packaging and lifecycle commands](SOFTWARE-TERRAFORM-PACKAGING.md) and [Catalog IAM requirements](SOFTWARE-TERRAFORM-PACKAGING.md#catalog-iam-requirements). An artifact's directory or filename does not establish IBM validation or publication. Keep private operational evidence and credentials outside this repository.

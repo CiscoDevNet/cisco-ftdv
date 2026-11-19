@@ -60,7 +60,7 @@ Supply the resource group, VPC, three subnet/security-group pairs and one region
 4. Inspect `selected_asav_image`, `interface_map` and `management_floating_ip`. Through management access, run `show version`, `show vm` and `show interface ip brief`; verify the guest version, hostname, interfaces and Day-0 results.
 5. Configure licensing and guest policy, then follow the [routing guide](docs/routing-guide.md) before changing customer routes. Instance `running` status alone does not establish forwarding readiness.
 
-The Catalog form can show friendly labels such as **Resource name prefix** and **ASAv Day-0 configuration**. Local/API inputs retain the Terraform keys `prefix` and `user_data`; see [variables.tf](variables.tf) for the complete schema.
+Use the Terraform parameter keys shown in the Catalog form, such as `prefix` and `user_data`. Review each field description; the Catalog editor may not offer a separate editable display name. See [variables.tf](variables.tf) for the complete schema.
 
 For local deployment, use a runtime satisfying `version.tf` and provider environment authentication. Keep variables/state outside the release package. Run `terraform init`, review `terraform plan`, apply the intended plan, then inspect `terraform output`. The Catalog Create form lists deployment values; [variables.tf](variables.tf) supplies the full local input reference.
 
@@ -103,3 +103,7 @@ For Schematics, use **Destroy resources** and review its logs. Verify that the V
 - [Cisco licensing](https://www.cisco.com/c/en/us/td/docs/security/asa/asa924/configuration/general/asa-924-general-config/intro-license-smart.html)
 
 Use [Cisco TAC](https://www.cisco.com/cisco/web/support/index.html) with an eligible support contract for ASAv, and IBM Cloud support for infrastructure, Catalog or Schematics incidents. Exclude credentials and raw state from support bundles.
+
+## Source license
+
+These Terraform deployment templates are licensed under Apache License 2.0. The deployment archive includes the repository's `LICENSE` and `NOTICE` files. Cisco appliance software images, BYOL entitlements and support remain subject to their applicable Cisco terms; the template source license does not change those terms.
