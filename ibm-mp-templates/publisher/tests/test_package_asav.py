@@ -6,11 +6,13 @@ import shutil
 import tarfile
 import tempfile
 import unittest
+import sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'package_asav.py'
+sys.path.insert(0, str(SCRIPT.parent))
 spec = importlib.util.spec_from_file_location('package_asav', SCRIPT)
 package = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(package)
@@ -38,7 +40,7 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(a.read_bytes(), b.read_bytes())
         with tarfile.open(a) as archive:
             members = archive.getmembers()
-            self.assertEqual(archive.getnames(), ['root'] + ['root/' + name for name in sorted(package.FILES)])
+            self.assertEqual(archive.getnames(), ['root'] + ['root/' + name for name in sorted(package.ARCHIVE_FILES)])
             self.assertTrue(members[0].isdir())
             self.assertTrue(all(member.isfile() for member in members[1:]))
             self.assertEqual({member.name.split('/')[0] for member in members}, {'root'})
@@ -46,11 +48,14 @@ class PackageChecks(unittest.TestCase):
             self.assertIn('root/README.md', archive.getnames())
 
     def test_rejects_previous_flat_archive_layout(self):
-        _, _, manifest = self.build(self.work / 'out')
+        valid, _, manifest = self.build(self.work / 'out')
         flat = self.work / 'flat.tgz'
-        with tarfile.open(flat, 'w:gz') as tar:
-            for name in sorted(package.FILES):
-                tar.add(self.source / name, arcname=name, recursive=False)
+        with tarfile.open(valid) as source, tarfile.open(flat, 'w:gz') as tar:
+            for name in sorted(package.ARCHIVE_FILES):
+                entry = source.getmember('root/' + name)
+                data = source.extractfile(entry).read()
+                entry.name = name
+                tar.addfile(entry, io.BytesIO(data))
         with self.assertRaisesRegex(ValueError, 'single root/'):
             package.verify_archive(flat, json.loads(manifest.read_text())['files_sha256'])
 
@@ -129,6 +134,30 @@ class PackageChecks(unittest.TestCase):
     def test_rejects_output_inside_source(self):
         with self.assertRaises(ValueError):
             self.build(self.source / 'dist')
+
+    def test_rejects_output_inside_any_project_module(self):
+        project = self.work / 'fake-project'
+        for product in ('asav', 'ftdv', 'fmcv', 'future'):
+            for suffix in ('', 'review'):
+                output = project / 'solutions' / (product + '-ibm-tf')
+                if suffix:
+                    output /= suffix
+                with self.subTest(product=product, suffix=suffix), \
+                        mock.patch.object(package, 'PROJECT_ROOT', project), \
+                        self.assertRaisesRegex(ValueError, 'outside every Terraform deployment module'):
+                    self.build(output)
+                self.assertFalse(output.exists())
+
+    def test_rejects_output_alias_into_another_module(self):
+        project = self.work / 'fake-project'
+        target = project / 'solutions/ftdv-ibm-tf'
+        target.mkdir(parents=True)
+        alias = self.work / 'output-alias'
+        alias.symlink_to(target, target_is_directory=True)
+        with mock.patch.object(package, 'PROJECT_ROOT', project), \
+                self.assertRaisesRegex(ValueError, 'outside every Terraform deployment module'):
+            self.build(alias / 'review')
+        self.assertEqual(list(target.iterdir()), [])
 
     def test_finder_metadata_is_not_shipped(self):
         (self.source / '.DS_Store').write_bytes(b'finder metadata')
@@ -228,11 +257,11 @@ class PackageChecks(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.build(self.work / 'out')
 
-    def test_changelog_and_all_14_files_are_shipped(self):
+    def test_changelog_module_and_legal_files_are_shipped(self):
         archive, _, _ = self.build(self.work / 'out')
         with tarfile.open(archive) as tar:
-            self.assertEqual(sum(member.isfile() for member in tar.getmembers()), 14)
-            self.assertEqual(len(tar.getmembers()), 15)
+            self.assertEqual(sum(member.isfile() for member in tar.getmembers()), 16)
+            self.assertEqual(len(tar.getmembers()), 17)
             self.assertEqual(tar.extractfile('root/changelog.txt').read(), (self.source / 'changelog.txt').read_bytes())
 
     def test_different_timestamps_keep_archive_bytes_reproducible(self):

@@ -11,12 +11,15 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from package_legal import LEGAL_FILES, legal_manifest, load_legal_files
+
 FILES = (
     ".terraform.lock.hcl", "README.md", "asav-images.json",
     "bootstrap/asav-day0.example.txt", "changelog.txt", "data.tf",
     "docs/asav-existing-vpc.png", "docs/routing-guide.md",
     "locals.tf", "main.tf", "outputs.tf", "provider.tf", "variables.tf", "version.tf",
 )
+ARCHIVE_FILES = FILES + LEGAL_FILES
 ARCHIVE_ROOT = "root"
 SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 RELEASE_TIMEZONE = timezone(timedelta(hours=5, minutes=30), name="Asia/Kolkata")
@@ -35,14 +38,16 @@ def digest(data):
 
 def verify_archive(archive, hashes):
     """Require one root directory, the exact customer payload and matching bytes."""
-    expected = [ARCHIVE_ROOT] + [ARCHIVE_ROOT + "/" + name for name in sorted(FILES)]
+    if set(hashes) != set(ARCHIVE_FILES):
+        raise ValueError("Archive must include the exact module payload plus LICENSE and NOTICE")
+    expected = [ARCHIVE_ROOT] + [ARCHIVE_ROOT + "/" + name for name in sorted(ARCHIVE_FILES)]
     with tarfile.open(archive, "r:gz") as tar:
         members = tar.getmembers()
         if ([m.name for m in members] != expected or not members[0].isdir()
                 or not all(m.isfile() for m in members[1:])):
             raise ValueError("Archive must contain a single root/ directory and exactly the allowed customer files")
         if any(digest(tar.extractfile(ARCHIVE_ROOT + "/" + name).read()) != hashes[name]
-               for name in FILES):
+               for name in ARCHIVE_FILES):
             raise ValueError("Archive/source hash mismatch")
 
 
@@ -137,8 +142,8 @@ def check_source(source):
 def build(source, output=None, version=None, *, filename=None, build_time=None):
     source = source.resolve()
     output = (output if output is not None else DEFAULT_OUTPUT).resolve()
-    if output == source or output.is_relative_to(source):
-        raise ValueError("Output directory must be outside the Terraform module")
+    if output.is_relative_to(source) or output.is_relative_to((PROJECT_ROOT / "solutions").resolve()):
+        raise ValueError("Output directory must be outside every Terraform deployment module")
     try:
         source_reference = source.relative_to(PROJECT_ROOT).as_posix()
         source_path_base = "project"
@@ -146,6 +151,8 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
         source_reference = source.name
         source_path_base = "custom_directory_name"
     catalog, links = check_source(source)
+    payload = {name: (source / name).read_bytes() for name in FILES}
+    payload.update(load_legal_files(PROJECT_ROOT.parent))
     changelog = read_latest_changelog(source / "changelog.txt")
     if version is not None and version != changelog["version"]:
         raise ValueError("--version must match the latest changelog version " + changelog["version"])
@@ -173,8 +180,8 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
                 root_entry.uid = root_entry.gid = 0
                 root_entry.uname = root_entry.gname = ""
                 tar.addfile(root_entry)
-                for name in sorted(FILES):
-                    data = (source / name).read_bytes()
+                for name in sorted(payload):
+                    data = payload[name]
                     hashes[name] = digest(data)
                     entry = tarfile.TarInfo(ARCHIVE_ROOT + "/" + name)
                     entry.size, entry.mode, entry.mtime = len(data), 0o644, 0
@@ -194,11 +201,13 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
         "source_path_base": source_path_base,
         "archive_filename": archive.name, "archive_sha256": archive_hash,
         "archive_root": ARCHIVE_ROOT + "/",
-        "archive_layout": "single root/ folder containing all 14 customer files; README.md beside main.tf",
+        "archive_layout": "single root/ folder containing 14 module files plus LICENSE and NOTICE; README.md beside main.tf",
+        "packaging_schema": 2, "module_file_count": len(FILES),
+        "archive_file_count": len(payload), "legal_files": legal_manifest(hashes),
         "files_sha256": hashes, "relative_links_verified": links,
         "default_asav_image_label": catalog["default_version"],
         "packaged_image_labels": sorted(catalog["releases"]),
-        "checks": ["single root/ directory", str(len(FILES)) + "-file allowlist", "changelog version/date", "README sections", "JSON/reference format", "relative links", "archive round trip"],
+        "checks": ["single root/ directory", str(len(payload)) + "-file allowlist", "canonical repository LICENSE/NOTICE", "changelog version/date", "README sections", "JSON/reference format", "relative links", "archive round trip"],
         "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval.",
     }, indent=2) + "\n")
     return archive, checksums, manifest

@@ -40,7 +40,8 @@ def main():
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(tar.extractfile(entry).read())
-    shutil.copytree(repo / "publisher/tests", module / "tests")
+    (module / "tests").mkdir()
+    shutil.copyfile(repo / "publisher/tests/asav.tftest.hcl", module / "tests/asav.tftest.hcl")
     if args.installed_providers:
         def reuse_file(source, destination):
             try:
