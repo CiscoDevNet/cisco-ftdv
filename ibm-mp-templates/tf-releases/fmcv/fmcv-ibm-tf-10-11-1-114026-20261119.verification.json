@@ -1,0 +1,105 @@
+{
+  "created_at_utc": "2026-11-19T06:10:26.008602+00:00",
+  "build_time_local": "2026-11-19T11:40:26.008602+05:30",
+  "filename_timezone": "Asia/Kolkata",
+  "status": "local_candidate_not_uploaded_or_IBM_validated",
+  "catalog_references_verified": true,
+  "reference_access_scopes": [
+    "selected_accounts"
+  ],
+  "software_package_version": "10.11.1",
+  "changelog": {
+    "version": "10.11.1",
+    "date": "2026-11-18",
+    "changes": [
+      "Initial TF template creation.",
+      "Verified exact published VSI references and recorded selected-account access scope.",
+      "Aligned automatic primary-IP allocation with ASAv to avoid provider 2.4.0 refresh drift."
+    ]
+  },
+  "module": "fmcv-ibm-tf",
+  "source": "solutions/fmcv-ibm-tf",
+  "source_path_base": "project",
+  "archive_filename": "fmcv-ibm-tf-10-11-1-114026-20261119.tgz",
+  "archive_sha256": "ed10ffada78f296e440a588253dc14d6eca1dbf3035fd4aaec8cd89985210f7b",
+  "archive_root": "root/",
+  "archive_layout": "single root/ folder containing 14 module files plus LICENSE and NOTICE; README.md beside main.tf",
+  "packaging_schema": 2,
+  "module_file_count": 14,
+  "archive_file_count": 16,
+  "legal_files": {
+    "LICENSE": {
+      "source_path": "LICENSE",
+      "source_path_base": "repository",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "NOTICE": {
+      "source_path": "NOTICE",
+      "source_path_base": "repository",
+      "sha256": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30"
+    }
+  },
+  "files_sha256": {
+    ".terraform.lock.hcl": "88c060c16604781908be0400670626e385ad9d2054e7a62871881939feff5032",
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30",
+    "README.md": "cab2158bdb4843b14d98e24493c0c9345faf896be60dbc100b4c94392e37e63a",
+    "bootstrap/fmcv-day0.example.json": "22d6ea53ee477add7f0baa6b9334b6cc40a4fffbd3f611f9bda28324996ea657",
+    "changelog.txt": "0b9ec3edfeee768959871419efcf01000ccabca74f7962cb236743be61b54a9a",
+    "data.tf": "391b3730c964a14dba75446e3a68e6decd195373200e8302e9285e53961427af",
+    "docs/fmcv-existing-vpc.png": "18da35fc8ed599998c1e6f1316627e5649a9a40db404127eecf7da8bdfdbd43d",
+    "docs/operations-guide.md": "cf00f35c6a8163d1578604cd28fa94ae47816144cff081666b5338ee6e43acc6",
+    "fmcv-images.json": "cded4457d60685965ede0ef9776aafce79e504469795b35b100384316883dc07",
+    "locals.tf": "9a5c0bb971b7bb750078de740ebe8691ba1fad279278038a1f6b3691c2237b01",
+    "main.tf": "b616b95b7ac78296b53bf281c8a394c524eac2b795d52ac5d1fd5f72ef191283",
+    "outputs.tf": "14f394f44faf435433caf86d897b99f64167fdd52b6ad9681e71103a94140253",
+    "provider.tf": "b5815fcd378e7f0e27570768629bb5c57146fc4913bcb4c1ce0953dca116fc1f",
+    "variables.tf": "f7bc551ca66e6c69688283f6c7d273e1d3f6a0e1d06c0448a31b79a22b00d7eb",
+    "version.tf": "0506d71f90134259ee1c417dc6feb952f72a34fc70368d2bf58f49f2749cbbed"
+  },
+  "relative_links_verified": [
+    {
+      "from": "README.md",
+      "target": "docs/fmcv-existing-vpc.png"
+    },
+    {
+      "from": "README.md",
+      "target": "bootstrap/fmcv-day0.example.json"
+    },
+    {
+      "from": "README.md",
+      "target": "fmcv-images.json"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/operations-guide.md"
+    },
+    {
+      "from": "README.md",
+      "target": "outputs.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "changelog.txt"
+    }
+  ],
+  "default_image_label": "10.1.1.1",
+  "packaged_image_labels": [
+    "10.1.1.1"
+  ],
+  "checks": [
+    "single root/ directory",
+    "16-file allowlist",
+    "canonical repository LICENSE/NOTICE",
+    "changelog version/date",
+    "README sections",
+    "JSON/reference format",
+    "relative links",
+    "archive round trip"
+  ],
+  "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval."
+}
