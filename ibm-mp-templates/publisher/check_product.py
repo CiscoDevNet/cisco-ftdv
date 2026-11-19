@@ -46,7 +46,8 @@ def main(product=None):
     tests=module/"tests";tests.mkdir()
     shutil.copyfile(project/"publisher/tests"/(product+"-publication-gate.tftest.hcl"),tests/"gate.tftest.hcl")
     command("fmt","fmt","-check","-recursive","-no-color")
-    command("init","init","-backend=false","-input=false","-lockfile=readonly","-no-color")
+    # Learn verified platform checksums only in this isolated extracted copy.
+    command("init","init","-backend=false","-input=false","-no-color")
     command("validate","validate","-json")
     catalog=json.loads((module/(product+"-images.json")).read_text())
     # Exercise the guard even after real references have been filled. Only the

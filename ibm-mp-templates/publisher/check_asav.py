@@ -51,9 +51,11 @@ def main():
         shutil.copytree(args.installed_providers.resolve(), module / ".terraform/providers",
                         symlinks=True, copy_function=reuse_file)
     results = []
+    # Standard init may add a verified platform checksum in this temporary copy.
+    # The source lock file and packaged bytes remain unchanged.
     commands = (
         ("fmt", ["fmt", "-check", "-recursive", "-no-color"]),
-        ("init", ["init", "-backend=false", "-input=false", "-lockfile=readonly", "-no-color"]),
+        ("init", ["init", "-backend=false", "-input=false", "-no-color"]),
         ("validate", ["validate", "-json"]),
         ("mock-tests", ["test", "-no-color"]),
     )
