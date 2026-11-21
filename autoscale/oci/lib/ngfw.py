@@ -821,11 +821,11 @@ class ParamikoSSH:
                       "expect": "Enter new password:"
                     },
                     {
-                      "command": "Cisco@123123",
+                      "command": "<new-password>",
                       "expect": "Confirm new password:"
                     },
                     {
-                      "command": "Cisco@123123",
+                      "command": "<new-password>",
                       "expect": "Password Update successful"
                     }
                   ]
