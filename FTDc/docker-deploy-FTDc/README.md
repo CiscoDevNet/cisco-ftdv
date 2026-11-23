@@ -1,6 +1,6 @@
 FTDc deploy steps:
 
-FTDc can be deployed on any VM with atleast 4 interfaces and 128 hugepages
+FTDc can be deployed on any VM with atleast 4 interfaces (1 for host management and 3 for FTD container) and 128 hugepages
 
 ### Prerequisites
 
