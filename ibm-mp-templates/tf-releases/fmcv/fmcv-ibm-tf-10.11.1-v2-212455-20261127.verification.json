@@ -1,0 +1,113 @@
+{
+  "created_at_utc": "2026-11-27T15:54:55.009271+00:00",
+  "build_time_local": "2026-11-27T21:24:55.009271+05:30",
+  "filename_timezone": "Asia/Kolkata",
+  "status": "local_candidate_not_uploaded_or_IBM_validated",
+  "catalog_references_verified": true,
+  "reference_access_scopes": [
+    "selected_accounts"
+  ],
+  "software_package_version": "10.11.1",
+  "changelog": {
+    "version": "10.11.1",
+    "date": "2026-11-18",
+    "changes": [
+      "Terraform package revision v2 (2026-Nov-27): Keep release-specific image and runtime details in package metadata and source. Update the deployment README to reference them.",
+      "Add resource_name_prefix and retain prefix as a deprecated alias with the existing fallback. Preserve FMCv resource names for equivalent inputs.",
+      "Document the Catalog deployment checklist, prefix migration, secure entry of raw Day-0 JSON, and host recovery behavior.",
+      "Initial TF template creation.",
+      "Verified exact published VSI references and recorded selected-account access scope.",
+      "Aligned automatic primary-IP allocation with ASAv to avoid provider 2.4.0 refresh drift."
+    ]
+  },
+  "module": "fmcv-ibm-tf",
+  "source": "solutions/fmcv-ibm-tf",
+  "source_path_base": "project",
+  "archive_filename": "fmcv-ibm-tf-10.11.1-v2-212455-20261127.tgz",
+  "archive_sha256": "e323b8e652de616170b1c076df12ed1385a17ba4a836e4ee867946ff9026813b",
+  "archive_root": "root/",
+  "archive_layout": "single root/ folder containing 14 module files plus LICENSE and NOTICE; README.md beside main.tf",
+  "packaging_schema": 2,
+  "module_file_count": 14,
+  "archive_file_count": 16,
+  "legal_files": {
+    "LICENSE": {
+      "source_path": "LICENSE",
+      "source_path_base": "repository",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "NOTICE": {
+      "source_path": "NOTICE",
+      "source_path_base": "repository",
+      "sha256": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30"
+    }
+  },
+  "files_sha256": {
+    ".terraform.lock.hcl": "88c060c16604781908be0400670626e385ad9d2054e7a62871881939feff5032",
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30",
+    "README.md": "b837ce395e3a33c244796c60461b08bdec7097878e02a1d67feed5d56ee603f5",
+    "bootstrap/fmcv-day0.example.json": "22d6ea53ee477add7f0baa6b9334b6cc40a4fffbd3f611f9bda28324996ea657",
+    "changelog.txt": "60761e3d589acc9015c13e0dd4d261d6ba564c3cab5d546ce1016b7f0660a891",
+    "data.tf": "391b3730c964a14dba75446e3a68e6decd195373200e8302e9285e53961427af",
+    "docs/fmcv-existing-vpc.png": "18da35fc8ed599998c1e6f1316627e5649a9a40db404127eecf7da8bdfdbd43d",
+    "docs/operations-guide.md": "cf00f35c6a8163d1578604cd28fa94ae47816144cff081666b5338ee6e43acc6",
+    "fmcv-images.json": "cded4457d60685965ede0ef9776aafce79e504469795b35b100384316883dc07",
+    "locals.tf": "473eef24de62dbc9c2aea784619bda5642075a04fd5e263522fd5cb35c6285ed",
+    "main.tf": "0e33e0c9e8aa69218999eb5cdbb883d7d47ab4612d32c8a000c635a9dece63c1",
+    "outputs.tf": "14f394f44faf435433caf86d897b99f64167fdd52b6ad9681e71103a94140253",
+    "provider.tf": "b5815fcd378e7f0e27570768629bb5c57146fc4913bcb4c1ce0953dca116fc1f",
+    "variables.tf": "2bcf2c3d89d88338b05dd44634db9604ad7c17dbfe0a313578d27e2fdcf59939",
+    "version.tf": "0506d71f90134259ee1c417dc6feb952f72a34fc70368d2bf58f49f2749cbbed"
+  },
+  "relative_links_verified": [
+    {
+      "from": "README.md",
+      "target": "docs/fmcv-existing-vpc.png"
+    },
+    {
+      "from": "README.md",
+      "target": "bootstrap/fmcv-day0.example.json"
+    },
+    {
+      "from": "README.md",
+      "target": "fmcv-images.json"
+    },
+    {
+      "from": "README.md",
+      "target": "version.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/operations-guide.md"
+    },
+    {
+      "from": "README.md",
+      "target": "outputs.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "changelog.txt"
+    }
+  ],
+  "default_image_label": "10.1.1.1",
+  "packaged_image_labels": [
+    "10.1.1.1"
+  ],
+  "checks": [
+    "single root/ directory",
+    "16-file allowlist",
+    "canonical repository LICENSE/NOTICE",
+    "changelog version/date",
+    "README sections",
+    "JSON/reference format",
+    "relative links",
+    "archive round trip"
+  ],
+  "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval.",
+  "artifact_revision": 2
+}

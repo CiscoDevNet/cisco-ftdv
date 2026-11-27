@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from package_legal import LEGAL_FILES, legal_manifest, load_legal_files
+from package_naming import release_filename
 
 FILES = (
     ".terraform.lock.hcl", "README.md", "asav-images.json",
@@ -139,7 +140,7 @@ def check_source(source):
     return catalog, links
 
 
-def build(source, output=None, version=None, *, filename=None, build_time=None):
+def build(source, output=None, version=None, *, filename=None, revision=None, build_time=None):
     source = source.resolve()
     output = (output if output is not None else DEFAULT_OUTPUT).resolve()
     if output.is_relative_to(source) or output.is_relative_to((PROJECT_ROOT / "solutions").resolve()):
@@ -161,10 +162,7 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Build time must include a timezone")
     local_time = now.astimezone(RELEASE_TIMEZONE)
-    if filename is None:
-        filename = "asav-ibm-tf-" + version.replace(".", "-") + local_time.strftime("-%H%M%S-%Y%m%d.tgz")
-    if len(filename) > 200 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.tgz", filename):
-        raise ValueError("--filename must be a basename ending in .tgz, using letters, digits, dots, underscores or hyphens")
+    filename = release_filename("asav", version, local_time, filename=filename, revision=revision)
     stem = filename[:-4]
     output.mkdir(parents=True, exist_ok=True)
     archive, manifest = output / filename, output / (stem + ".verification.json")
@@ -191,7 +189,7 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
     verify_archive(archive, hashes)
     archive_hash = digest(archive.read_bytes())
     checksums.write_text(archive_hash + "  " + archive.name + "\n")
-    manifest.write_text(json.dumps({
+    report = {
         "created_at_utc": now.astimezone(timezone.utc).isoformat(),
         "build_time_local": local_time.isoformat(), "filename_timezone": "Asia/Kolkata",
         "status": "local_candidate_not_uploaded_or_IBM_validated",
@@ -209,7 +207,10 @@ def build(source, output=None, version=None, *, filename=None, build_time=None):
         "packaged_image_labels": sorted(catalog["releases"]),
         "checks": ["single root/ directory", str(len(payload)) + "-file allowlist", "canonical repository LICENSE/NOTICE", "changelog version/date", "README sections", "JSON/reference format", "relative links", "archive round trip"],
         "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval.",
-    }, indent=2) + "\n")
+    }
+    if revision is not None:
+        report["artifact_revision"] = revision
+    manifest.write_text(json.dumps(report, indent=2) + "\n")
     return archive, checksums, manifest
 
 
@@ -218,11 +219,14 @@ def main():
     parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1] / "solutions/asav-ibm-tf")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT,
                         help="Archive directory; default: tf-releases/asav in the IBM project")
-    parser.add_argument("--filename", help="Custom .tgz basename; version still comes from changelog.txt")
+    naming = parser.add_mutually_exclusive_group()
+    naming.add_argument("--filename", help="Custom .tgz basename; version still comes from changelog.txt")
+    naming.add_argument("--revision", type=int, help="Positive archive revision number for the generated filename")
     parser.add_argument("--version", help="Optional consistency check; must equal the latest changelog version")
     args = parser.parse_args()
     try:
-        for path in build(args.source, args.output_dir, args.version, filename=args.filename):
+        for path in build(args.source, args.output_dir, args.version,
+                          filename=args.filename, revision=args.revision):
             print(path)
     except (ValueError, KeyError, TypeError, OSError, AttributeError) as error:
         parser.exit(1, "Package check failed: " + str(error) + "\n")

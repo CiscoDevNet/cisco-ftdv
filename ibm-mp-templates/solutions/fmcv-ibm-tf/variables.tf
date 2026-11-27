@@ -18,7 +18,7 @@ variable "ibmcloud_api_key" {
 }
 
 variable "region" {
-  description = "IBM Cloud region containing the existing VPC and selected subnets. The selected image/profile must support the region/zone."
+  description = "IBM Cloud region containing the existing VPC and management subnet. The selected image and profile must support the subnet location."
   type        = string
   default     = "us-east"
   nullable    = false
@@ -29,7 +29,7 @@ variable "region" {
 }
 
 variable "resource_group_name" {
-  description = "Name of the existing resource group for owned VSI, VNIs, boot volume and optional management floating IP."
+  description = "Name of the existing resource group for the FMCv VSI, management VNI, boot volume, and optional floating IP."
   type        = string
   nullable    = false
   validation {
@@ -38,14 +38,30 @@ variable "resource_group_name" {
   }
 }
 
-variable "prefix" {
-  description = "Customer-supplied resource-name prefix, unique per deployment in the region/resource group. Used unchanged; no random suffix is appended."
+variable "resource_name_prefix" {
+  description = "Unique resource name prefix for this deployment in the target region and resource group. Terraform uses the supplied prefix before suffixes such as -vsi and -mgmt-vni."
   type        = string
-  default     = "cisco-fmcv"
-  nullable    = false
+  default     = null
+
   validation {
-    condition     = length(var.prefix) >= 1 && length(var.prefix) <= 35 && can(regex("^[a-z][a-z0-9-]*$", var.prefix)) && !strcontains(var.prefix, "--") && !endswith(var.prefix, "-")
-    error_message = "prefix must be 1-35 lowercase letters/numbers/hyphens, start with a letter, have no consecutive/trailing hyphens, and be unique per deployment."
+    condition     = var.resource_name_prefix == null ? true : length(var.resource_name_prefix) <= 35 && can(regex(local.resource_name_prefix_pattern, var.resource_name_prefix))
+    error_message = "resource_name_prefix must contain 1–35 lowercase letters, digits or hyphens. Start with a letter and avoid consecutive or trailing hyphens."
+  }
+
+  validation {
+    condition     = var.resource_name_prefix == null || var.prefix == null || var.resource_name_prefix == var.prefix
+    error_message = "Set only resource_name_prefix or prefix, or provide the same value for both."
+  }
+}
+
+variable "prefix" {
+  description = "Deprecated alias for resource_name_prefix. Existing callers can continue to supply their original prefix. If both inputs are omitted, Terraform uses cisco-fmcv."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.prefix == null ? true : length(var.prefix) <= 35 && can(regex(local.resource_name_prefix_pattern, var.prefix))
+    error_message = "prefix must contain 1–35 lowercase letters, digits or hyphens. Start with a letter and avoid consecutive or trailing hyphens."
   }
 }
 
@@ -101,7 +117,7 @@ variable "instance_profile" {
 }
 
 variable "enable_secure_boot" {
-  description = "Requested mode must be supported by the selected image entry and live profile. The initial release permits only the declared baseline mode; qualification is limited to the profiles and regions documented in the README."
+  description = "Requested mode must be supported by the selected image in fmcv-images.json and by the live IBM Cloud profile."
   type        = bool
   default     = false
   nullable    = false

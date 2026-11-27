@@ -1,4 +1,7 @@
 locals {
+  resource_name_prefix_pattern   = "^[a-z]([a-z0-9]|-[a-z0-9])*$"
+  effective_resource_name_prefix = coalesce(var.resource_name_prefix, var.prefix, "cisco-fmcv")
+
   fmcv_catalog_id          = "1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc"
   fmcv_catalog_offering_id = "319ec1e1-0b9f-421c-a4f8-88e2ea84c887-global"
   fmcv_version_crn_prefix  = "crn:v1:bluemix:public:globalcatalog-collection:global::${local.fmcv_catalog_id}:version:${local.fmcv_catalog_offering_id}/"

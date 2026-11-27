@@ -41,20 +41,30 @@ variable "resource_group_name" {
   }
 }
 
-variable "prefix" {
+variable "resource_name_prefix" {
   description = "Complete customer-supplied resource-name prefix, unique for each deployment in the target region and resource group. Use 1-35 lowercase letters, numbers, or hyphens. Terraform uses this value unchanged before resource suffixes such as -vsi and -mgmt-vni; no random suffix is appended."
   type        = string
-  default     = "cisco-asav"
+  default     = null
 
   validation {
-    condition = (
-      length(var.prefix) >= 1 &&
-      length(var.prefix) <= 35 &&
-      can(regex("^[a-z][a-z0-9-]*$", var.prefix)) &&
-      !strcontains(var.prefix, "--") &&
-      !endswith(var.prefix, "-")
-    )
-    error_message = "prefix must be 1-35 lowercase letters, numbers, or hyphens; it must start with a letter, contain no consecutive hyphens, and not end with a hyphen. Supply a unique prefix for each deployment; no random suffix is added."
+    condition     = var.resource_name_prefix == null ? true : length(var.resource_name_prefix) <= 35 && can(regex(local.resource_name_prefix_pattern, var.resource_name_prefix))
+    error_message = "resource_name_prefix must contain 1–35 lowercase letters, digits or hyphens. Start with a letter and avoid consecutive or trailing hyphens."
+  }
+
+  validation {
+    condition     = var.resource_name_prefix == null || var.prefix == null || var.resource_name_prefix == var.prefix
+    error_message = "Set only resource_name_prefix or prefix, or provide the same value for both."
+  }
+}
+
+variable "prefix" {
+  description = "Deprecated alias for resource_name_prefix. Existing callers can continue to supply their original prefix. If both inputs are omitted, Terraform uses cisco-asav."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.prefix == null ? true : length(var.prefix) <= 35 && can(regex(local.resource_name_prefix_pattern, var.prefix))
+    error_message = "prefix must contain 1–35 lowercase letters, digits or hyphens. Start with a letter and avoid consecutive or trailing hyphens."
   }
 }
 

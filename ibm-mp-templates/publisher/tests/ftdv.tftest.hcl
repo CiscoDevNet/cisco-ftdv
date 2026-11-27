@@ -43,9 +43,42 @@ variables {
 run "deploy_defaults" {
   command = apply
   assert {
+    condition     = output.instance_name == "product-unit-vsi"
+    error_message = "A legacy prefix must still determine resource names."
+  }
+  assert {
     condition     = length(ibm_is_instance.ftdv.network_attachments) == 3 && length(output.interface_map) == 4 && length(ibm_is_floating_ip.management) == 0 && length(ibm_is_instance.ftdv.keys) == 1 && contains(ibm_is_instance.ftdv.keys, var.ssh_key_id) && local.effective_user_data == null && ibm_is_virtual_network_interface.management.allow_ip_spoofing == false && ibm_is_virtual_network_interface.management.protocol_state_filtering_mode == "auto"
     error_message = "deploy_defaults contract failed."
   }
+}
+run "default_prefix_without_either_key" {
+  command = plan
+  variables { prefix = null }
+  assert {
+    condition     = output.instance_name == "cisco-ftdv-vsi"
+    error_message = "Omitting both prefix inputs must preserve the FTDv fallback."
+  }
+}
+run "allow_matching_prefix_keys" {
+  command = plan
+  variables { resource_name_prefix = "product-unit" }
+  assert {
+    condition     = output.instance_id == run.deploy_defaults.instance_id
+    error_message = "Matching legacy and new prefix values must preserve instance identity."
+  }
+}
+run "reject_conflicting_prefix_keys" {
+  command = plan
+  variables { resource_name_prefix = "different-prefix" }
+  expect_failures = [var.resource_name_prefix]
+}
+run "reject_empty_resource_name_prefix" {
+  command = plan
+  variables {
+    prefix               = null
+    resource_name_prefix = ""
+  }
+  expect_failures = [var.resource_name_prefix]
 }
 run "attachment_order" {
   command = plan
@@ -96,6 +129,29 @@ run "enable_management_fip" {
   assert {
     condition     = length(ibm_is_floating_ip.management) == 1 && ibm_is_floating_ip.management[0].target == ibm_is_virtual_network_interface.management.id && output.instance_id == run.deploy_defaults.instance_id
     error_message = "enable_management_fip contract failed."
+  }
+}
+run "rename_prefix_without_changing_names" {
+  command = plan
+  variables {
+    prefix                        = null
+    resource_name_prefix          = "product-unit"
+    create_management_floating_ip = true
+  }
+  assert {
+    condition = (
+      output.instance_id == run.enable_management_fip.instance_id &&
+      output.interface_map == run.enable_management_fip.interface_map &&
+      output.management_floating_ip == run.enable_management_fip.management_floating_ip &&
+      output.instance_name == "product-unit-vsi" &&
+      ibm_is_instance.ftdv.boot_volume[0].name == "product-unit-boot" &&
+      ibm_is_virtual_network_interface.management.name == "product-unit-mgmt-vni" &&
+      ibm_is_virtual_network_interface.data_1.name == "product-unit-data-1-vni" &&
+      ibm_is_virtual_network_interface.data_2.name == "product-unit-data-2-vni" &&
+      ibm_is_virtual_network_interface.data_3.name == "product-unit-data-3-vni" &&
+      ibm_is_floating_ip.management[0].name == "product-unit-mgmt-fip"
+    )
+    error_message = "Migrating the same prefix must preserve FTDv resource identities and names."
   }
 }
 run "disable_management_fip" {

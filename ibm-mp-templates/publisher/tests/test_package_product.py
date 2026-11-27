@@ -50,6 +50,40 @@ class ProductPackages(unittest.TestCase):
                 b,_,_=build(source,self.root/"two"/p,**kwargs)
                 self.assertEqual(a.read_bytes(),b.read_bytes())
                 self.assertEqual(a.name,p+"-ibm-tf-1-2-3-154112-20261113.tgz")
+
+    def test_revision_names_for_releases_and_drafts(self):
+        at = datetime(2026, 11, 13, 21, 45, tzinfo=timezone.utc)
+        for product in ("ftdv", "fmcv"):
+            source = self.source(product)
+            install_fixture(source, product)
+            for draft in (False, True):
+                with self.subTest(product=product, draft=draft):
+                    archive, checksum, manifest = build(
+                        source, self.root / "out", product=product, revision=2, build_time=at, draft=draft
+                    )
+                    stem = f"{product}-ibm-tf-1.2.3-v2-031500-20261114"
+                    if draft:
+                        stem = "DRAFT-" + stem
+                    self.assertEqual(archive.name, stem + ".tgz")
+                    self.assertEqual(checksum.name, stem + ".sha256")
+                    self.assertEqual(manifest.name, stem + ".verification.json")
+                    report = json.loads(manifest.read_text())
+                    self.assertEqual(report["software_package_version"], "1.2.3")
+                    self.assertEqual(report["artifact_revision"], 2)
+
+    def test_revision_and_custom_filename_conflict_in_product_clis(self):
+        output = self.root / "out"
+        for product in ("ftdv", "fmcv"):
+            with self.subTest(product=product):
+                result = subprocess.run(
+                    [sys.executable, "-B", str(PROJECT / "publisher" / f"package_{product}.py"),
+                     "--revision", "2", "--filename", "custom.tgz", "--output-dir", str(output)],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("not allowed with argument", result.stderr)
+        self.assertFalse(output.exists())
+
     def test_custom_name_and_no_overwrite(self):
         source=self.source("fmcv")
         a,_,_=build(source,self.root/"out",product="fmcv",draft=True,filename="DRAFT-custom.tgz")

@@ -187,6 +187,32 @@ class PackageChecks(unittest.TestCase):
         self.assertEqual(checksum.name, 'my-asav-pilot.sha256')
         self.assertEqual(json.loads(manifest.read_text())['software_package_version'], '9.2410.1')
 
+    def test_revision_name_keeps_dotted_version_and_rolls_over_in_ist(self):
+        at = datetime(2026, 11, 5, 21, 45, tzinfo=timezone.utc)
+        legacy, _, _ = self.build(self.work / 'out', build_time=at)
+        archive, checksum, manifest = self.build(self.work / 'out', build_time=at, revision=2)
+        stem = 'asav-ibm-tf-9.2410.1-v2-031500-20261106'
+        self.assertEqual(archive.name, stem + '.tgz')
+        self.assertEqual(checksum.name, stem + '.sha256')
+        self.assertEqual(manifest.name, stem + '.verification.json')
+        self.assertEqual(archive.read_bytes(), legacy.read_bytes())
+        report = json.loads(manifest.read_text())
+        self.assertEqual(report['software_package_version'], '9.2410.1')
+        self.assertEqual(report['artifact_revision'], 2)
+
+    def test_revision_and_custom_filename_conflict(self):
+        output = self.work / 'out'
+        with self.assertRaisesRegex(ValueError, 'cannot be used together'):
+            self.build(output, revision=2, filename='custom.tgz')
+        self.assertFalse(output.exists())
+
+    def test_invalid_revision_does_not_create_output(self):
+        output = self.work / 'out'
+        for revision in [0, -1, True, 1.5, '2']:
+            with self.subTest(revision=revision), self.assertRaisesRegex(ValueError, 'positive integer'):
+                self.build(output, revision=revision)
+        self.assertFalse(output.exists())
+
     def test_rejects_unsafe_or_wrong_extension_filename(self):
         for name in ['../escape.tgz', '/tmp/absolute.tgz', 'file.zip', '.hidden.tgz', '']:
             with self.subTest(name=name), self.assertRaises(ValueError):

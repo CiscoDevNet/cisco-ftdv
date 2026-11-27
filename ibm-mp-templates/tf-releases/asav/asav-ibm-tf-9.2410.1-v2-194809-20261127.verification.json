@@ -1,0 +1,108 @@
+{
+  "created_at_utc": "2026-11-27T14:18:09.715735+00:00",
+  "build_time_local": "2026-11-27T19:48:09.715735+05:30",
+  "filename_timezone": "Asia/Kolkata",
+  "status": "local_candidate_not_uploaded_or_IBM_validated",
+  "software_package_version": "9.2410.1",
+  "changelog": {
+    "version": "9.2410.1",
+    "date": "2026-11-06",
+    "changes": [
+      "Terraform package revision v2 (2026-Nov-27): Add resource_name_prefix and retain prefix as a deprecated alias with the existing fallback.",
+      "Preserve ASAv resource names for equivalent inputs and document how to migrate the input key.",
+      "Initial TF template creation for ASAv 9.24.10.1 using VSI Catalog package 9.2410.1.",
+      "Allow Terraform >= 1.13.4 and < 1.14.0 for Schematics-managed patch updates.",
+      "Use IBM provider 2.4.0 and include deployment, update and destroy guidance.",
+      "Record the verified Darwin AMD64 provider checksum for read-only local checks.",
+      "Accept one required ssh_key_id string and resolve image options from asav-images.json.",
+      "Include the Day-0 example, architecture diagram and routing guide in the release archive.",
+      "Document Catalog image choices, customer-facing input labels and validation overrides."
+    ]
+  },
+  "module": "asav-ibm-tf",
+  "source": "solutions/asav-ibm-tf",
+  "source_path_base": "project",
+  "archive_filename": "asav-ibm-tf-9.2410.1-v2-194809-20261127.tgz",
+  "archive_sha256": "31f9b54f173af892cfca23a4645ca513c956e408f0929a617a3b7f9d25af941a",
+  "archive_root": "root/",
+  "archive_layout": "single root/ folder containing 14 module files plus LICENSE and NOTICE; README.md beside main.tf",
+  "packaging_schema": 2,
+  "module_file_count": 14,
+  "archive_file_count": 16,
+  "legal_files": {
+    "LICENSE": {
+      "source_path": "LICENSE",
+      "source_path_base": "repository",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    "NOTICE": {
+      "source_path": "NOTICE",
+      "source_path_base": "repository",
+      "sha256": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30"
+    }
+  },
+  "files_sha256": {
+    ".terraform.lock.hcl": "88c060c16604781908be0400670626e385ad9d2054e7a62871881939feff5032",
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "c33a9d5d7743fedca34a56673cc31e080a6adfd89c259e7328ee2f24a8572a30",
+    "README.md": "662733c378f37c15fbd26e2384de319bfa6c20e2a1f6b3546a65f55f3257ed29",
+    "asav-images.json": "244276c0f86e9e84c28b756e814f6e752355e001ba2a2ec808cfe8a06969a169",
+    "bootstrap/asav-day0.example.txt": "cbe717e5fe458a6a4c2dea8198f26bf346f0b043f546656f3db682db74981666",
+    "changelog.txt": "b23ec381290c52500a71a0fcc0f4462dd8787bfc4a507ee2c2d92e2a7d8effcf",
+    "data.tf": "9854ad8bd6d0d13ac2b83bad01fcd9546ff075003d6ac4d1e5f5da24c59ee3b0",
+    "docs/asav-existing-vpc.png": "096ef20b6efbebcb007ce060483983f59cf6e1e7d57851a7057dccd99aab38fd",
+    "docs/routing-guide.md": "cd468ab77c9f4660868aacc7c9c062d42fbf1401a7730d38b9589d9025c47195",
+    "locals.tf": "ebcd8e171474392dbb2d1066035cd4a20c88002c82585ab9b14414d93fb399d2",
+    "main.tf": "c29da1c1a0ee92dcd0147bdae9c6f35af6a56690a24df009f911dedd3a3a1ad9",
+    "outputs.tf": "58b79e0d6f9cabf09e6bf6308bb93420941fc8c2ec61f3b28b8e6b4d7f86f0e9",
+    "provider.tf": "b5815fcd378e7f0e27570768629bb5c57146fc4913bcb4c1ce0953dca116fc1f",
+    "variables.tf": "b6006fe34139f650f92d23b15dc91f1eed9529f3573c76adaff83e03af07eb6e",
+    "version.tf": "0506d71f90134259ee1c417dc6feb952f72a34fc70368d2bf58f49f2749cbbed"
+  },
+  "relative_links_verified": [
+    {
+      "from": "README.md",
+      "target": "docs/asav-existing-vpc.png"
+    },
+    {
+      "from": "README.md",
+      "target": "bootstrap/asav-day0.example.txt"
+    },
+    {
+      "from": "README.md",
+      "target": "asav-images.json"
+    },
+    {
+      "from": "README.md",
+      "target": "variables.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "docs/routing-guide.md"
+    },
+    {
+      "from": "README.md",
+      "target": "outputs.tf"
+    },
+    {
+      "from": "README.md",
+      "target": "changelog.txt"
+    }
+  ],
+  "default_asav_image_label": "9.24.10.1",
+  "packaged_image_labels": [
+    "9.24.10.1"
+  ],
+  "checks": [
+    "single root/ directory",
+    "16-file allowlist",
+    "canonical repository LICENSE/NOTICE",
+    "changelog version/date",
+    "README sections",
+    "JSON/reference format",
+    "relative links",
+    "archive round trip"
+  ],
+  "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval.",
+  "artifact_revision": 2
+}
