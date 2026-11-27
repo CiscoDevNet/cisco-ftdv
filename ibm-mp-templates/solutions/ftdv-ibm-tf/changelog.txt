@@ -2,6 +2,9 @@
 2026-Nov-18
 version 10.11.1
 Changes
+Terraform package revision v2 (2026-Nov-27): Add resource_name_prefix and retain prefix as a deprecated alias with the existing fallback.
+Preserve FTDv resource names for equivalent inputs and document Catalog deployment, Day-0 entry, and prefix migration.
+Keep release-specific image and runtime details in package metadata and source.
 Initial TF template creation.
 Verified exact published VSI references and recorded selected-account access scope.
 Aligned automatic primary-IP allocation with ASAv to avoid provider 2.4.0 refresh drift.

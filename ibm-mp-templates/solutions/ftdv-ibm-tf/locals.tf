@@ -1,4 +1,7 @@
 locals {
+  resource_name_prefix_pattern   = "^[a-z]([a-z0-9]|-[a-z0-9])*$"
+  effective_resource_name_prefix = coalesce(var.resource_name_prefix, var.prefix, "cisco-ftdv")
+
   ftdv_catalog_id          = "1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc"
   ftdv_catalog_offering_id = "29e54f20-ff16-45e5-9a18-469652bbeab1-global"
   ftdv_version_crn_prefix  = "crn:v1:bluemix:public:globalcatalog-collection:global::${local.ftdv_catalog_id}:version:${local.ftdv_catalog_offering_id}/"
