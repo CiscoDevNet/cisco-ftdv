@@ -42,6 +42,10 @@ variables {
 run "deploy_defaults" {
   command = apply
   assert {
+    condition     = ibm_is_instance.asav.name == "asav-unit-vsi"
+    error_message = "A legacy prefix must still determine the resource names."
+  }
+  assert {
     condition     = length(ibm_is_instance.asav.network_attachments) == 2 && ibm_is_instance.asav.enable_secure_boot && length(ibm_is_floating_ip.management) == 0
     error_message = "Default topology must be three NICs, Secure Boot on and private management."
   }
@@ -58,6 +62,53 @@ run "deploy_defaults" {
     error_message = "The selected single SSH key must be passed to the instance as a one-element provider list."
   }
 }
+run "rename_prefix_without_changing_names" {
+  command = plan
+  variables {
+    prefix               = null
+    resource_name_prefix = "asav-unit"
+  }
+  assert {
+    condition = (
+      output.instance_id == run.deploy_defaults.instance_id &&
+      ibm_is_instance.asav.name == "asav-unit-vsi" &&
+      ibm_is_instance.asav.boot_volume[0].name == "asav-unit-boot" &&
+      ibm_is_virtual_network_interface.management.name == "asav-unit-mgmt-vni" &&
+      ibm_is_virtual_network_interface.data_1.name == "asav-unit-data-1-vni" &&
+      ibm_is_virtual_network_interface.data_2.name == "asav-unit-data-2-vni"
+    )
+    error_message = "Using the new key for the same prefix must preserve the instance identity and names."
+  }
+}
+run "default_prefix_without_either_key" {
+  command = plan
+  variables { prefix = null }
+  assert {
+    condition     = ibm_is_instance.asav.name == "cisco-asav-vsi"
+    error_message = "Omitting both prefix inputs must preserve the original fallback."
+  }
+}
+run "allow_matching_prefix_keys" {
+  command = plan
+  variables { resource_name_prefix = "asav-unit" }
+  assert {
+    condition     = output.instance_id == run.deploy_defaults.instance_id
+    error_message = "Matching legacy and new prefix values must preserve the instance identity."
+  }
+}
+run "reject_conflicting_prefix_keys" {
+  command = plan
+  variables { resource_name_prefix = "different-prefix" }
+  expect_failures = [var.resource_name_prefix]
+}
+run "reject_empty_resource_name_prefix" {
+  command = plan
+  variables {
+    prefix               = null
+    resource_name_prefix = ""
+  }
+  expect_failures = [var.resource_name_prefix]
+}
 run "update_tags" {
   command = apply
   variables { tags = ["cisco", "changed-tag"] }
@@ -70,7 +121,7 @@ run "enable_management_fip" {
   command = apply
   variables { create_management_floating_ip = true }
   assert {
-    condition     = length(ibm_is_floating_ip.management) == 1 && output.instance_id == run.deploy_defaults.instance_id
+    condition     = length(ibm_is_floating_ip.management) == 1 && ibm_is_floating_ip.management[0].name == "asav-unit-mgmt-fip" && output.instance_id == run.deploy_defaults.instance_id
     error_message = "Public-management toggle must add one FIP without a new mock VSI."
   }
 }

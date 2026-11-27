@@ -2,6 +2,8 @@
 2026-Nov-06
 version 9.2410.1
 Changes
+Terraform package revision v2 (2026-Nov-27): Add resource_name_prefix and retain prefix as a deprecated alias with the existing fallback.
+Preserve ASAv resource names for equivalent inputs and document how to migrate the input key.
 Initial TF template creation for ASAv 9.24.10.1 using VSI Catalog package 9.2410.1.
 Allow Terraform >= 1.13.4 and < 1.14.0 for Schematics-managed patch updates.
 Use IBM provider 2.4.0 and include deployment, update and destroy guidance.

@@ -1,5 +1,5 @@
 resource "ibm_is_virtual_network_interface" "management" {
-  name                          = "${var.prefix}-mgmt-vni"
+  name                          = "${local.effective_resource_name_prefix}-mgmt-vni"
   subnet                        = data.ibm_is_subnet.management.id
   security_groups               = [var.management_security_group_id]
   resource_group                = data.ibm_resource_group.target.id
@@ -10,7 +10,7 @@ resource "ibm_is_virtual_network_interface" "management" {
 }
 
 resource "ibm_is_virtual_network_interface" "data_1" {
-  name                          = "${var.prefix}-data-1-vni"
+  name                          = "${local.effective_resource_name_prefix}-data-1-vni"
   subnet                        = data.ibm_is_subnet.data_1.id
   security_groups               = [var.data_security_group_1_id]
   resource_group                = data.ibm_resource_group.target.id
@@ -21,7 +21,7 @@ resource "ibm_is_virtual_network_interface" "data_1" {
 }
 
 resource "ibm_is_virtual_network_interface" "data_2" {
-  name                          = "${var.prefix}-data-2-vni"
+  name                          = "${local.effective_resource_name_prefix}-data-2-vni"
   subnet                        = data.ibm_is_subnet.data_2.id
   security_groups               = [var.data_security_group_2_id]
   resource_group                = data.ibm_resource_group.target.id
@@ -32,7 +32,7 @@ resource "ibm_is_virtual_network_interface" "data_2" {
 }
 
 resource "ibm_is_instance" "asav" {
-  name               = "${var.prefix}-vsi"
+  name               = "${local.effective_resource_name_prefix}-vsi"
   vpc                = data.ibm_is_vpc.target.id
   zone               = local.deployment_zone
   profile            = data.ibm_is_instance_profile.selected.name
@@ -79,7 +79,7 @@ resource "ibm_is_instance" "asav" {
   }
 
   boot_volume {
-    name = "${var.prefix}-boot"
+    name = "${local.effective_resource_name_prefix}-boot"
   }
 
   timeouts {
@@ -155,7 +155,7 @@ resource "ibm_is_instance" "asav" {
 resource "ibm_is_floating_ip" "management" {
   count = var.create_management_floating_ip ? 1 : 0
 
-  name           = "${var.prefix}-mgmt-fip"
+  name           = "${local.effective_resource_name_prefix}-mgmt-fip"
   target         = ibm_is_virtual_network_interface.management.id
   resource_group = data.ibm_resource_group.target.id
   tags           = var.tags

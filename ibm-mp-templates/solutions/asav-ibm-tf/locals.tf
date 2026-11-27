@@ -1,4 +1,7 @@
 locals {
+  resource_name_prefix_pattern   = "^[a-z]([a-z0-9]|-[a-z0-9])*$"
+  effective_resource_name_prefix = coalesce(var.resource_name_prefix, var.prefix, "cisco-asav")
+
   asav_catalog_id          = "1082e7d2-5e2f-0a11-a3bc-f88a8e1931fc"
   asav_catalog_offering_id = "452f20c1-add3-4191-bbbf-476c9314932f-global"
   asav_version_crn_prefix  = "crn:v1:bluemix:public:globalcatalog-collection:global::${local.asav_catalog_id}:version:${local.asav_catalog_offering_id}/"
