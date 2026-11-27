@@ -50,7 +50,7 @@ See the [shared publisher guide](../SOFTWARE-TERRAFORM-PACKAGING.md).
 
 ## Pull request checks
 
-The repository workflow `IBM Terraform PR checks` runs on PRs targeting `cisco-secure-firewall-ibm-marketplace`, on relevant pushes to that branch, or by manual dispatch. It runs Python regression tests, verifies retained artifact triplets, and runs isolated fmt/init/validate/mock checks for all three products on Linux with Terraform 1.13.5 and the committed provider lock files. Checkout uses a full commit SHA with credentials persistence disabled and read-only token permissions. The workflow uses mocks without IBM credentials or live resources.
+The repository workflow `IBM Terraform PR checks` runs on PRs targeting `cisco-secure-firewall-ibm-marketplace` and on relevant pushes to that branch. It runs Python regression tests, verifies retained artifact triplets, and runs isolated fmt/init/validate/mock checks for all three products on Linux with Terraform 1.13.5 and the committed provider lock files. Checkout uses a full commit SHA with credentials persistence disabled and read-only token permissions. The workflow uses mocks without IBM credentials or live resources.
 
 `python3 publisher/verify_releases.py` checks each retained TGZ against its own checksum and manifest. Add `--changed-since origin/cisco-secure-firewall-ibm-marketplace` to also compare new or changed triplets against the module files and canonical `LICENSE` and `NOTICE` in your checkout. CI uses the PR base or previous push revision for this comparison when available. Retained releases keep their original payload when source advances.
 

@@ -45,6 +45,20 @@ class ReleaseArchives(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing"):
             verify_triplet(archive)
 
+    def test_symlinked_triplet_members_rejected(self):
+        archive = self.copy_triplet()
+        for member in triplet_files(archive):
+            with self.subTest(member=member.name):
+                target = member.with_name(member.name + ".original")
+                member.rename(target)
+                member.symlink_to(target.name)
+                try:
+                    with self.assertRaisesRegex(ValueError, "must not be a symlink"):
+                        verify_triplet(archive)
+                finally:
+                    member.unlink()
+                    target.rename(member)
+
     def test_manifest_payload_tampering_rejected(self):
         archive = self.copy_triplet()
         path = archive.with_suffix(".verification.json")

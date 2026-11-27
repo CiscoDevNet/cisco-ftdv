@@ -21,11 +21,14 @@ def triplet_files(archive):
 
 
 def verify_triplet(archive, *, source_project=None):
-    _, checksum, manifest = triplet_files(archive)
+    archive, checksum, manifest = triplet_files(archive)
     if archive.name.startswith("DRAFT-"):
         raise ValueError("Keep draft review archives outside committed release folders")
-    if not checksum.is_file() or not manifest.is_file():
-        raise ValueError("Archive is missing its checksum or verification report")
+    for member in (archive, checksum, manifest):
+        if member.is_symlink():
+            raise ValueError(f"Release file must not be a symlink: {member}")
+        if not member.is_file():
+            raise ValueError(f"Release file is missing or is not a regular file: {member}")
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     parts = checksum.read_text().split()
     report = json.loads(manifest.read_text())
