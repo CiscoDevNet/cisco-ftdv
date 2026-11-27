@@ -25,6 +25,14 @@ variables {
 run "deploy_defaults" {
   command = apply
   assert {
+    condition = (
+      ibm_is_instance.fmcv.name == "product-unit-vsi" &&
+      ibm_is_instance.fmcv.boot_volume[0].name == "product-unit-boot" &&
+      ibm_is_virtual_network_interface.management.name == "product-unit-mgmt-vni"
+    )
+    error_message = "The legacy prefix must still determine the VSI, boot volume, and management VNI names."
+  }
+  assert {
     condition     = length(ibm_is_instance.fmcv.network_attachments) == 0 && length(output.interface_map) == 1 && length(ibm_is_floating_ip.management) == 0 && length(ibm_is_instance.fmcv.keys) == 1 && contains(ibm_is_instance.fmcv.keys, var.ssh_key_id) && local.effective_user_data == null && ibm_is_virtual_network_interface.management.allow_ip_spoofing == false && ibm_is_virtual_network_interface.management.protocol_state_filtering_mode == "auto"
     error_message = "deploy_defaults contract failed."
   }
@@ -59,9 +67,71 @@ run "enable_management_fip" {
     create_management_floating_ip = true
   }
   assert {
-    condition     = length(ibm_is_floating_ip.management) == 1 && ibm_is_floating_ip.management[0].target == ibm_is_virtual_network_interface.management.id && output.instance_id == run.deploy_defaults.instance_id
+    condition     = length(ibm_is_floating_ip.management) == 1 && ibm_is_floating_ip.management[0].name == "product-unit-mgmt-fip" && ibm_is_floating_ip.management[0].target == ibm_is_virtual_network_interface.management.id && output.instance_id == run.deploy_defaults.instance_id
     error_message = "enable_management_fip contract failed."
   }
+}
+run "rename_prefix_without_changing_names" {
+  command = plan
+  variables {
+    prefix                        = null
+    resource_name_prefix          = "product-unit"
+    create_management_floating_ip = true
+  }
+  assert {
+    condition = (
+      output.instance_id == run.deploy_defaults.instance_id &&
+      output.interface_map.eth0.vni_id == run.deploy_defaults.interface_map.eth0.vni_id &&
+      output.management_floating_ip == run.enable_management_fip.management_floating_ip &&
+      ibm_is_instance.fmcv.name == "product-unit-vsi" &&
+      ibm_is_instance.fmcv.boot_volume[0].name == "product-unit-boot" &&
+      ibm_is_virtual_network_interface.management.name == "product-unit-mgmt-vni" &&
+      ibm_is_floating_ip.management[0].name == "product-unit-mgmt-fip"
+    )
+    error_message = "Moving the same prefix to the new key must preserve instance and VNI identity and all resource names."
+  }
+}
+run "default_prefix_without_either_key" {
+  command = plan
+  variables {
+    prefix                        = null
+    create_management_floating_ip = true
+  }
+  assert {
+    condition = (
+      ibm_is_instance.fmcv.name == "cisco-fmcv-vsi" &&
+      ibm_is_instance.fmcv.boot_volume[0].name == "cisco-fmcv-boot" &&
+      ibm_is_virtual_network_interface.management.name == "cisco-fmcv-mgmt-vni" &&
+      ibm_is_floating_ip.management[0].name == "cisco-fmcv-mgmt-fip"
+    )
+    error_message = "Omitting both prefix inputs must keep the original fallback for every resource name."
+  }
+}
+run "allow_matching_prefix_keys" {
+  command = plan
+  variables {
+    resource_name_prefix          = "product-unit"
+    create_management_floating_ip = true
+  }
+  assert {
+    condition     = output.instance_id == run.deploy_defaults.instance_id && ibm_is_floating_ip.management[0].name == "product-unit-mgmt-fip"
+    error_message = "Matching legacy and new prefix values must preserve the deployment."
+  }
+}
+run "reject_conflicting_prefix_keys" {
+  command = plan
+  variables {
+    resource_name_prefix = "different-prefix"
+  }
+  expect_failures = [var.resource_name_prefix]
+}
+run "reject_empty_resource_name_prefix" {
+  command = plan
+  variables {
+    prefix               = null
+    resource_name_prefix = ""
+  }
+  expect_failures = [var.resource_name_prefix]
 }
 run "disable_management_fip" {
   command = apply

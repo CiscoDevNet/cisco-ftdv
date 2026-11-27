@@ -1,5 +1,5 @@
 resource "ibm_is_virtual_network_interface" "management" {
-  name                          = "${var.prefix}-mgmt-vni"
+  name                          = "${local.effective_resource_name_prefix}-mgmt-vni"
   subnet                        = data.ibm_is_subnet.management.id
   security_groups               = [var.management_security_group_id]
   resource_group                = data.ibm_resource_group.target.id
@@ -10,7 +10,7 @@ resource "ibm_is_virtual_network_interface" "management" {
 }
 
 resource "ibm_is_instance" "fmcv" {
-  name               = "${var.prefix}-vsi"
+  name               = "${local.effective_resource_name_prefix}-vsi"
   vpc                = data.ibm_is_vpc.target.id
   zone               = local.deployment_zone
   profile            = data.ibm_is_instance_profile.selected.name
@@ -39,7 +39,7 @@ resource "ibm_is_instance" "fmcv" {
     response_hop_limit = 1
   }
   boot_volume {
-    name               = "${var.prefix}-boot"
+    name               = "${local.effective_resource_name_prefix}-boot"
     auto_delete_volume = true
   }
   timeouts {
@@ -97,7 +97,7 @@ resource "ibm_is_instance" "fmcv" {
 
 resource "ibm_is_floating_ip" "management" {
   count          = var.create_management_floating_ip ? 1 : 0
-  name           = "${var.prefix}-mgmt-fip"
+  name           = "${local.effective_resource_name_prefix}-mgmt-fip"
   target         = ibm_is_virtual_network_interface.management.id
   resource_group = data.ibm_resource_group.target.id
   tags           = var.tags
