@@ -4,15 +4,15 @@ Use **Software → Terraform**. Customer installation instructions are in the se
 
 ## Product contracts
 
-| Product | Package/listing version | Image selector label | Interfaces | Default profile / Secure Boot |
-|---|---|---|---|---|
-| ASAv | 9.2410.1 | 9.24.10.1 | Management eth0; data eth1/eth2 | `cx3d-2x5` / true |
-| FTDv | 10.11.1 | 10.1.1.1 | Data eth0/eth1/eth3; management eth2; Diagnostic OFF | `cx3d-4x10` / true |
-| FMCv | 10.11.1 | 10.1.1.1 | Management eth0 | `bx3d-8x40` / false |
+| Product | Interfaces | Default profile / Secure Boot |
+|---|---|---|
+| ASAv | Management eth0; data eth1/eth2 | `cx3d-2x5` / true |
+| FTDv | Data eth0/eth1/eth3; management eth2; Diagnostic OFF | `cx3d-4x10` / true |
+| FMCv | Management eth0 | `bx3d-8x40` / false |
 
-Common behavior follows ASAv: reuse existing RG/VPC/subnets/SGs/key, customer-unique prefix without random suffix, one required string `ssh_key_id`, optional sensitive raw Day-0, optional management FIP false by default, native VNIs, HTTP metadata/hop limit 1, and `ibm_is_instance.catalog_offering.version_crn` from product image JSON. The image digest is reference metadata; the archive SHA-256 is a different checksum.
+All products reuse the existing RG, VPC, subnets, SGs, and SSH key. They use a unique prefix, a required `ssh_key_id` string, optional sensitive Day-0, native VNIs, HTTP metadata with hop limit 1, and private management by default. Each module's changelog records its package versions. The product image JSON supplies the image label and `ibm_is_instance.catalog_offering.version_crn`.
 
-Intentional differences: FTDv has three data NICs with spoofing true/filtering disabled, while its management NIC and FMCv use false/Auto. ASAv retains its all-interface defaults. FTDv/FMCv accept raw JSON rather than ASA commands; their boot volumes inherit image minimums (100/250 GB respectively), and explicitly enable boot-volume auto-deletion. They also guard verified reference/access-scope metadata for selected-account releases. These differences are product-specific; do not mechanically copy ASAv settings.
+FTDv uses spoofing with protocol filtering disabled on its three data NICs. Its management NIC and FMCv use spoofing disabled with automatic filtering. ASAv retains its all-interface defaults. FTDv and FMCv accept raw JSON Day-0 configuration. Their boot volumes inherit the selected image's minimum from the packaged image metadata and are configured for automatic deletion. Both templates check verified image references and access scope.
 
 FTDv raw Day-0 may optionally include supported FMC registration fields. Terraform does not create an FMC, call its API or complete manager-side Add Device. FMC licensing/evaluation initialization is required before registration. See the module operations guides for bootstrap, connectivity, licensing and no-Day-0 setup details.
 
@@ -23,8 +23,6 @@ New TGZs contain exactly one `root/` directory and 16 files: 14 module files (se
 The repository-root legal files remain the single source; `package_legal.py` reads them at build time and rejects missing, empty or symlinked files. Module directories retain their strict 14-file allowlists. Verification reports record 16 archived-file hashes, legal-file provenance and packaging schema 2.
 
 Publisher tools/tests, repository/project READMEs, planning notes, state, credentials, provider caches, logs and private account evidence stay outside the archive. Builders enforce an exact file allowlist and reject unexpected module files or symlinks. See [IBM archive guidance](https://cloud.ibm.com/docs/sell?topic=sell-repo-upload-error).
-
-**Pending ASAv Catalog update:** the fresh 16-file ASAv candidate has been generated with the approved README corrections and legal files; see the [candidate status](publisher/README.md#asav-candidate-and-pending-catalog-update). The historical submitted TGZ/checksum/report remain unchanged. Import the reviewed candidate through the supported Catalog draft/revision workflow and rerun exact-archive Partner Center validation when resumed. Do not overwrite the old URL or assume its prior validation covers new bytes. Keep the import/validation action open until completed.
 
 ## 1. Pre-publication: checks and release artifacts
 
@@ -45,9 +43,7 @@ Check runners use isolated temporary copies and product-specific mock tests; the
 Builders need no cloud credentials. They produce a TGZ plus sibling `.sha256` and `.verification.json` under `tf-releases/PRODUCT/`:
 
 ```text
-asav/asav-ibm-tf-9-2410-1-HHMMSS-YYYYMMDD.tgz
-ftdv/ftdv-ibm-tf-10-11-1-HHMMSS-YYYYMMDD.tgz
-fmcv/fmcv-ibm-tf-10-11-1-HHMMSS-YYYYMMDD.tgz
+PRODUCT/PRODUCT-ibm-tf-VERSION_WITH_DASHES-HHMMSS-YYYYMMDD.tgz
 ```
 
 Filename time uses Asia/Kolkata, six-digit HHMMSS. Source-identical builds produce identical archive bytes regardless of filename/time. Existing artifact names are never overwritten. Preserve published triplets; keep superseded unpublished builds and `DRAFT-` review copies outside the committed release folders. Every builder rejects custom output inside any deployment module under `solutions/`, including paths reached through symlinks.
@@ -61,11 +57,11 @@ tar -tzf "$PRODUCT_OUT/ftdv-review.tgz"
 (cd "$PRODUCT_OUT" && shasum -a 256 -c ftdv-review.sha256)
 ```
 
-`--version` is an equality check against the changelog, not an override. Unresolved FTDv/FMCv references block normal packaging; `--draft` permits clearly labelled local review output only. A verification report describes exact archive bytes and project-relative source, not IBM approval.
+`--version` checks equality with the changelog. Unresolved FTDv/FMCv references block normal packaging. Use `--draft` for labelled local review output. The verification report records the archive digest and project-relative source.
 
 ### Version and image maintenance
 
-Prepend each dated `version MAJOR.MINOR.PATCH` entry to the **top** of the module's `changelog.txt`. The builder reads the first entry and validates the entire history: unique, numerically descending three-component versions, valid English-month dates and a Changes heading. Length does not change selection. Suffixes such as `-v1` are not supported; agree the next IBM Software version before shipping a template-only revision.
+Prepend each new dated `version MAJOR.MINOR.PATCH` entry to the **top** of the module's `changelog.txt`. The builder reads the first entry and checks that versions are unique, numeric, and newest first. Each entry needs a valid English-month date and a Changes heading. When refreshing the same preview version, record the revision under its existing Changes heading and pass `--revision N` to the product's builder. It generates `PRODUCT-ibm-tf-SOFTWARE_VERSION-vN-HHMMSS-YYYYMMDD.tgz` and records the revision in the verification report. The Software version still comes from the changelog. Choose either `--revision` or `--filename` when customizing the name.
 
 Edit only the selected product's `solutions/PRODUCT-ibm-tf/PRODUCT-images.json` for compatible image-list changes:
 
@@ -96,34 +92,34 @@ IBM's onboarding guide asks for URLs to additional agreements customers must acc
 
 ## 2. Partner Center import and configuration
 
-1. Review/commit/push the source and curated product archive. Use its immutable raw URL or a GitHub Release asset URL; a GitHub `blob` URL serves HTML. An automatic whole-repository source archive is not the curated module payload.
-2. Download the chosen URL to a temporary directory and compare SHA-256. Record source commit, URL and digest. For private source, configure supported PAT/Secrets Manager access and assign a credential renewal owner; do not assume import removes future fetch requirements.
-3. Import into the corresponding **Software → Terraform** offering with the dotted changelog version. Enable the Terraform runtime override and select **1.13**. Verify the actual patch satisfies `version.tf` in Schematics logs; `TF_VERSION` is legacy metadata, not the executable selector.
+1. Build and check the curated archive on the review branch. Commit it with the source, checksum and verification report. Merge the approved PR to `cisco-secure-firewall-ibm-marketplace`, preserving those exact bytes. Keep past release archives and checksums available.
+2. After merge, generate the [Catalog handoff](publisher/README.md#catalog-handoff) from the integration commit that contains the reviewed archive. Download its commit-pinned raw URL to a temporary directory and compare its SHA-256 with the handoff before importing. Keep the commit reachable in integration history or through a protected release tag. Use feature-commit URLs only for pre-merge testing. For private source, configure supported PAT/Secrets Manager access and assign a credential renewal owner.
+3. Import into the corresponding **Software → Terraform** offering with the dotted changelog version. To refresh the same preview version, back up its saved form and refresh the source on its edit draft. Review the resulting configuration before validation. Enable the Terraform runtime override and select **1.13**. Verify the actual patch satisfies `version.tf` in Schematics logs. `TF_VERSION` is legacy metadata.
 4. Review required/sensitive/advanced inputs and output descriptions using the table below. Configure IAM requirements for the actual deployment identity.
 5. Preview rendered README/relative images, architecture media, documentation/support and legal terms. Maintain product/card/About/Pricing/BYOL fields separately; README/HCL does not automatically fill Partner Center marketing metadata. Each Terraform offer needs its reviewed BYOL plan and Software-version association. Current backing-image `plan_crn=null` behavior is separate from this UI configuration.
 6. Validate the exact imported archive and inspect logs/guest readiness. Complete applicable cost/compliance/requirements reviews before removing validation-owned resources. An old validation badge does not validate new archive bytes.
 
-Raw URL pattern after the archive is committed and pushed:
+Raw URL pattern after the PR merges:
 
 ```text
-https://raw.githubusercontent.com/CiscoDevNet/cisco-ftdv/COMMIT_SHA/ibm-mp-templates/tf-releases/PRODUCT/FILE.tgz
+https://raw.githubusercontent.com/CiscoDevNet/cisco-ftdv/INTEGRATION_COMMIT_SHA/ibm-mp-templates/tf-releases/PRODUCT/FILE.tgz
 ```
 
 ### Runtime and input configuration
 
 | Input/configuration | Review |
 |---|---|
-| `resource_group_name`, `vpc_id`, subnet/SG IDs | Required existing resources in the correct region/VPC/zone; RG name is not an RG ID. |
-| `ssh_key_id` | Required single string, no array or default account key. Guest user/key setup remains separate. |
-| `prefix` | Customer supplies a unique prefix; no random suffix. |
-| `PRODUCT_image_version` | Visible optional string; show the JSON default and retained label choices. Catalog does not synchronize them automatically. |
+| `resource_group_name`, `vpc_id`, subnet/SG IDs | Make these inputs required and clear account-specific defaults. Return the resource group name and a single resource ID for each VPC and subnet selection. Use text fields for security-group IDs. |
+| `ssh_key_id` | Require one VPC key ID from the deployment region. The picker can show keys from other regions. Guest user and key setup remain separate. |
+| Resource name prefix | Expose `resource_name_prefix` and retain `prefix` as a Terraform compatibility alias. An editable Catalog default can generate a five-character suffix for new installs. Preserve the effective prefix for existing deployments. |
+| `PRODUCT_image_version` | Use packaged image metadata for the default and supported labels. For one supported image, use a required text field with the packaged default and an exact-value constraint. |
 | `instance_profile`, `region`, `enable_secure_boot` | Review product/image and live placement compatibility; configured choices are not proof of exhaustive guest qualification. |
 | `user_data` | Optional sensitive/password input with a suitable secure multiline widget. Raw ASA text for ASAv; raw JSON object for FTDv/FMCv; never Base64. Secrets can remain in state. |
 | `create_management_floating_ip` | Default false. Before enabling, restrict SG/ACL/guest management access. |
 | Forwarding | Retain ASAv defaults and FTDv data spoofing true/filtering disabled. Management-only FMCv has no forwarding controls. A boot-only false override does not qualify forwarding. |
 | Internal compatibility controls | Keep `TF_VERSION` and metadata compatibility settings out of the normal form; avoid an unnecessary API-key override when runtime IAM is available. |
 
-Keep Terraform keys/types intact. The observed Software input editor did not provide a separate reliable friendly-name field; use clear descriptions and verify actual customer rendering. Imported form configuration and README prose do not automatically synchronize.
+Preserve compatibility when introducing a new Terraform key. Carry over compatible form settings from the previous version and verify actual customer rendering. Review the imported form configuration and use the [Catalog handoff](publisher/README.md#catalog-handoff) to generate the README override with commit-pinned links.
 
 ### Catalog IAM requirements
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from package_legal import LEGAL_FILES, legal_manifest, load_legal_files
+from package_naming import release_filename
 
 def files_for(product):
     if product not in ("ftdv", "fmcv"):
@@ -161,7 +162,7 @@ def check_source(source, product, *, draft=False):
     return catalog, links
 
 
-def build(source, output=None, version=None, *, product, filename=None, build_time=None, draft=False):
+def build(source, output=None, version=None, *, product, filename=None, revision=None, build_time=None, draft=False):
     FILES = files_for(product)
     source = source.resolve()
     output = (output if output is not None else PROJECT_ROOT / "tf-releases" / product).resolve()
@@ -184,12 +185,7 @@ def build(source, output=None, version=None, *, product, filename=None, build_ti
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Build time must include a timezone")
     local_time = now.astimezone(RELEASE_TIMEZONE)
-    if filename is None:
-        filename = ("DRAFT-" if draft else "") + product + "-ibm-tf-" + version.replace(".", "-") + local_time.strftime("-%H%M%S-%Y%m%d.tgz")
-    if len(filename) > 200 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.tgz", filename):
-        raise ValueError("--filename must be a basename ending in .tgz, using letters, digits, dots, underscores or hyphens")
-    if draft and not filename.startswith("DRAFT-"):
-        raise ValueError("Draft filenames must start DRAFT-")
+    filename = release_filename(product, version, local_time, filename=filename, revision=revision, draft=draft)
     stem = filename[:-4]
     output.mkdir(parents=True, exist_ok=True)
     archive, manifest = output / filename, output / (stem + ".verification.json")
@@ -216,7 +212,7 @@ def build(source, output=None, version=None, *, product, filename=None, build_ti
     verify_archive(archive, hashes)
     archive_hash = digest(archive.read_bytes())
     checksums.write_text(archive_hash + "  " + archive.name + "\n")
-    manifest.write_text(json.dumps({
+    report = {
         "created_at_utc": now.astimezone(timezone.utc).isoformat(),
         "build_time_local": local_time.isoformat(), "filename_timezone": "Asia/Kolkata",
         "status": "DRAFT_NOT_FOR_IBM_IMPORT" if draft else "local_candidate_not_uploaded_or_IBM_validated",
@@ -236,7 +232,10 @@ def build(source, output=None, version=None, *, product, filename=None, build_ti
         "packaged_image_labels": sorted(catalog["releases"]),
         "checks": ["single root/ directory", str(len(payload)) + "-file allowlist", "canonical repository LICENSE/NOTICE", "changelog version/date", "README sections", "JSON/reference format", "relative links", "archive round trip"],
         "limits": "Does not validate live IAM, image availability, guest readiness, provider updates, licensing or IBM approval.",
-    }, indent=2) + "\n")
+    }
+    if revision is not None:
+        report["artifact_revision"] = revision
+    manifest.write_text(json.dumps(report, indent=2) + "\n")
     return archive, checksums, manifest
 
 
@@ -246,13 +245,17 @@ def main(product=None):
         parser.add_argument("product", choices=("ftdv", "fmcv"))
     parser.add_argument("--source", type=Path)
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--filename", help="Custom .tgz basename")
+    naming = parser.add_mutually_exclusive_group()
+    naming.add_argument("--filename", help="Custom .tgz basename")
+    naming.add_argument("--revision", type=int, help="Positive archive revision number for the generated filename")
     parser.add_argument("--version", help="Must match the first/newest changelog entry")
     parser.add_argument("--draft", action="store_true", help="Build a labelled review artifact with unresolved Catalog references; not for IBM import")
     args = parser.parse_args()
     product = product or args.product
     try:
-        for path in build(args.source or PROJECT_ROOT / "solutions" / (product + "-ibm-tf"), args.output_dir, args.version, product=product, filename=args.filename, draft=args.draft):
+        source = args.source or PROJECT_ROOT / "solutions" / (product + "-ibm-tf")
+        for path in build(source, args.output_dir, args.version, product=product, filename=args.filename,
+                          revision=args.revision, draft=args.draft):
             print(path)
     except (ValueError, KeyError, TypeError, OSError, AttributeError) as error:
         parser.exit(1, "Package check failed: " + str(error) + "\n")

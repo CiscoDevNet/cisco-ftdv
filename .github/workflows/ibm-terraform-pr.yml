@@ -16,6 +16,11 @@ on:
       - 'LICENSE'
       - 'NOTICE'
   workflow_dispatch:
+    inputs:
+      release_base_ref:
+        type: string
+        description: Git ref or commit for checking changed releases against checkout source
+        required: false
 
 permissions:
   contents: read
@@ -42,11 +47,32 @@ jobs:
       - name: Checkout reviewed source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Run Python regression tests
         run: python3 -m unittest discover -s publisher/tests -p 'test_*.py'
-      - name: Verify retained archive triplets
-        run: python3 publisher/verify_releases.py
+      - name: Verify retained and changed archive triplets
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          MANUAL_BASE_REF: ${{ inputs.release_base_ref }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request) RELEASE_BASE="$PR_BASE_SHA" ;;
+            push) RELEASE_BASE="$PUSH_BEFORE_SHA" ;;
+            workflow_dispatch) RELEASE_BASE="$MANUAL_BASE_REF" ;;
+          esac
+          if [[ "$EVENT_NAME" == push && "$RELEASE_BASE" == 0000000000000000000000000000000000000000 ]]; then
+            echo "New branch push has no previous commit. Checking retained archive integrity only."
+            python3 publisher/verify_releases.py
+          elif [[ "$EVENT_NAME" == workflow_dispatch && -z "$RELEASE_BASE" ]]; then
+            echo "No manual release base supplied. Checking retained archive integrity only."
+            python3 publisher/verify_releases.py
+          else
+            python3 publisher/verify_releases.py --changed-since="$RELEASE_BASE"
+          fi
 
   terraform:
     name: Terraform mocks (${{ matrix.product }})

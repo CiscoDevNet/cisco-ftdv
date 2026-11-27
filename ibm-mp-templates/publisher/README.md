@@ -16,7 +16,7 @@ Checks build/extract into isolated temporary directories and run fmt/init/valida
 
 Initialization uses standard `terraform init` in the temporary extracted copy so Terraform can record the current platform’s provider content checksum after verifying the package against the committed checksums. The provider version remains pinned; source lock files and release archives are never modified by these checks. See [Terraform dependency lock files](https://developer.hashicorp.com/terraform/language/files/dependency-lock).
 
-Builders produce deterministic `root/` payloads containing 14 allowlisted module files plus the canonical repository `LICENSE` and `NOTICE` (16 files total). The legal text is read from repository root at build time; module directories do not maintain duplicate copies. New manifests hash both legal files and record their repository-relative origin. They validate changelog history, image references, relative links and round-trip hashes; reject unexpected files/symlinks; refuse overwrites; and write `.tgz`, `.sha256` and `.verification.json` under `tf-releases/PRODUCT/`. `--filename` customizes the basename; `--output-dir` changes the external destination; `--version` checks equality with the newest changelog entry. Every builder rejects output inside any deployment module under `solutions/`, including symlink aliases and custom-source descendants.
+Builders produce deterministic `root/` payloads containing 14 allowlisted module files plus the canonical repository `LICENSE` and `NOTICE` (16 files total). They read and hash both legal files from the repository root. Builders validate changelog history, image references, relative links, and round-trip hashes. They reject unexpected files and symlinks, refuse overwrites, and write `.tgz`, `.sha256`, and `.verification.json` under `tf-releases/PRODUCT/`. Use `--revision N` to append a package revision to the dotted Software version, or `--filename` for a custom basename. Both options are optional and mutually exclusive. Use `--output-dir` for an external destination and `--version` to check the newest changelog entry. Builders reject output inside deployment modules under `solutions/`.
 
 FTDv/FMCv share `package_product.py` and `check_product.py`, with small product wrappers. ASAv retains its existing builder and check runner so its release behavior remains independent. Each runner selects only its own Terraform tests. Unresolved FTDv/FMCv image references block a normal build; `--draft` permits a labelled local review archive whose filename must begin `DRAFT-`. Keep such drafts outside committed release folders. Reports describe local package checks, not IBM validation/approval.
 
@@ -42,7 +42,7 @@ FTDv/FMCv were source-qualified on 18 November 2026 with Terraform 1.13.5 / IBM 
 | Lifecycle | No-op/tags/FIP toggle and Day-0 VSI replacement | No-op/tags/FIP toggle |
 | Cleanup | Owned resources removed | Owned resources removed |
 
-These results do not establish Partner Center validation, all-profile/region coverage, image upgrades, FMCv VSI replacement, recovery, HA/performance or advanced threat qualification. ASAv deployment HCL and its historical submitted release are preserved from the merged base; a fresh candidate includes the approved README and packaging updates. This does not rerun or extend its historical cloud qualification. Keep detailed test logs, planning checklists and account/resource inventories outside public source.
+These results cover the recorded source tests. Validate the exact Partner Center archive separately. All-profile and all-region coverage, image upgrades, FMCv VSI replacement, recovery, HA, performance, and advanced threat qualification need separate tests. Keep detailed logs and account or resource inventories outside public source.
 
 FMCv VSI replacement, image migration and backup/restore recovery are explicitly excluded from the initial qualified scope. This does not remove the customer's need to establish backups.
 
@@ -50,12 +50,21 @@ See the [shared publisher guide](../SOFTWARE-TERRAFORM-PACKAGING.md).
 
 ## Pull request checks
 
-The repository workflow `IBM Terraform PR checks` runs on PRs targeting `cisco-secure-firewall-ibm-marketplace`, on relevant pushes to that branch, or by manual dispatch. It runs Python regression tests, verifies retained artifact triplets, and runs isolated fmt/init/validate/mock checks for all three products on Linux with Terraform1.13.5 and the committed provider lock files. Checkout is pinned to a full commit SHA with credentials persistence disabled; token permissions are read-only. No configured IBM credentials, PAT or cloud deployment secrets are required, and no live resources are created.
+The repository workflow `IBM Terraform PR checks` runs on PRs targeting `cisco-secure-firewall-ibm-marketplace`, on relevant pushes to that branch, or by manual dispatch. It runs Python regression tests, verifies retained artifact triplets, and runs isolated fmt/init/validate/mock checks for all three products on Linux with Terraform 1.13.5 and the committed provider lock files. Checkout uses a full commit SHA with credentials persistence disabled and read-only token permissions. The workflow uses mocks without IBM credentials or live resources.
 
-`python3 publisher/verify_releases.py` checks each retained TGZ against its own checksum/manifest. Historical release bytes remain valid when source documentation advances; this check does not claim that every historical archive equals current source or is IBM-validated. Build and validate the exact new candidate before onboarding it. Hosted workflow execution starts only after this workflow is pushed and a supported event occurs.
+`python3 publisher/verify_releases.py` checks each retained TGZ against its own checksum and manifest. Add `--changed-since origin/cisco-secure-firewall-ibm-marketplace` to also compare new or changed triplets against the module files and canonical `LICENSE` and `NOTICE` in your checkout. CI uses the PR base or previous push revision for this comparison when available. Retained releases keep their original payload when source advances.
 
-## ASAv candidate and pending Catalog update
+## Release artifacts
 
-The fresh ASAv candidate is [`asav-ibm-tf-9-2410-1-114026-20261119.tgz`](../tf-releases/asav/asav-ibm-tf-9-2410-1-114026-20261119.tgz), version **9.2410.1**, with 16 files including the approved README changes and canonical `LICENSE`/`NOTICE`. Its checksum and verification report are stored beside it. The historical submitted 14-file TGZ/checksum/report remain unchanged.
+Find retained archives, checksums, and verification reports in [`tf-releases/`](../tf-releases/). Use the module changelog for release history and the verification report for the exact archive filename and hash.
 
-**Still pending:** commit/push the reviewed candidate when authorized, import it through the supported Catalog draft/revision workflow, and rerun exact-archive Partner Center validation. A local build does not update the existing Catalog version or extend its prior validation. `verify_releases.py` keeps the Catalog-update reminder visible for the retained historical archive. New schema 2 archives include legal files and their provenance hashes.
+### Catalog handoff
+
+After the archive merges, refresh the local `origin/cisco-secure-firewall-ibm-marketplace` ref. Provide the exact integration commit and archive path relative to the Git repository root.
+
+```sh
+python3 publisher/prepare_catalog_handoff.py "$ARCHIVE_REPO_PATH" \
+  --commit "$INTEGRATION_COMMIT_SHA" --output /private/tmp/catalog-readme.md
+```
+
+The helper verifies the checked-out triplet against the commit and prints the commit-pinned raw URL and SHA-256. It writes the Catalog-ready README to a new temporary file, converting bundled relative links into commit-pinned GitHub links. Omit `--output` to print the README. Verify the downloaded archive against the digest before importing it. Follow the [Partner Center workflow](../SOFTWARE-TERRAFORM-PACKAGING.md#2-partner-center-import-and-configuration) for import and validation.
